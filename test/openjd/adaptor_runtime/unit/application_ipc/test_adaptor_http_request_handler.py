@@ -71,7 +71,7 @@ class TestPathMappingEndpoint:
             path_mapping_data={
                 "path_mapping_rules": [
                     {
-                        "source_os": "windows",
+                        "source_path_format": "windows",
                         "source_path": SOURCE_PATH,
                         "destination_os": "linux",
                         "destination_path": DEST_PATH,
@@ -104,7 +104,7 @@ class TestPathMappingRulesEndpoint:
         SOURCE_PATH = "Z:\\asset_storage1"
         DEST_PATH = "/mnt/shared/asset_storage1"
         rules = {
-            "source_os": "Windows",
+            "source_path_format": "Windows",
             "source_path": SOURCE_PATH,
             "destination_os": "Linux",
             "destination_path": DEST_PATH,
