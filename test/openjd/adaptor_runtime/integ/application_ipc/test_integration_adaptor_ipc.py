@@ -25,13 +25,13 @@ def adaptor():
 
     path_mapping_rules = [
         {
-            "source_os": "windows",
+            "source_path_format": "windows",
             "source_path": "Z:\\asset_storage1",
             "destination_os": "linux",
             "destination_path": "/mnt/shared/asset_storage1",
         },
         {
-            "source_os": "windows",
+            "source_path_format": "windows",
             "source_path": "🌚\\🌒\\🌓\\🌔\\🌝\\🌖\\🌗\\🌘\\🌚",
             "destination_os": "linux",
             "destination_path": "🌝/🌖/🌗/🌘/🌚/🌒/🌓/🌔/🌝",
