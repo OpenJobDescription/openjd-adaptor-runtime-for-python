@@ -57,13 +57,15 @@ class FrontendRunner:
         signal.signal(signal.SIGINT, self._sigint_handler)
         signal.signal(signal.SIGTERM, self._sigint_handler)
 
-    def init(self, adaptor_module: ModuleType, init_data: dict = {}) -> None:
+    def init(self, adaptor_module: ModuleType, init_data: dict = {}, path_mapping_data: dict = {}) -> None:
         """
         Creates the backend process then sends a heartbeat request to verify that it has started
         successfully.
 
         Args:
             adaptor_module (ModuleType): The module of the adaptor running the runtime.
+            init_data (dict): Data to pass to the adaptor during initialization.
+            path_mapping_data (dict): Path mapping rules to make available to the adaptor while it's running.
         """
         if adaptor_module.__package__ is None:
             raise Exception(f"Adaptor module is not a package: {adaptor_module}")
@@ -85,6 +87,8 @@ class FrontendRunner:
             self._connection_file_path,
             "--init-data",
             json.dumps(init_data),
+            "--path-mapping-rules",
+            json.dumps(path_mapping_data),
         ]
         try:
             process = subprocess.Popen(

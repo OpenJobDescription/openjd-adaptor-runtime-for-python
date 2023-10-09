@@ -205,7 +205,7 @@ class EntryPoint:
                             f"Adaptor module is not loaded: {self.adaptor_class.__module__}"
                         )
 
-                    frontend.init(adaptor_module, init_data)
+                    frontend.init(adaptor_module, init_data, path_mapping_data)
                     frontend.start()
                 elif subcommand == "run":
                     frontend.run(run_data)
@@ -266,7 +266,7 @@ class EntryPoint:
         )
 
         # "Hidden" command that actually runs the adaptor runtime in background mode
-        bg_subparser.add_parser("_serve", parents=[init_data, connection_file])
+        bg_subparser.add_parser("_serve", parents=[init_data, path_mapping_rules, connection_file])
 
         bg_subparser.add_parser("start", parents=[init_data, path_mapping_rules, connection_file])
         bg_subparser.add_parser("run", parents=[run_data, connection_file])
