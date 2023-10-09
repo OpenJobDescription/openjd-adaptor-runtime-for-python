@@ -57,7 +57,9 @@ class FrontendRunner:
         signal.signal(signal.SIGINT, self._sigint_handler)
         signal.signal(signal.SIGTERM, self._sigint_handler)
 
-    def init(self, adaptor_module: ModuleType, init_data: dict = {}, path_mapping_data: dict = {}) -> None:
+    def init(
+        self, adaptor_module: ModuleType, init_data: dict = {}, path_mapping_data: dict = {}
+    ) -> None:
         """
         Creates the backend process then sends a heartbeat request to verify that it has started
         successfully.

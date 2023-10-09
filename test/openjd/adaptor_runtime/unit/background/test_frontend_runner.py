@@ -1,5 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
+from __future__ import annotations
+
 import http.client as http_client
 import json
 import re
@@ -80,7 +82,7 @@ class TestFrontendRunner:
             adaptor_module.__package__ = "package"
             conn_file_path = "/path"
             init_data = {"init": "data"}
-            path_mapping_data = {}
+            path_mapping_data: dict = {}
             runner = FrontendRunner(conn_file_path)
 
             # WHEN
