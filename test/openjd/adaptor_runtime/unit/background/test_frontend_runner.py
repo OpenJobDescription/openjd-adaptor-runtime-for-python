@@ -80,10 +80,11 @@ class TestFrontendRunner:
             adaptor_module.__package__ = "package"
             conn_file_path = "/path"
             init_data = {"init": "data"}
+            path_mapping_data = {}
             runner = FrontendRunner(conn_file_path)
 
             # WHEN
-            runner.init(adaptor_module, init_data)
+            runner.init(adaptor_module, init_data, path_mapping_data)
 
             # THEN
             assert caplog.messages == [
@@ -104,6 +105,8 @@ class TestFrontendRunner:
                     conn_file_path,
                     "--init-data",
                     json.dumps(init_data),
+                    "--path-mapping-rules",
+                    json.dumps(path_mapping_data),
                 ],
                 shell=False,
                 close_fds=True,

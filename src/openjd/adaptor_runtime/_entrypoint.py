@@ -241,6 +241,7 @@ class EntryPoint:
         path_mapping_rules = ArgumentParser(add_help=False)
         path_mapping_rules.add_argument(
             "--path-mapping-rules",
+            default="",
             required=False,
             type=_load_data,
             help=_CLI_HELP_TEXT["path_mapping_rules"],
