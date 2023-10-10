@@ -415,7 +415,7 @@ class TestStart:
 
         # THEN
         _parse_args_mock.assert_called_once()
-        mock_magic_init.assert_called_once_with(mock_adaptor_module, {})
+        mock_magic_init.assert_called_once_with(mock_adaptor_module, {}, {})
         mock_magic_start.assert_called_once_with(conn_file)
         mock_start.assert_called_once_with()
 
