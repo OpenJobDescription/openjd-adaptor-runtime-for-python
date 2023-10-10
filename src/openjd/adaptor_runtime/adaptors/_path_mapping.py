@@ -45,13 +45,13 @@ class PathMappingRule:
     def __init__(
         self,
         *,
-        source_os: str,
+        source_path_format: str,
         source_path: str,
         destination_path: str,
         destination_os: str = OSName(),
     ):
         for label, value in (
-            ("source_os", source_os),
+            ("source_path_format", source_path_format),
             ("source_path", source_path),
             ("destination_path", destination_path),
         ):
@@ -60,8 +60,10 @@ class PathMappingRule:
 
         self.source_path: str = source_path
         self.destination_path: str = destination_path
-        self._source_os: str = OSName(source_os)  # Raises ValueError if not valid OS
-        self._is_windows_source: bool = OSName.is_windows(self._source_os)
+        self._source_path_format: str = OSName(
+            source_path_format
+        )  # Raises ValueError if not valid OS
+        self._is_windows_source: bool = OSName.is_windows(self._source_path_format)
 
         self._destination_os: str = OSName(destination_os)  # Raises ValueError if not valid OS
         self._is_windows_destination: bool = OSName.is_windows(self._destination_os)
@@ -91,13 +93,23 @@ class PathMappingRule:
         if not rule:
             raise ValueError("Empty path mapping rule")
 
+        # TODO - DELETE ONCE MIGRATION COMPLETE
+        # The field "source_os" was renamed to "source_path_format", but interfaces may still
+        # provide the old name until they're updated. Remove once we're sure all interfaces are
+        # updated.
+        if "source_os" in rule:
+            new_rule = dict(**rule)
+            new_rule["source_path_format"] = new_rule["source_os"]
+            del new_rule["source_os"]
+            rule = new_rule
+        # END TODO
         return PathMappingRule(**rule)
 
     def to_dict(self) -> dict[str, str]:
         """Builds a PathMappingRule given a dict with the fields required by __init__
         raises TypeError, ValueError: if rule is None, an empty dict, or nonvalid"""
         return {
-            "source_os": self._source_os,
+            "source_path_format": self._source_path_format,
             "source_path": self.source_path,
             "destination_os": self._destination_os,
             "destination_path": self.destination_path,

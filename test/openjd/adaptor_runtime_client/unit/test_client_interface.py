@@ -96,7 +96,7 @@ class TestClientInterface:
             (
                 [
                     {
-                        "source_os": "one",
+                        "source_path_format": "one",
                         "source_path": "here",
                         "destination_os": "two",
                         "destination_path": "there",

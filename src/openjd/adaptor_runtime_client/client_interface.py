@@ -33,7 +33,7 @@ _REQUEST_TIMEOUT = None
 # due to some applications running an older Python version that can't import newer typing
 @_dataclass
 class PathMappingRule:
-    source_os: str
+    source_path_format: str
     source_path: str
     destination_path: str
     destination_os: str
