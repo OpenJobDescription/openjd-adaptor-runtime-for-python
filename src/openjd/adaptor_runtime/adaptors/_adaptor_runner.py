@@ -81,6 +81,4 @@ class AdaptorRunner(AdaptorStates):
 
 
 def _fail(reason: str):
-    # TODO: Add a way to output "system" messages that ignore logging configuration.
-    # We don't ever want this message to get filtered out by Python's logging library.
     _logger.error(f"{_OPENJD_FAIL_STDOUT_PREFIX}{reason}")
