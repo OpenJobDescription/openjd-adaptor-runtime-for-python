@@ -20,6 +20,10 @@ from .adaptors.configuration import (
     ConfigurationManager,
 )
 from ._osname import OSName
+from ._utils._logging import (
+    _OPENJD_LOG_REGEX,
+    ConditionalFormatter,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .adaptors.configuration import AdaptorConfiguration
@@ -92,7 +96,9 @@ class EntryPoint:
         """
         Starts the run of the adaptor.
         """
-        formatter = logging.Formatter("%(levelname)s: %(message)s")
+        formatter = ConditionalFormatter(
+            "%(levelname)s: %(message)s", ignore_patterns=[_OPENJD_LOG_REGEX]
+        )
         stream_handler = logging.StreamHandler(sys.stdout)
         stream_handler.setFormatter(formatter)
 
