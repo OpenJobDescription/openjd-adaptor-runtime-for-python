@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import platform
+from typing import Optional
 
 
 class OSName(str):
@@ -40,15 +41,18 @@ class OSName(str):
         return OSName.resolve_os_name(name) == OSName.MACOS
 
     @staticmethod
-    def is_windows(name: str) -> bool:
+    def is_windows(name: Optional[str] = None) -> bool:
+        name = OSName._get_os_name() if name is None else name
         return OSName.resolve_os_name(name) == OSName.WINDOWS
 
     @staticmethod
-    def is_linux(name: str) -> bool:
+    def is_linux(name: Optional[str] = None) -> bool:
+        name = OSName._get_os_name() if name is None else name
         return OSName.resolve_os_name(name) == OSName.LINUX
 
     @staticmethod
-    def is_posix(name: str) -> bool:
+    def is_posix(name: Optional[str] = None) -> bool:
+        name = OSName._get_os_name() if name is None else name
         return (
             OSName.resolve_os_name(name) == OSName.POSIX
             or OSName.is_macos(name)
