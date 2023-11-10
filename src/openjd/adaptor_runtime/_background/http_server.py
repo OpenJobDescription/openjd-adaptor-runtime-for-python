@@ -4,27 +4,16 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import socketserver
-import time
-from concurrent.futures import Future
-from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from queue import Queue
 from typing import Callable
-
 from .._osname import OSName
-from ..adaptors._adaptor_runner import _OPENJD_FAIL_STDOUT_PREFIX
+from .server_response import ServerResponseGenerator, AsyncFutureRunner
 from ..adaptors import AdaptorRunner
 from .._http import HTTPResponse, RequestHandler, ResourceRequestHandler
 from .log_buffers import LogBuffer
-from .model import (
-    AdaptorState,
-    AdaptorStatus,
-    BufferedOutput,
-    DataclassJSONEncoder,
-    HeartbeatResponse,
-)
+
 
 if OSName.is_windows():
     # TODO: This is for avoid type errors when enabling Github CI in Windows
@@ -34,42 +23,6 @@ else:
     from socketserver import UnixStreamServer  # type: ignore
 
 _logger = logging.getLogger(__name__)
-
-
-class AsyncFutureRunner:
-    """
-    Class that models an asynchronous worker thread using concurrent.futures.
-    """
-
-    _WAIT_FOR_START_INTERVAL = 0.01
-
-    def __init__(self) -> None:
-        self._thread_pool = ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="AdaptorRuntimeBackendWorkerThread"
-        )
-        self._future: Future | None = None
-
-    def submit(self, fn: Callable, *args, **kwargs) -> None:
-        if self.is_running:
-            raise Exception("Cannot submit new task while another task is running")
-        self._future = self._thread_pool.submit(fn, *args, **kwargs)
-
-    @property
-    def is_running(self) -> bool:
-        if self._future is None:
-            return False
-        return self._future.running()
-
-    @property
-    def has_started(self) -> bool:
-        if self._future is None:
-            return False  # pragma: no cover
-        return self._future.running() or self._future.done()
-
-    def wait_for_start(self):
-        """Blocks until the Future has started"""
-        while not self.has_started:
-            time.sleep(self._WAIT_FOR_START_INTERVAL)
 
 
 class BackgroundHTTPServer(UnixStreamServer):
@@ -166,44 +119,30 @@ class BackgroundResourceRequestHandler(ResourceRequestHandler):
 
         return self.handler.server
 
+    @property
+    def server_response(self):
+        """
+        This property is similar to the server property. self.body variable is not set until the
+        init method is called.
+        """
+        if not hasattr(self, "_server_response"):
+            body = json.loads(self.body.decode(encoding="utf-8")) if self.body else {}
+            self._server_response = ServerResponseGenerator(
+                self.server, HTTPResponse, body, self.query_string_params
+            )
+        return self._server_response
+
 
 class HeartbeatHandler(BackgroundResourceRequestHandler):
     """
     Handler for the heartbeat resource
     """
 
-    # Failure messages are in the form: "<log-level>: openjd_fail: <message>"
-    _FAILURE_REGEX = f"^(?:\\w+: )?{re.escape(_OPENJD_FAIL_STDOUT_PREFIX)}"
-    _ACK_ID_KEY = "ack_id"
-
     path: str = "/heartbeat"
+    _ACK_ID_KEY = ServerResponseGenerator.ACK_ID_KEY
 
     def get(self) -> HTTPResponse:
-        failed = False
-        if not self.server._log_buffer:
-            output = BufferedOutput(BufferedOutput.EMPTY, "")
-        else:
-            # Check for chunk ID ACKs
-            ack_id = self._parse_ack_id()
-            if ack_id:
-                if self.server._log_buffer.clear(ack_id):
-                    _logger.debug(f"Received ACK for chunk: {ack_id}")
-                else:
-                    _logger.warning(f"Received ACK for old or invalid chunk: {ack_id}")
-
-            output = self.server._log_buffer.chunk()
-
-            if re.search(self._FAILURE_REGEX, output.output, re.MULTILINE):
-                failed = True
-
-        status = (
-            AdaptorStatus.WORKING if self.server._future_runner.is_running else AdaptorStatus.IDLE
-        )
-
-        heartbeat = HeartbeatResponse(
-            state=self.server._adaptor_runner.state, status=status, output=output, failed=failed
-        )
-        return HTTPResponse(HTTPStatus.OK, json.dumps(heartbeat, cls=DataclassJSONEncoder))
+        return self.server_response.generate_heartbeat_get_response(self._parse_ack_id)
 
     def _parse_ack_id(self) -> str | None:
         """
@@ -228,8 +167,7 @@ class ShutdownHandler(BackgroundResourceRequestHandler):
     path: str = "/shutdown"
 
     def put(self) -> HTTPResponse:
-        self.server._cancel_queue.put(True)
-        return HTTPResponse(HTTPStatus.OK)
+        return self.server_response.generate_shutdown_put_response()
 
 
 class RunHandler(BackgroundResourceRequestHandler):
@@ -240,15 +178,7 @@ class RunHandler(BackgroundResourceRequestHandler):
     path: str = "/run"
 
     def put(self) -> HTTPResponse:
-        if self.server._future_runner.is_running:
-            return HTTPResponse(HTTPStatus.BAD_REQUEST)
-
-        run_data: dict = json.loads(self.body.decode(encoding="utf-8")) if self.body else {}
-
-        return self.server.submit(
-            self.server._adaptor_runner._run,
-            run_data,
-        )
+        return self.server_response.generate_run_put_response()
 
 
 class StartHandler(BackgroundResourceRequestHandler):
@@ -259,10 +189,7 @@ class StartHandler(BackgroundResourceRequestHandler):
     path: str = "/start"
 
     def put(self) -> HTTPResponse:
-        if self.server._future_runner.is_running:
-            return HTTPResponse(HTTPStatus.BAD_REQUEST)
-
-        return self.server.submit(self.server._adaptor_runner._start)
+        return self.server_response.generate_start_put_response()
 
 
 class StopHandler(BackgroundResourceRequestHandler):
@@ -273,17 +200,7 @@ class StopHandler(BackgroundResourceRequestHandler):
     path: str = "/stop"
 
     def put(self) -> HTTPResponse:
-        if self.server._future_runner.is_running:
-            return HTTPResponse(HTTPStatus.BAD_REQUEST)
-
-        return self.server.submit(self._stop_adaptor)
-
-    def _stop_adaptor(self):  # pragma: no cover
-        try:
-            self.server._adaptor_runner._stop()
-            _logger.info("Daemon background process stopped.")
-        finally:
-            self.server._adaptor_runner._cleanup()
+        return self.server_response.generate_stop_put_response()
 
 
 class CancelHandler(BackgroundResourceRequestHandler):
@@ -294,13 +211,4 @@ class CancelHandler(BackgroundResourceRequestHandler):
     path: str = "/cancel"
 
     def put(self) -> HTTPResponse:
-        if not (
-            self.server._future_runner.is_running
-            and self.server._adaptor_runner.state in [AdaptorState.START, AdaptorState.RUN]
-        ):
-            return HTTPResponse(HTTPStatus.OK, body="No action required")
-
-        return self.server.submit(
-            self.server._adaptor_runner._cancel,
-            force_immediate=True,
-        )
+        return self.server_response.generate_cancel_put_response()

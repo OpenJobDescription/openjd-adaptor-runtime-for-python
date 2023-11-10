@@ -9,11 +9,10 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-import openjd.adaptor_runtime._background.http_server as http_server
+from openjd.adaptor_runtime._background import server_response, http_server
 from openjd.adaptor_runtime.adaptors import AdaptorRunner
 from openjd.adaptor_runtime.adaptors._adaptor_runner import _OPENJD_FAIL_STDOUT_PREFIX
 from openjd.adaptor_runtime._background.http_server import (
-    AsyncFutureRunner,
     BackgroundHTTPServer,
     BackgroundRequestHandler,
     BackgroundResourceRequestHandler,
@@ -23,6 +22,9 @@ from openjd.adaptor_runtime._background.http_server import (
     RunHandler,
     ShutdownHandler,
     StartHandler,
+)
+from openjd.adaptor_runtime._background.server_response import (
+    AsyncFutureRunner,
     ThreadPoolExecutor,
 )
 from openjd.adaptor_runtime._background.log_buffers import InMemoryLogBuffer
@@ -134,7 +136,7 @@ class TestAsyncFutureRunner:
         if not running:
             mock_future.done.assert_called_once()
 
-    @patch.object(http_server.time, "sleep")
+    @patch.object(server_response.time, "sleep")
     @patch.object(AsyncFutureRunner, "has_started", new_callable=PropertyMock)
     def test_wait_for_start(self, mock_has_started, mock_sleep):
         # GIVEN
@@ -278,6 +280,8 @@ class TestHeartbeatHandler:
         mock_server._adaptor_runner.state = AdaptorState.NOT_STARTED
 
         fake_request_handler.server = mock_server
+        fake_request_handler.headers = {"Content-Length": 0}  # type: ignore
+        fake_request_handler.path = ""
         handler = HeartbeatHandler(fake_request_handler)
 
         # WHEN
@@ -321,6 +325,8 @@ class TestHeartbeatHandler:
         mock_server._adaptor_runner.state = AdaptorState.RUN
 
         fake_request_handler.server = mock_server
+        fake_request_handler.headers = {"Content-Length": 0}  # type: ignore
+        fake_request_handler.path = ""
         handler = HeartbeatHandler(fake_request_handler)
 
         # WHEN
@@ -377,6 +383,8 @@ class TestHeartbeatHandler:
         mock_server._adaptor_runner.state = AdaptorState.RUN
 
         fake_request_handler.server = mock_server
+        fake_request_handler.headers = {"Content-Length": 0}  # type: ignore
+        fake_request_handler.path = ""
         handler = HeartbeatHandler(fake_request_handler)
 
         # WHEN
@@ -431,6 +439,9 @@ class TestHeartbeatHandler:
         mock_server._adaptor_runner.state = AdaptorState.RUN
 
         fake_request_handler.server = mock_server
+        fake_request_handler.headers = {"Content-Length": 0}  # type: ignore
+        fake_request_handler.path = ""
+
         handler = HeartbeatHandler(fake_request_handler)
 
         # WHEN
@@ -546,6 +557,8 @@ class TestShutdownHandler:
         mock_cancel_queue = MagicMock(spec=Queue)
         mock_server._cancel_queue = mock_cancel_queue
         mock_request_handler.server = mock_server
+        mock_request_handler.headers = {"Content-Length": 0}
+        mock_request_handler.path = ""
         handler = ShutdownHandler(mock_request_handler)
 
         # WHEN
@@ -563,7 +576,8 @@ class TestRunHandler:
     """
 
     @patch("json.loads")
-    def test_submits_adaptor_run_to_worker(self, mock_loads: MagicMock):
+    @patch.object(http_server.ServerResponseGenerator, "submit")
+    def test_submits_adaptor_run_to_worker(self, mock_submit: MagicMock, mock_loads: MagicMock):
         # GIVEN
         content_length = 123
         run_data = {"run": "data"}
@@ -579,6 +593,7 @@ class TestRunHandler:
         mock_handler = MagicMock()
         mock_handler.headers = {"Content-Length": str(content_length)}
         mock_handler.rfile.read.return_value = str_run_data.encode("utf-8")
+        mock_handler.path = ""
         mock_handler.server = mock_server
         handler = RunHandler(mock_handler)
 
@@ -588,11 +603,11 @@ class TestRunHandler:
         # THEN
         mock_handler.rfile.read.assert_called_once_with(content_length)
         mock_loads.assert_called_once_with(str_run_data)
-        mock_server.submit.assert_called_once_with(
+        mock_submit.assert_called_once_with(
             mock_server._adaptor_runner._run,
             run_data,
         )
-        assert result is mock_server.submit.return_value
+        assert result is mock_submit.return_value
 
     def test_returns_400_if_busy(self):
         # GIVEN
@@ -603,6 +618,9 @@ class TestRunHandler:
 
         mock_handler = MagicMock()
         mock_handler.server = mock_server
+        mock_handler.headers = {"Content-Length": 0}
+        mock_handler.path = ""
+
         handler = RunHandler(mock_handler)
 
         # WHEN
@@ -617,25 +635,28 @@ class TestStartHandler:
     Tests for the StartHandler class
     """
 
-    def test_put_starts_adaptor_runner(self):
+    @patch.object(http_server.ServerResponseGenerator, "submit")
+    def test_put_starts_adaptor_runner(self, mock_submit: MagicMock):
         # GIVEN
         mock_request_handler = MagicMock()
         mock_server = MagicMock(spec=BackgroundHTTPServer)
         mock_server._adaptor_runner = MagicMock(spec=AdaptorRunner)
         mock_request_handler.server = mock_server
+        mock_request_handler.headers = {"Content-Length": 0}
+        mock_request_handler.path = ""
 
         mock_future_runner = MagicMock()
         mock_future_runner.is_running = False
         mock_server._future_runner = mock_future_runner
-
         handler = StartHandler(mock_request_handler)
 
         # WHEN
         response = handler.put()
 
         # THEN
-        mock_server.submit.assert_called_once_with(mock_server._adaptor_runner._start)
-        assert response is mock_server.submit.return_value
+
+        mock_submit.assert_called_once_with(mock_server._adaptor_runner._start)
+        assert response is mock_submit.return_value
 
     def test_returns_400_if_busy(self):
         # GIVEN
@@ -646,6 +667,8 @@ class TestStartHandler:
 
         mock_handler = MagicMock()
         mock_handler.server = mock_server
+        mock_handler.headers = {"Content-Length": 0}
+        mock_handler.path = ""
         handler = StartHandler(mock_handler)
 
         # WHEN
@@ -660,12 +683,15 @@ class TestStopHandlerr:
     Tests for the StopHandler class
     """
 
-    def test_put_ends_adaptor_runner(self):
+    @patch.object(http_server.ServerResponseGenerator, "submit")
+    def test_put_ends_adaptor_runner(self, mock_submit: MagicMock):
         # GIVEN
         mock_request_handler = MagicMock()
         mock_server = MagicMock(spec=BackgroundHTTPServer)
         mock_server._adaptor_runner = MagicMock(spec=AdaptorRunner)
         mock_request_handler.server = mock_server
+        mock_request_handler.headers = {"Content-Length": 0}
+        mock_request_handler.path = ""
 
         mock_future_runner = MagicMock()
         mock_future_runner.is_running = False
@@ -677,8 +703,8 @@ class TestStopHandlerr:
         response = handler.put()
 
         # THEN
-        mock_server.submit.assert_called_once_with(handler._stop_adaptor)
-        assert response is mock_server.submit.return_value
+        mock_submit.assert_called_once_with(handler.server_response._stop_adaptor)
+        assert response is mock_submit.return_value
 
     def test_returns_400_if_busy(self):
         # GIVEN
@@ -689,6 +715,8 @@ class TestStopHandlerr:
 
         mock_handler = MagicMock()
         mock_handler.server = mock_server
+        mock_handler.headers = {"Content-Length": 0}
+        mock_handler.path = ""
         handler = StopHandler(mock_handler)
 
         # WHEN
@@ -703,13 +731,16 @@ class TestCancelHandler:
     Tests for the CancelHandler class
     """
 
-    def test_put_cancels_adaptor_runner(self):
+    @patch.object(http_server.ServerResponseGenerator, "submit")
+    def test_put_cancels_adaptor_runner(self, mock_submit: MagicMock):
         # GIVEN
         mock_request_handler = MagicMock()
         mock_server = MagicMock(spec=BackgroundHTTPServer)
         mock_server._adaptor_runner = MagicMock(spec=AdaptorRunner)
         mock_server._adaptor_runner.state = AdaptorState.RUN
         mock_request_handler.server = mock_server
+        mock_request_handler.headers = {"Content-Length": 0}
+        mock_request_handler.path = ""
 
         mock_future_runner = MagicMock()
         mock_future_runner.is_running = True
@@ -721,11 +752,11 @@ class TestCancelHandler:
         response = handler.put()
 
         # THEN
-        mock_server.submit.assert_called_once_with(
+        mock_submit.assert_called_once_with(
             mock_server._adaptor_runner._cancel,
             force_immediate=True,
         )
-        assert response is mock_server.submit.return_value
+        assert response is mock_submit.return_value
 
     def test_returns_immediately_if_future_not_running(self):
         # GIVEN
@@ -735,6 +766,8 @@ class TestCancelHandler:
         mock_server._future_runner = mock_future_runner
 
         mock_handler = MagicMock()
+        mock_handler.headers = {"Content-Length": 0}
+        mock_handler.path = ""
         mock_handler.server = mock_server
         handler = CancelHandler(mock_handler)
 
@@ -767,6 +800,8 @@ class TestCancelHandler:
         mock_server._adaptor_runner = mock_adaptor_runner
 
         mock_handler = MagicMock()
+        mock_handler.headers = {"Content-Length": 0}
+        mock_handler.path = ""
         mock_handler.server = mock_server
         handler = CancelHandler(mock_handler)
 
