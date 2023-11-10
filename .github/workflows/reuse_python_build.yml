@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11']
-        os: [ubuntu-latest]
+        os: ["ubuntu-latest", "windows-latest"]
     env:
       PYTHON: ${{ matrix.python-version }}
       CODEARTIFACT_REGION: "us-west-2"
@@ -49,16 +49,30 @@ jobs:
         mask-aws-account-id: true
 
     - name: Setup CodeArtifact Linux
+      if: ${{ matrix.os == 'ubuntu-latest'}}
       run: |
         CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain ${{ secrets.CODEARTIFACT_DOMAIN }} --domain-owner ${{ secrets.CODEARTIFACT_ACCOUNT_ID }} --query authorizationToken --output text --region us-west-2)
         echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
         echo CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN >> $GITHUB_ENV
-        
+
+    - name: CodeArtifact Setup Windows
+      if: ${{ matrix.os == 'windows-latest'}}
+      run: |
+        $CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain ${{ secrets.CODEARTIFACT_DOMAIN }} --domain-owner ${{ secrets.CODEARTIFACT_ACCOUNT_ID }} --query authorizationToken --output text --region us-west-2)
+        echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
+        echo CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN >> $env:GITHUB_ENV
+
     - name: Install Dependencies
       run: pip install --upgrade -r requirements-development.txt
 
     - name: Run Linting
+      if: ${{ matrix.os == 'ubuntu-latest'}}
       run: hatch run lint
 
-    - name: Run Tests
+    - name: Run Tests Linux
+      if: ${{ matrix.os == 'ubuntu-latest'}}
       run: hatch run test
+
+    - name: Run Tests Windows
+      if: ${{ matrix.os == 'windows-latest'}}
+      run: hatch run test-windows
