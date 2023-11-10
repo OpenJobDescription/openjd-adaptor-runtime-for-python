@@ -8,17 +8,24 @@ import socketserver
 from http import HTTPStatus
 from queue import Queue
 from typing import Callable
-
+from .._osname import OSName
 from .server_response import ServerResponseGenerator, AsyncFutureRunner
 from ..adaptors import AdaptorRunner
 from .._http import HTTPResponse, RequestHandler, ResourceRequestHandler
 from .log_buffers import LogBuffer
 
 
+if OSName.is_windows():
+    # TODO: This is for avoid type errors when enabling Github CI in Windows
+    #   need to clear this up before GA
+    from socketserver import TCPServer as UnixStreamServer  # type: ignore
+else:
+    from socketserver import UnixStreamServer  # type: ignore
+
 _logger = logging.getLogger(__name__)
 
 
-class BackgroundHTTPServer(socketserver.UnixStreamServer):
+class BackgroundHTTPServer(UnixStreamServer):
     """
     HTTP server for the background mode of the adaptor runtime communicating via Unix socket.
 
@@ -34,7 +41,7 @@ class BackgroundHTTPServer(socketserver.UnixStreamServer):
         log_buffer: LogBuffer | None = None,
         bind_and_activate: bool = True,
     ) -> None:  # pragma: no cover
-        super().__init__(socket_path, BackgroundRequestHandler, bind_and_activate)
+        super().__init__(socket_path, BackgroundRequestHandler, bind_and_activate)  # type: ignore
         self._adaptor_runner = adaptor_runner
         self._cancel_queue = cancel_queue
         self._future_runner = AsyncFutureRunner()
