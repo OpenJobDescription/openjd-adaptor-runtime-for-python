@@ -71,7 +71,9 @@ _RUNTIME_CONFIG_PATHS: dict[Any, Any] = {
                 "runtime",
                 "configuration.json",
             )
-        )
+        ),
+        # TODO: Replace this with a proper path
+        "Windows": r"C:/tmp/configuration.json",
     },
     "user_config_rel_path": os.path.join(
         ".openjd", "worker", "adaptors", "runtime", "configuration.json"
@@ -162,8 +164,11 @@ class EntryPoint:
         if command == "run":
             self._adaptor_runner = AdaptorRunner(adaptor=adaptor)
             # To be able to handle cancelation via a SIGTERM/SIGINT
-            signal.signal(signal.SIGINT, self._sigint_handler)
-            signal.signal(signal.SIGTERM, self._sigint_handler)
+            # TODO: Signal handler needed to be checked in Windows
+            #  The current plan is to use CTRL_BREAK.
+            if OSName.is_posix():
+                signal.signal(signal.SIGINT, self._sigint_handler)
+                signal.signal(signal.SIGTERM, self._sigint_handler)
             try:
                 self._adaptor_runner._start()
                 self._adaptor_runner._run(run_data)

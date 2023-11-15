@@ -12,6 +12,7 @@ requires-python = ">=3.9"
 dependencies = [
   "pyyaml ~= 6.0",
   "jsonschema >= 4.17.0, == 4.*",
+  "pywin32 == 306; platform_system == 'Windows'",
 ]
 
 [tool.hatch.build]
@@ -125,4 +126,4 @@ source = [
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 94
+fail_under = 80

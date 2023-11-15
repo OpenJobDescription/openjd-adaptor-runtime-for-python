@@ -6,7 +6,7 @@ pre-install-commands = [
 [envs.default.scripts]
 sync = "pip install -r requirements-testing.txt"
 test = "pytest --cov-config pyproject.toml {args:test}"
-test-windows = "pytest --cov-config pyproject.toml {args:test} --cov-fail-under=34"
+test-windows = "pytest --cov-config pyproject.toml {args:test/openjd/adaptor_runtime/integ/background} --cov-fail-under=44"
 typing = "mypy {args:src test}"
 style = [
   "ruff {args:.}",

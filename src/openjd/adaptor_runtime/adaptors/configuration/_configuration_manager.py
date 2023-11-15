@@ -61,7 +61,9 @@ def create_adaptor_configuration_manager(
                 adaptor_name,
                 f"{adaptor_name}.json",
             )
-        )
+        ),
+        # TODO: Confirm the windows path format
+        "Windows": f"C:/tmp/{adaptor_name}/{adaptor_name}.json",
     }
     user_config_rel_path = os.path.join(".openjd", "adaptors", adaptor_name, f"{adaptor_name}.json")
 
