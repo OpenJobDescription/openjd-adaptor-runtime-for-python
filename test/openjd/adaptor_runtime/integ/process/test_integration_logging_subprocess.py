@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 import time
 from logging import DEBUG
 from unittest import mock
@@ -38,18 +39,19 @@ class TestIntegrationLoggingSubprocess(object):
         Testing that we stop the process immediately and after SIGTERM fails.
         """
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "no_sigterm.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "signals_test.py"
         )
         caplog.set_level(DEBUG)
-        p = LoggingSubprocess(args=[test_file])
+        p = LoggingSubprocess(args=[sys.executable, test_file, "False"])
 
         # This is because we are giving the subprocess time to load and
         # register the sigterm signal handler with the OS.
-        while "Starting no_sigterm.sh Script" not in caplog.text:
-            True
+        while "Starting signals_test.py Script" not in caplog.text:
+            time.sleep(0.2)
 
         p.terminate(grace_period)
 
+        assert "Starting signals_test.py Script" in caplog.text
         for output in expected_output:
             assert output in caplog.text
 
@@ -60,14 +62,14 @@ class TestIntegrationLoggingSubprocess(object):
         when SIGTERM was sent and SIGKILL was not needed.
         """
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "print_signals.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "signals_test.py"
         )
         caplog.set_level(DEBUG)
-        p = LoggingSubprocess(args=[test_file])
+        p = LoggingSubprocess(args=[sys.executable, test_file, "True"])
 
         # This is because we are giving the subprocess time to load and ignore the sigterm signal.
-        while "Starting print_signals.sh Script" not in caplog.text:
-            True
+        while "Starting signals_test.py Script" not in caplog.text:
+            time.sleep(0.2)
 
         p.terminate(5)  # Sometimes, when this is 1 second the process doesn't terminate in time.
 
@@ -75,7 +77,7 @@ class TestIntegrationLoggingSubprocess(object):
             "Sending the SIGTERM signal to pid=" in caplog.text
         )  # Asserting the SIGTERM signal was sent to the subprocess
         assert (
-            "Trapped: TERM" in caplog.text
+            "Trapped: SIGTERM" in caplog.text
         )  # Asserting the SIGTERM was received by the subprocess.
         assert (
             "now sending the SIGKILL signal." not in caplog.text
@@ -120,11 +122,11 @@ class TestIntegrationLoggingSubprocess(object):
         message = "Hello World"
 
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
         )
         # WHEN
         p = LoggingSubprocess(
-            args=[test_file, message, "1"],
+            args=[sys.executable, test_file, message, "1"],
         )
         p.wait()
 
@@ -157,17 +159,19 @@ class TestIntegrationRegexHandler(object):
         regex_callbacks = [RegexCallback([regex], callback)]
         regex_handler = RegexHandler(regex_callbacks)
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
         )
         # WHEN
         p = LoggingSubprocess(
-            args=[test_file, output, str(echo_count)],
+            args=[sys.executable, test_file, output, str(echo_count)],
             stdout_handler=regex_handler if stdout else None,
             stderr_handler=regex_handler if stderr else None,
         )
         p.wait()
         time.sleep(0.01)  # magic sleep - logging handler has a delay and test can exit too fast
-
+        print(
+            [sys.executable, test_file, output, str(echo_count)],
+        )
         # THEN
         assert callback.call_count == echo_count * (stdout + stderr)
         assert all(c[0][0].re == regex for c in callback.call_args_list)
@@ -198,7 +202,7 @@ class TestIntegrationRegexHandler(object):
         stderr_handlers = regex_handlers[num_procs:]
 
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
         )
 
         # WHEN
@@ -206,7 +210,7 @@ class TestIntegrationRegexHandler(object):
         for i in range(num_procs):
             procs.append(
                 LoggingSubprocess(
-                    args=[test_file, output, str(echo_count)],
+                    args=[sys.executable, test_file, output, str(echo_count)],
                     stdout_handler=stdout_handlers[i],
                     stderr_handler=stderr_handlers[i],
                 )
