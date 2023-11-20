@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import time
 from logging import INFO
 from typing import List
@@ -59,12 +60,13 @@ class TestIntegrationRegexHandlerManagedProcess(object):
         # GIVEN
         class FakeManagedProcess(ManagedProcess):
             def get_executable(self) -> str:
-                return os.path.join(
-                    os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
-                )
+                return sys.executable
 
             def get_arguments(self) -> List[str]:
-                return [output, str(echo_count)]
+                test_file = os.path.join(
+                    os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
+                )
+                return [test_file, output, str(echo_count)]
 
             def get_startup_directory(self) -> str | None:
                 return None
