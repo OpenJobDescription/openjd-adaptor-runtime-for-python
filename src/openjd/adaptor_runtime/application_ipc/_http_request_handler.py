@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from http import HTTPStatus
-from time import sleep
 from typing import TYPE_CHECKING
 from typing import Optional
 
+from ._adaptor_server_response import AdaptorServerResponseGenerator
 from .._http import HTTPResponse, RequestHandler, ResourceRequestHandler
 
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
@@ -42,6 +41,20 @@ class AdaptorResourceRequestHandler(ResourceRequestHandler):
 
     server: AdaptorServer  # This is just for type hinting
 
+    @property
+    def server_response(self):
+        """
+        This is required because the socketserver.BaseRequestHandler.__init__ method actually
+        handles the request. This means the and self.query_string_params variable
+        are not set until that init method is called, so we need to do this type check outside
+        the init chain.
+        """
+        if not hasattr(self, "_server_response"):
+            self._server_response = AdaptorServerResponseGenerator(
+                self.server, HTTPResponse, self.query_string_params
+            )
+        return self._server_response
+
 
 class PathMappingEndpoint(AdaptorResourceRequestHandler):
     path = "/path_mapping"
@@ -54,15 +67,7 @@ class PathMappingEndpoint(AdaptorResourceRequestHandler):
             HTTPResponse: A body and response code to send to the DCC Client
         """
         try:
-            if "path" in self.query_string_params:
-                return HTTPResponse(
-                    HTTPStatus.OK,
-                    json.dumps(
-                        {"path": self.server.adaptor.map_path(self.query_string_params["path"][0])}
-                    ),
-                )
-            else:
-                return HTTPResponse(HTTPStatus.BAD_REQUEST, "Missing path in query string.")
+            return self.server_response.generate_path_mapping_get_response()
         except Exception as e:
             return HTTPResponse(HTTPStatus.INTERNAL_SERVER_ERROR, body=str(e))
 
@@ -77,16 +82,7 @@ class PathMappingRulesEndpoint(AdaptorResourceRequestHandler):
         Returns:
             HTTPResponse: A body and response code to send to the DCC Client
         """
-        return HTTPResponse(
-            HTTPStatus.OK,
-            json.dumps(
-                {
-                    "path_mapping_rules": [
-                        rule.to_dict() for rule in self.server.adaptor.path_mapping_rules
-                    ]
-                }
-            ),
-        )
+        return self.server_response.generate_path_mapping_rules_get_response()
 
 
 class ActionEndpoint(AdaptorResourceRequestHandler):
@@ -100,15 +96,7 @@ class ActionEndpoint(AdaptorResourceRequestHandler):
         Returns:
             HTTPResponse: A body and response code to send to the DCC Client
         """
-        action = self._dequeue_action()
-
-        # We are going to wait until we have an action in the queue. This
-        # could happen between tasks.
-        while action is None:
-            sleep(0.01)
-            action = self._dequeue_action()
-
-        return HTTPResponse(HTTPStatus.OK, str(action))
+        return self.server_response.generate_action_get_response()
 
     def _dequeue_action(self) -> Optional[Action]:
         """This function will dequeue the first action in the queue.
