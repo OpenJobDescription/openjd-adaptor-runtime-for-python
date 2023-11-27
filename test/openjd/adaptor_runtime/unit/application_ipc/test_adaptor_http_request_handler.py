@@ -129,7 +129,10 @@ class TestPathMappingRulesEndpoint:
 
 
 class TestActionEndpoint:
-    def test_get_returns_action(self):
+    @patch.object(
+        ActionEndpoint, "query_string_params", new_callable=PropertyMock, return_value="{}"
+    )
+    def test_get_returns_action(self, mock_qsp):
         # GIVEN
         mock_request_handler = MagicMock()
         mock_server = MagicMock(spec=_AdaptorServer)
