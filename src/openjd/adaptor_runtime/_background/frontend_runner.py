@@ -15,8 +15,9 @@ import urllib.parse as urllib_parse
 from threading import Event
 from types import FrameType
 from types import ModuleType
-from typing import Optional
+from typing import Optional, Dict
 
+from .._osname import OSName
 from ..process._logging import _ADAPTOR_OUTPUT_LEVEL
 from .model import (
     AdaptorState,
@@ -27,6 +28,13 @@ from .model import (
     DataclassMapper,
     HeartbeatResponse,
 )
+
+if OSName.is_windows():
+    import win32file
+    import win32pipe
+    import pywintypes
+    import winerror
+    from openjd.adaptor_runtime._background.named_pipe_helper import NamedPipeHelper
 
 _logger = logging.getLogger(__name__)
 
@@ -50,12 +58,17 @@ class FrontendRunner:
             heartbeat_interval (float, optional): Interval between heartbeats, in seconds.
                 Defaults to 1.
         """
+        # TODO: Need to figure out how to set up the timeout for the Windows NamedPipe Server
+        #  For Namedpipe, we can only set a timeout on the server side not on the client side.
         self._timeout_s = timeout_s
         self._heartbeat_interval = heartbeat_interval
         self._connection_file_path = connection_file_path
         self._canceled = Event()
-        signal.signal(signal.SIGINT, self._sigint_handler)
-        signal.signal(signal.SIGTERM, self._sigint_handler)
+        # TODO: Signal handler needed to be checked in Windows
+        #  The current plan is to use CTRL_BREAK.
+        if OSName.is_posix():
+            signal.signal(signal.SIGINT, self._sigint_handler)
+            signal.signal(signal.SIGTERM, self._sigint_handler)
 
     def init(
         self, adaptor_module: ModuleType, init_data: dict = {}, path_mapping_data: dict = {}
@@ -109,7 +122,8 @@ class FrontendRunner:
 
         # Wait for backend process to create connection file
         try:
-            _wait_for_file(self._connection_file_path, timeout_s=5)
+            # TODO: Need to investigate why more time is required in Windows
+            _wait_for_file(self._connection_file_path, timeout_s=5 if OSName.is_posix() else 10)
         except TimeoutError:
             _logger.error(
                 "Backend process failed to write connection file in time at: "
@@ -166,8 +180,8 @@ class FrontendRunner:
         """
         params: dict[str, str] | None = {"ack_id": ack_id} if ack_id else None
         response = self._send_request("GET", "/heartbeat", params=params)
-
-        return DataclassMapper(HeartbeatResponse).map(json.load(response.fp))
+        body = json.load(response.fp) if OSName.is_posix() else json.loads(response["body"])  # type: ignore
+        return DataclassMapper(HeartbeatResponse).map(body)
 
     def _heartbeat_until_state_complete(self, state: AdaptorState) -> None:
         """
@@ -220,6 +234,29 @@ class FrontendRunner:
         *,
         params: dict | None = None,
         json_body: dict | None = None,
+    ) -> http_client.HTTPResponse | Dict:
+        if OSName.is_windows():
+            return self._send_windows_request(
+                method,
+                path,
+                params=params if params else None,
+                json_body=json_body if json_body else None,
+            )
+        else:
+            return self._send_linux_request(
+                method,
+                path,
+                params=params if params else None,
+                json_body=json_body if json_body else None,
+            )
+
+    def _send_linux_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict | None = None,
+        json_body: dict | None = None,
     ) -> http_client.HTTPResponse:
         conn = UnixHTTPConnection(self.connection_settings.socket, timeout=self._timeout_s)
 
@@ -244,6 +281,66 @@ class FrontendRunner:
             raise HTTPError(response, errmsg)
 
         return response
+
+    def _send_windows_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict | None = None,
+        json_body: dict | None = None,
+    ) -> Dict:
+        start_time = time.time()
+        # Wait for the server pipe to become available.
+        handle = None
+        while handle is None:
+            try:
+                handle = win32file.CreateFile(
+                    self.connection_settings.socket,  # pipe name
+                    # Give the read / write permission
+                    win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                    0,  # Disable the sharing Mode
+                    None,  # TODO: Need to set the security descriptor. Right now, None means default security
+                    win32file.OPEN_EXISTING,  # Open existing pipe
+                    0,  # No Additional flags
+                    None,  # A valid handle to a template file, This parameter is ignored when opening an existing pipe.
+                )
+            except pywintypes.error as e:
+                # NamedPipe server may be not ready,
+                # or no additional resource to create new instance and need to wait for previous connection release
+                if e.args[0] in [winerror.ERROR_FILE_NOT_FOUND, winerror.ERROR_PIPE_BUSY]:
+                    duration = time.time() - start_time
+                    time.sleep(0.1)
+                    # Check timeout limit
+                    if duration > self._timeout_s:
+                        _logger.error(
+                            f"NamedPipe Server readiness timeout. Duration: {duration} seconds, "
+                            f"Timeout limit: {self._timeout_s} seconds."
+                        )
+                        raise e
+                    continue
+                _logger.error(f"Could not open pipe: {e}")
+                raise e
+
+        # Switch to message-read mode for the pipe. This ensures that each write operation is treated as a
+        # distinct message. For example, a single write operation like "Hello from client." will be read
+        # entirely in one request, avoiding partial reads like "Hello fr".
+        win32pipe.SetNamedPipeHandleState(handle, win32pipe.PIPE_READMODE_MESSAGE, None, None)
+
+        # Send a message to the server.
+        message_dict = {
+            "method": method,
+            "body": json.dumps(json_body),
+            "path": path,
+        }
+        if params:
+            message_dict["params"] = json.dumps(params)
+        message = json.dumps(message_dict)
+        NamedPipeHelper.write_to_pipe(handle, message)
+        _logger.debug(f"Message sent from frontend process: {message}")
+        result = NamedPipeHelper.read_from_pipe(handle)
+        handle.close()
+        return json.loads(result)
 
     @property
     def connection_settings(self) -> ConnectionSettings:

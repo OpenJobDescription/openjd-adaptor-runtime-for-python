@@ -10,9 +10,10 @@ import time
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
-from typing import Callable, Dict, TYPE_CHECKING, Any
+from typing import Callable, Dict, TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
+    from .backend_named_pipe_server import WinBackgroundNamedPipeServer
     from .http_server import BackgroundHTTPServer
 
 
@@ -75,7 +76,7 @@ class ServerResponseGenerator:
 
     def __init__(
         self,
-        server: BackgroundHTTPServer,
+        server: Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer],
         response_fn: Callable,
         body: Dict,
         query_string_params: Dict[str, Any],

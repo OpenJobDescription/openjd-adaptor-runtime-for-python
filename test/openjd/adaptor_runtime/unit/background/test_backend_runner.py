@@ -69,7 +69,7 @@ class TestBackendRunner:
         assert caplog.messages == [
             "Running in background daemon mode.",
             f"Listening on {socket_path}",
-            "HTTP server has shutdown.",
+            "Background server has been shut down.",
         ]
         mock_server_cls.assert_called_once_with(
             socket_path,
@@ -143,7 +143,7 @@ class TestBackendRunner:
             f"Listening on {socket_path}",
             "Error writing to connection file: ",
             "Shutting down server...",
-            "HTTP server has shutdown.",
+            "Background server has been shut down.",
         ]
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
@@ -163,7 +163,7 @@ class TestBackendRunner:
         server_mock = MagicMock()
         submit_mock = MagicMock()
         server_mock.submit = submit_mock
-        runner._http_server = server_mock
+        runner._server = server_mock
 
         # WHEN
         runner._sigint_handler(MagicMock(), MagicMock())
