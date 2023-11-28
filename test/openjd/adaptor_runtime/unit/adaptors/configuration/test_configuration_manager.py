@@ -6,10 +6,11 @@ import os
 import re
 from typing import Generator as _Generator
 from unittest.mock import MagicMock, call, mock_open, patch
+import platform
 
 import pytest
 
-import openjd.adaptor_runtime._osname as osname
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.adaptors.configuration import (
     AdaptorConfiguration as _AdaptorConfiguration,
     Configuration as _Configuration,
@@ -127,11 +128,8 @@ class TestEnsureConfigFile:
             assert f"Could not write empty configuration to {path}: " in caplog.text
 
 
-class TestCreateAdaptorConfigurationManager:
-    """
-    Tests for the create_adaptor_configuration_manager function.
-    """
-
+@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+class TestCreateAdaptorConfigurationManagerPosix:
     def test_creates_config_manager(self):
         """
         This test is fragile as it relies on the hardcoded path formats to adaptor config files.
@@ -150,8 +148,8 @@ class TestCreateAdaptorConfigurationManager:
         # THEN
         assert result._config_cls == _AdaptorConfiguration
         assert result._default_config_path == default_config_path
-        assert result._system_config_path_map["Linux"] == (
-            f"/etc/openjd/adaptors/{adaptor_name}/{adaptor_name}.json"
+        assert (
+            result._system_config_path == f"/etc/openjd/adaptors/{adaptor_name}/{adaptor_name}.json"
         )
         assert result._user_config_rel_path == os.path.join(
             ".openjd", "adaptors", adaptor_name, f"{adaptor_name}.json"
@@ -161,6 +159,52 @@ class TestCreateAdaptorConfigurationManager:
         assert result._schema_path[0] == os.path.abspath(
             os.path.join(_configuration_manager_dir, "_adaptor_configuration.schema.json")
         )
+
+
+@pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+class TestCreateAdaptorConfigurationManagerWindows:
+    def test_creates_config_manager(self):
+        """
+        This test is fragile as it relies on the hardcoded path formats to adaptor config files.
+        """
+        # GIVEN
+        adaptor_name = "adaptor"
+        default_config_path = "/path/to/config"
+
+        # WHEN
+        result = _create_adaptor_configuration_manager(
+            _AdaptorConfiguration,
+            adaptor_name,
+            default_config_path,
+        )
+
+        # THEN
+        assert result._config_cls == _AdaptorConfiguration
+        assert result._default_config_path == default_config_path
+        assert result._system_config_path == os.path.abspath(
+            os.path.join(
+                os.path.sep,
+                os.environ["PROGRAMDATA"],
+                "openjd",
+                "adaptors",
+                adaptor_name,
+                f"{adaptor_name}.json",
+            )
+        )
+        assert result._user_config_rel_path == os.path.join(
+            ".openjd", "adaptors", adaptor_name, f"{adaptor_name}.json"
+        )
+        assert isinstance(result._schema_path, list)
+        assert len(result._schema_path) == 1
+        assert result._schema_path[0] == os.path.abspath(
+            os.path.join(_configuration_manager_dir, "_adaptor_configuration.schema.json")
+        )
+
+
+class TestCreateAdaptorConfigurationManager:
+    """
+    Tests for the create_adaptor_configuration_manager function.
+    """
 
     def test_accepts_single_schema(self):
         # GIVEN
@@ -204,9 +248,51 @@ class TestCreateAdaptorConfigurationManager:
         assert result._schema_path[1:] == schema_paths
 
 
+@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+class TestConfigurationManagerPosix:
+    """
+    Posix-specific tests for the base ConfigurationManager class
+    """
+
+    class TestSystemConfigPosix:
+        @patch.object(platform, "system")
+        def test_gets_linux_path(self, mock_system: MagicMock):
+            # GIVEN
+            mock_system.return_value = "Linux"
+            expected = "path/to/linux/system/config"
+            manager = ConfigurationManagerMock(system_config_path=expected)
+
+            # WHEN
+            result = manager.get_system_config_path()
+
+            # THEN
+            assert result == expected
+
+
+@pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+class TestConfigurationManagerWindows:
+    """
+    Windows-specific tests for the base ConfigurationManager class
+    """
+
+    class TestSystemConfigWindows:
+        @patch.object(platform, "system")
+        def test_gets_windows_path(self, mock_system: MagicMock):
+            # GIVEN
+            mock_system.return_value = "Windows"
+            expected = "path\\to\\windows\\system\\config"
+            manager = ConfigurationManagerMock(system_config_path=expected)
+
+            # WHEN
+            result = manager.get_system_config_path()
+
+            # THEN
+            assert result == expected
+
+
 class TestConfigurationManager:
     """
-    Tests for the base ConfigurationManager class
+    Cross-platform tests for the base ConfigurationManager class
     """
 
     class TestBuildConfig:
@@ -480,48 +566,6 @@ class TestConfigurationManager:
         """
         Tests for methods that get the system-level configuration
         """
-
-        @patch.object(osname.platform, "system")
-        def test_gets_linux_path(self, mock_system: MagicMock):
-            # GIVEN
-            mock_system.return_value = "Linux"
-            expected = "path/to/linux/system/config"
-            manager = ConfigurationManagerMock(
-                system_config_path_map={
-                    "Linux": expected,
-                }
-            )
-
-            # WHEN
-            result = manager.get_system_config_path()
-
-            # THEN
-            mock_system.assert_called_once()
-            assert result == expected
-
-        @patch.object(osname.platform, "system")
-        def test_raises_on_nonvalid_os(self, mock_system: MagicMock):
-            """
-            Validate a NotImplementedError is Raised if the OSName does not resolve.
-            """
-
-            # GIVEN
-            mock_system.return_value = "unsupported_os"
-
-            # WHEN
-            with pytest.raises(NotImplementedError):
-                ConfigurationManagerMock().get_system_config_path()
-
-            # THEN
-            mock_system.assert_called_once()
-
-        @patch.object(osname, "OSName", return_value="unsupported_os")
-        def test_raises_on_valid_os_not_implemented(self, mock_system: MagicMock):
-            """
-            Validate a NotImplementedError is Raised if the OSName resolves but is not supported
-            """
-            with pytest.raises(NotImplementedError):
-                ConfigurationManagerMock().get_system_config_path()
 
         @patch.object(configuration_manager, "_ensure_config_file")
         @patch.object(ConfigurationManagerMock, "get_system_config_path")

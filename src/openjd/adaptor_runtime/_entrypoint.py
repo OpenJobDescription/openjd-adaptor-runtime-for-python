@@ -57,24 +57,22 @@ _CLI_HELP_TEXT = {
 _DIR = os.path.dirname(os.path.realpath(__file__))
 # Keyword args to init the ConfigurationManager for the runtime.
 _ENV_CONFIG_PATH_PREFIX = "RUNTIME_CONFIG_PATH"
-_RUNTIME_CONFIG_PATHS: dict[Any, Any] = {
+_system_config_path_prefix = "/etc" if OSName.is_posix() else os.environ["PROGRAMDATA"]
+_system_config_path = os.path.abspath(
+    os.path.join(
+        _system_config_path_prefix,
+        "openjd",
+        "worker",
+        "adaptors",
+        "runtime",
+        "configuration.json",
+    )
+)
+
+_runtime_config_paths: dict[Any, Any] = {
     "schema_path": os.path.abspath(os.path.join(_DIR, "configuration.schema.json")),
     "default_config_path": os.path.abspath(os.path.join(_DIR, "configuration.json")),
-    "system_config_path_map": {
-        "Linux": os.path.abspath(
-            os.path.join(
-                os.path.sep,
-                "etc",
-                "openjd",
-                "worker",
-                "adaptors",
-                "runtime",
-                "configuration.json",
-            )
-        ),
-        # TODO: Replace this with a proper path
-        "Windows": r"C:/tmp/configuration.json",
-    },
+    "system_config_path": _system_config_path,
     "user_config_rel_path": os.path.join(
         ".openjd", "worker", "adaptors", "runtime", "configuration.json"
     ),
@@ -124,7 +122,7 @@ class EntryPoint:
         additional_config_path = os.environ.get(_ENV_CONFIG_PATH_PREFIX)
         self.config_manager = ConfigurationManager(
             config_cls=RuntimeConfiguration,
-            **_RUNTIME_CONFIG_PATHS,
+            **_runtime_config_paths,
             additional_config_paths=[additional_config_path] if additional_config_path else [],
         )
         try:

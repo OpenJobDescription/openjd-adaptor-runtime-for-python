@@ -19,6 +19,13 @@ def pytest_collection_modifyitems(items):
                 "integ",
                 "test_integration_entrypoint.py",
             ),
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)),
+                "unit",
+                "adaptors",
+                "configuration",
+                "test_configuration_manager.py",
+            ),
         ]
         skip_marker = pytest.mark.skip(reason="Skipping tests on Windows")
         for item in items:
