@@ -39,12 +39,12 @@ class TestBackendRunner:
 
     @patch.object(backend_runner.json, "dump")
     @patch.object(backend_runner.os, "remove")
-    @patch.object(backend_runner, "Queue")
+    @patch.object(backend_runner, "Event")
     @patch.object(backend_runner, "Thread")
     def test_run(
         self,
         mock_thread: MagicMock,
-        mock_queue: MagicMock,
+        mock_event: MagicMock,
         mock_os_remove: MagicMock,
         mock_json_dump: MagicMock,
         mock_server_cls: MagicMock,
@@ -74,7 +74,7 @@ class TestBackendRunner:
         mock_server_cls.assert_called_once_with(
             socket_path,
             adaptor_runner,
-            mock_queue.return_value,
+            mock_event.return_value,
             log_buffer=None,
         )
         mock_thread.assert_called_once()
@@ -112,12 +112,12 @@ class TestBackendRunner:
 
     @patch.object(backend_runner, "secure_open")
     @patch.object(backend_runner.os, "remove")
-    @patch.object(backend_runner, "Queue")
+    @patch.object(backend_runner, "Event")
     @patch.object(backend_runner, "Thread")
     def test_run_raises_when_writing_connection_file_fails(
         self,
         mock_thread: MagicMock,
-        mock_queue: MagicMock,
+        mock_event: MagicMock,
         mock_os_remove: MagicMock,
         open_mock: MagicMock,
         socket_path: str,
@@ -137,7 +137,7 @@ class TestBackendRunner:
 
         # THEN
         assert raised_err.value is err
-        mock_queue.return_value.put.assert_called_once_with(True)
+        mock_event.return_value.set.assert_called_once()
         assert caplog.messages == [
             "Running in background daemon mode.",
             f"Listening on {socket_path}",

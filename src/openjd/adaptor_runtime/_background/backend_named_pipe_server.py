@@ -3,10 +3,9 @@
 from __future__ import annotations
 import logging
 
-import threading
+from threading import Event, Thread
 import time
 
-from queue import Queue
 from typing import List, Optional
 
 from .named_pipe_request_handler import WinBackgroundResourceRequestHandler
@@ -72,7 +71,7 @@ class WinBackgroundNamedPipeServer:
         self,
         pipe_name: str,
         adaptor_runner: AdaptorRunner,
-        cancel_queue: Queue,
+        shutdown_event: Event,
         *,
         log_buffer: LogBuffer | None = None,
     ):  # pragma: no cover
@@ -80,7 +79,7 @@ class WinBackgroundNamedPipeServer:
         Args:
             pipe_name (str): Name of the pipe for the NamedPipe Server.
             adaptor_runner (AdaptorRunner): Adaptor runner instance for operation execution.
-            cancel_queue (Queue): Queue used for signaling server shutdown.
+            shutdown_event (Event): An Event used for signaling server shutdown.
             log_buffer (LogBuffer|None, optional): Buffer for logging activities, defaults to None.
         """
         if not OSName.is_windows():
@@ -89,7 +88,7 @@ class WinBackgroundNamedPipeServer:
                 f"Current Operating System is {OSName._get_os_name()}"
             )
         self._adaptor_runner = adaptor_runner
-        self._cancel_queue = cancel_queue
+        self._shutdown_event = shutdown_event
         self._future_runner = AsyncFutureRunner()
         self._log_buffer = log_buffer
         self._named_pipe_instances: List[HANDLE] = []
@@ -134,9 +133,8 @@ class WinBackgroundNamedPipeServer:
         and corresponding threads for handling client-server communication.
         """
         _logger.info(f"Creating Named Pipe with name: {self._pipe_name}")
-        # During shutdown, a `True` will be pushed to the `_cancel_queue` for ending this loop
-        # TODO: Using threading.event instead of a queue to signal and termination
-        while self._cancel_queue.qsize() == 0:
+        # During shutdown, _shutdown_event will be set
+        while not self._shutdown_event.is_set():
             pipe_handle = self._create_pipe(self._pipe_name)
             if pipe_handle is None:
                 error_msg = (
@@ -159,16 +157,16 @@ class WinBackgroundNamedPipeServer:
                 else:
                     _logger.error(f"Error encountered while connecting to NamedPipe: {e} ")
             request_handler = WinBackgroundResourceRequestHandler(self, pipe_handle)
-            threading.Thread(target=request_handler.instance_thread).start()
+            Thread(target=request_handler.instance_thread).start()
 
     def shutdown(self) -> None:
         """
         Shuts down the Named Pipe server and closes all named pipe handlers.
 
         Signals the `serve_forever` method to stop listening to the NamedPipe Server by
-        pushing a `True` value into the `_cancel_queue`.
+        setting the _shutdown_event.
         """
-        self._cancel_queue.put(True)
+        self._shutdown_event.set()
         # TODO: Need to find out a better way to wait for the communication finish
         #  After sending the shutdown command, we need to wait for the response
         #  from it before shutting down server or the client won't get the response.

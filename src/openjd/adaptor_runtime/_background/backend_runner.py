@@ -6,8 +6,7 @@ import json
 import logging
 import os
 import signal
-from queue import Queue
-from threading import Thread
+from threading import Thread, Event
 from types import FrameType
 from typing import Optional, Union
 
@@ -71,7 +70,7 @@ class BackendRunner:
         that port to a connection file, and listens for HTTP requests until a shutdown is requested
         """
         _logger.info("Running in background daemon mode.")
-        queue: Queue = Queue()
+        shutdown_event: Event = Event()
 
         if OSName.is_posix():
             server_path = SocketDirectories.for_os().get_process_socket_path(
@@ -87,14 +86,14 @@ class BackendRunner:
                 self._server = WinBackgroundNamedPipeServer(
                     server_path,
                     self._adaptor_runner,
-                    cancel_queue=queue,
+                    shutdown_event=shutdown_event,
                     log_buffer=self._log_buffer,
                 )
             else:
                 self._server = BackgroundHTTPServer(
                     server_path,
                     self._adaptor_runner,
-                    cancel_queue=queue,
+                    shutdown_event=shutdown_event,
                     log_buffer=self._log_buffer,
                 )
             _logger.debug(f"Listening on {server_path}")
@@ -118,11 +117,11 @@ class BackendRunner:
         except OSError as e:
             _logger.error(f"Error writing to connection file: {e}")
             _logger.info("Shutting down server...")
-            queue.put(True)
+            shutdown_event.set()
             raise
         finally:
-            # Block until the cancel queue has been pushed to
-            queue.get()
+            # Block until the shutdown_event is set
+            shutdown_event.wait()
 
             # Shutdown the server
             self._server.shutdown()  # type: ignore
