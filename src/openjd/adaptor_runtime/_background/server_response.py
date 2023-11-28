@@ -163,7 +163,7 @@ class ServerResponseGenerator:
             Linux: return HTTPResponse.
         """
 
-        self.server._cancel_queue.put(True)
+        self.server._shutdown_event.set()
         return self.response_method(HTTPStatus.OK)
 
     def generate_run_put_response(self) -> HTTPResponse:

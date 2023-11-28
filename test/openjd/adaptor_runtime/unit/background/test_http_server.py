@@ -4,7 +4,7 @@ import json
 import os
 import socketserver
 from http import HTTPStatus
-from queue import Queue
+from threading import Event
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -554,8 +554,8 @@ class TestShutdownHandler:
         # GIVEN
         mock_request_handler = MagicMock()
         mock_server = MagicMock(spec=BackgroundHTTPServer)
-        mock_cancel_queue = MagicMock(spec=Queue)
-        mock_server._cancel_queue = mock_cancel_queue
+        mock_shutdown_event = MagicMock(spec=Event)
+        mock_server._shutdown_event = mock_shutdown_event
         mock_request_handler.server = mock_server
         mock_request_handler.headers = {"Content-Length": 0}
         mock_request_handler.path = ""
@@ -565,7 +565,7 @@ class TestShutdownHandler:
         response = handler.put()
 
         # THEN
-        mock_cancel_queue.put.assert_called_once_with(True)
+        mock_shutdown_event.set.assert_called_once()
         assert response.status == HTTPStatus.OK
         assert response.body is None
 
