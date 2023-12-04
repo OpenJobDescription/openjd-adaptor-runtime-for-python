@@ -13,6 +13,7 @@ def pytest_collection_modifyitems(items):
         # Add the tests' paths that we want to enable in Windows
         do_not_skip_paths = [
             os.path.join(os.path.abspath(os.path.dirname(__file__)), "integ", "background"),
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), "integ", "process"),
             os.path.join(
                 os.path.abspath(os.path.dirname(__file__)),
                 "integ",

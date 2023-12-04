@@ -12,6 +12,7 @@ from unittest import mock
 
 import pytest
 
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.app_handlers import RegexCallback, RegexHandler
 from openjd.adaptor_runtime.process import LoggingSubprocess
 from openjd.adaptor_runtime.process._logging_subprocess import _STDERR_LEVEL, _STDOUT_LEVEL
@@ -34,6 +35,8 @@ class TestIntegrationLoggingSubprocess(object):
 
     @pytest.mark.timeout(5)
     @pytest.mark.parametrize("grace_period, expected_output", expected_stop_params)
+    # TODO: Windows signal Implementation
+    @pytest.mark.skipif(OSName.is_windows(), reason="Signal is not implemented in Windows yet.")
     def test_stop_process(self, grace_period, expected_output, caplog: pytest.LogCaptureFixture):
         """
         Testing that we stop the process immediately and after SIGTERM fails.
@@ -56,6 +59,8 @@ class TestIntegrationLoggingSubprocess(object):
             assert output in caplog.text
 
     @pytest.mark.timeout(5)
+    # TODO: Windows signal Implementation
+    @pytest.mark.skipif(OSName.is_windows(), reason="Signal is not implemented in Windows yet.")
     def test_terminate_process(self, caplog):
         """
         Testing that the process was terminated successfully. This means that the process ended
@@ -91,8 +96,10 @@ class TestIntegrationLoggingSubprocess(object):
     @pytest.mark.parametrize("startup_dir", startup_dir_params)
     def test_startup_directory(self, startup_dir: str | None, caplog):
         caplog.set_level(logging.INFO)
-
-        args = ["pwd"]
+        if OSName.is_windows():
+            args = ["powershell.exe", "pwd"]
+        else:
+            args = ["pwd"]
         ls = LoggingSubprocess(args=args, startup_directory=startup_dir)
 
         # Sometimes we assert too quickly, so we are waiting for the pwd command to finish
@@ -102,18 +109,28 @@ class TestIntegrationLoggingSubprocess(object):
         # Explicitly cleanup the IO threads to ensure all output is logged
         ls._cleanup_io_threads()
 
-        assert "Running command: pwd" in caplog.text
+        assert f"Running command: {' '.join(args)}" in caplog.text
 
         if startup_dir is not None:
             assert startup_dir in caplog.text
 
-    def test_startup_directory_empty(self):
+    @pytest.mark.skipif(not OSName.is_posix(), reason="Only run this test in Linux.")
+    def test_startup_directory_empty_posix(self):
         """When calling LoggingSubprocess with an empty cwd, FileNotFoundError will be raised."""
         args = ["pwd"]
         with pytest.raises(FileNotFoundError) as excinfo:
             LoggingSubprocess(args=args, startup_directory="")
-
         assert "[Errno 2] No such file or directory: ''" in str(excinfo.value)
+
+    @pytest.mark.skipif(not OSName.is_windows(), reason="Only run this test in Windows.")
+    def test_startup_directory_empty_windows(self):
+        """When calling LoggingSubprocess with an empty cwd, OSError will be raised."""
+        args = ["powershell.exe", "pwd"]
+        with pytest.raises(OSError) as exc_info:
+            LoggingSubprocess(args=args, startup_directory="")
+        assert "The filename, directory name, or volume label syntax is incorrect" in str(
+            exc_info.value
+        )
 
     @pytest.mark.parametrize("log_level", [_STDOUT_LEVEL, _STDERR_LEVEL])
     def test_log_levels(self, log_level: int, caplog):
