@@ -12,6 +12,7 @@ from unittest import mock
 
 import pytest
 
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.app_handlers import RegexCallback, RegexHandler
 from openjd.adaptor_runtime.process import ManagedProcess
 
@@ -27,10 +28,16 @@ class TestManagedProcess(object):
                 super(FakeManagedProcess, self).__init__(run_data)
 
             def get_executable(self) -> str:
-                return "echo"
+                if OSName.is_windows():
+                    return "powershell.exe"
+                else:
+                    return "echo"
 
             def get_arguments(self) -> List[str]:
-                return ["Hello World!"]
+                if OSName.is_windows():
+                    return ["echo", "Hello World!"]
+                else:
+                    return ["Hello World!"]
 
             def get_startup_directory(self) -> str | None:
                 return None
