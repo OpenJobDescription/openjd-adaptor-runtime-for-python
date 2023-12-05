@@ -78,8 +78,8 @@ class ServerResponseGenerator:
         self,
         server: Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer],
         response_fn: Callable,
-        body: Dict,
-        query_string_params: Dict[str, Any],
+        body: Dict | None = None,
+        query_string_params: Dict[str, Any] | None = None,
     ):
         """
         Response generator

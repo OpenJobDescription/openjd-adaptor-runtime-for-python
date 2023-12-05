@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
     from openjd.adaptor_runtime._named_pipe import NamedPipeServer
 
-from openjd.adaptor_runtime._background.named_pipe_helper import (
+from openjd.adaptor_runtime._named_pipe.named_pipe_helper import (
     NamedPipeHelper,
     PipeDisconnectedException,
 )
@@ -82,6 +82,9 @@ class ResourceRequestHandler(ABC):
                         f"Encountered an error while sending the error response: {traceback.format_exc()}."
                     )
         try:
+            # Flush the pipe to allow the client to read the pipe's contents before disconnecting.
+            # Then disconnect the pipe, and close the handle to this pipe instance.
+            win32file.FlushFileBuffers(self.pipe_handle)
             win32pipe.DisconnectNamedPipe(self.pipe_handle)
             win32file.CloseHandle(self.pipe_handle)
         except Exception:
