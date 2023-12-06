@@ -48,7 +48,9 @@ class WinBackgroundResourceRequestHandler(ResourceRequestHandler):
         """
         request_dict = json.loads(data)
         path = request_dict["path"]
-        body = json.loads(request_dict["body"])
+        body = None
+        if "body" in request_dict:
+            body = json.loads(request_dict["body"])
         method = request_dict["method"]
 
         if "params" in request_dict and request_dict["params"] != "null":
