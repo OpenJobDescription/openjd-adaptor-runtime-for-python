@@ -119,7 +119,7 @@ class FrontendRunner:
         # Wait for backend process to create connection file
         try:
             # TODO: Need to investigate why more time is required in Windows
-            _wait_for_file(self._connection_file_path, timeout_s=5 if OSName.is_posix() else 10)
+            _wait_for_file(self._connection_file_path, timeout_s=5 if OSName.is_posix() else 15)
         except TimeoutError:
             _logger.error(
                 "Backend process failed to write connection file in time at: "

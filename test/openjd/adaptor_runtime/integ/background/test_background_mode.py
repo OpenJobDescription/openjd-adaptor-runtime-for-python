@@ -62,7 +62,7 @@ class TestDaemonMode:
     ) -> Generator[tuple[FrontendRunner, psutil.Process], None, None]:
         caplog.set_level(0)
         # TODO: Investigate why we need more time in Windows.
-        frontend = FrontendRunner(connection_file_path, timeout_s=5.0 if OSName.is_posix() else 10)
+        frontend = FrontendRunner(connection_file_path, timeout_s=5.0 if OSName.is_posix() else 15)
         frontend.init(sys.modules[SampleAdaptor.__module__])
         conn_settings = _load_connection_settings(connection_file_path)
 

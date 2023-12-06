@@ -14,4 +14,5 @@ jobs:
     name: Code Quality
     uses: ./.github/workflows/reuse_python_build.yml
     secrets: inherit
+    if: always()
 

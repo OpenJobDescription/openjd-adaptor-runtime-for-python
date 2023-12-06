@@ -44,7 +44,7 @@ class TestConfigurationManagerLinux:
             manager = ConfigurationManager(
                 config_cls=Configuration,
                 schema_path=json_schema_file.name,
-                system_config_path_map={"Linux": config_file.name},
+                system_config_path=config_file.name,
                 # These fields can be empty since they will not be used in this test
                 default_config_path="",
                 user_config_rel_path="",
@@ -82,7 +82,7 @@ class TestConfigurationManagerLinux:
                 config_cls=Configuration,
                 schema_path=json_schema_file.name,
                 default_config_path=default_config_file.name,
-                system_config_path_map={"Linux": system_config_file.name},
+                system_config_path=system_config_file.name,
                 user_config_rel_path=os.path.relpath(
                     user_config_file.name,
                     start=os.path.expanduser("~"),
