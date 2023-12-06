@@ -14,6 +14,7 @@ def pytest_collection_modifyitems(items):
         do_not_skip_paths = [
             os.path.join(os.path.abspath(os.path.dirname(__file__)), "integ", "background"),
             os.path.join(os.path.abspath(os.path.dirname(__file__)), "integ", "process"),
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), "integ", "application_ipc"),
             os.path.join(
                 os.path.abspath(os.path.dirname(__file__)),
                 "integ",

@@ -11,6 +11,7 @@ import json
 from typing import Dict, Optional
 from pywintypes import HANDLE
 
+
 from openjd.adaptor_runtime._background.server_config import NAMED_PIPE_BUFFER_SIZE
 
 _logger = logging.getLogger(__name__)
@@ -21,17 +22,33 @@ class PipeDisconnectedException(Exception):
     Exception raised when a Named Pipe is either broken or not connected.
 
     Attributes:
-        message (str): Explanation of the error.
-        error_code (int): The specific Windows error code associated with the pipe issue.
+        error (pywintypes.error): An error raised by pywin32.
     """
 
-    def __init__(self, message: str, error_code: int):
-        self.message = message
-        self.error_code = error_code
-        super().__init__(f"{message} (Error code: {error_code})")
+    def __init__(self, error: pywintypes.error):
+        self.winerror = error.winerror  # The numerical error code
+        self.funcname = error.funcname  # The name of the function that caused the error
+        self.strerror = error.strerror  # The human-readable error message
+
+        self.message = f"An error occurred: {error.strerror} (Error code: {error.winerror}) in function {error.funcname }"
+        super().__init__(self.message)
 
     def __str__(self):
-        return f"{self.message} (Error code: {self.error_code})"
+        return self.message
+
+
+class NamedPipeTimeoutError(Exception):
+    """A custom error raised on timeouts when waiting for another error."""
+
+    def __init__(self, duration: float, error: Exception):
+        """Initialize TimeoutError with original error.
+
+        Args:
+            duration (float): The duration waited in seconds.
+            error (Exception): The original error that was raised.
+        """
+        self.error = error
+        super().__init__(f"Timeout after {duration}s, original error: {error}")
 
 
 class NamedPipeHelper:
@@ -41,6 +58,26 @@ class NamedPipeHelper:
     This class provides static methods to interact with Named Pipes,
     facilitating data transmission between the server and the client.
     """
+
+    @staticmethod
+    def _handle_pipe_exception(e: pywintypes.error) -> None:
+        """
+        Handles exceptions related to pipe operations.
+
+        Args:
+            e (pywintypes.error): The caught exception.
+
+        Raises:
+            PipeDisconnectedException: When the pipe is disconnected, broken, or invalid.
+        """
+        if e.winerror in [
+            winerror.ERROR_BROKEN_PIPE,
+            winerror.ERROR_PIPE_NOT_CONNECTED,
+            winerror.ERROR_INVALID_HANDLE,
+        ]:
+            raise PipeDisconnectedException(e)
+        else:
+            raise
 
     @staticmethod
     def read_from_pipe(handle: HANDLE) -> str:  # type: ignore
@@ -68,15 +105,7 @@ class NamedPipeHelper:
                     )
             # Server maybe shutdown during reading.
             except pywintypes.error as e:
-                if e.winerror in [
-                    winerror.ERROR_BROKEN_PIPE,
-                    winerror.ERROR_PIPE_NOT_CONNECTED,
-                    winerror.ERROR_INVALID_HANDLE,
-                ]:
-                    raise PipeDisconnectedException(
-                        "Client disconnected or pipe is not available", e.winerror
-                    )
-                raise
+                NamedPipeHelper._handle_pipe_exception(e)
 
     @staticmethod
     def write_to_pipe(handle: HANDLE, message: str) -> None:  # type: ignore
@@ -92,15 +121,7 @@ class NamedPipeHelper:
             win32file.WriteFile(handle, message.encode("utf-8"))
         # Server maybe shutdown during writing.
         except pywintypes.error as e:
-            if e.winerror in [
-                winerror.ERROR_BROKEN_PIPE,
-                winerror.ERROR_PIPE_NOT_CONNECTED,
-                winerror.ERROR_INVALID_HANDLE,
-            ]:
-                raise PipeDisconnectedException(
-                    "Client disconnected or pipe is not available", e.winerror
-                )
-            raise
+            NamedPipeHelper._handle_pipe_exception(e)
 
     @staticmethod
     def establish_named_pipe_connection(pipe_name: str, timeout_in_seconds: float) -> HANDLE:
@@ -143,7 +164,7 @@ class NamedPipeHelper:
             except pywintypes.error as e:
                 # NamedPipe server may be not ready,
                 # or no additional resource to create new instance and need to wait for previous connection release
-                if e.args[0] in [winerror.ERROR_FILE_NOT_FOUND, winerror.ERROR_PIPE_BUSY]:
+                if e.winerror in [winerror.ERROR_FILE_NOT_FOUND, winerror.ERROR_PIPE_BUSY]:
                     duration = time.time() - start_time
                     time.sleep(0.1)
                     # Check timeout limit
@@ -152,7 +173,7 @@ class NamedPipeHelper:
                             f"NamedPipe Server readiness timeout. Duration: {duration} seconds, "
                             f"Timeout limit: {timeout_in_seconds} seconds."
                         )
-                        raise e
+                        raise NamedPipeTimeoutError(duration, e)
                     continue
                 _logger.error(f"Could not open pipe: {e}")
                 raise e
@@ -160,7 +181,17 @@ class NamedPipeHelper:
         # Switch to message-read mode for the pipe. This ensures that each write operation is treated as a
         # distinct message. For example, a single write operation like "Hello from client." will be read
         # entirely in one request, avoiding partial reads like "Hello fr".
-        win32pipe.SetNamedPipeHandleState(handle, win32pipe.PIPE_READMODE_MESSAGE, None, None)
+        win32pipe.SetNamedPipeHandleState(
+            handle,  # The handle to the named pipe.
+            win32pipe.PIPE_READMODE_MESSAGE,  # Set the pipe to message mode
+            # Maximum bytes collected before transmission to the server.
+            # 'None' means the system's default value is used.
+            None,
+            # Maximum time to wait
+            # 'None' means the system's default value is used.
+            None,
+        )
+
         return handle
 
     @staticmethod
@@ -197,17 +228,19 @@ class NamedPipeHelper:
         """
 
         handle = NamedPipeHelper.establish_named_pipe_connection(pipe_name, timeout_in_seconds)
-        message_dict = {
-            "method": method,
-            "path": path,
-        }
+        try:
+            message_dict = {
+                "method": method,
+                "path": path,
+            }
 
-        if json_body:
-            message_dict["body"] = json.dumps(json_body)
-        if params:
-            message_dict["params"] = json.dumps(params)
-        message = json.dumps(message_dict)
-        NamedPipeHelper.write_to_pipe(handle, message)
-        result = NamedPipeHelper.read_from_pipe(handle)
-        handle.close()
+            if json_body:
+                message_dict["body"] = json.dumps(json_body)
+            if params:
+                message_dict["params"] = json.dumps(params)
+            message = json.dumps(message_dict)
+            NamedPipeHelper.write_to_pipe(handle, message)
+            result = NamedPipeHelper.read_from_pipe(handle)
+        finally:
+            handle.close()
         return json.loads(result)

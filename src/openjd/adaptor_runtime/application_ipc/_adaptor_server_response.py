@@ -6,12 +6,14 @@ import json
 import sys
 from http import HTTPStatus
 from time import sleep
-from typing import TYPE_CHECKING, Callable, Dict, Any, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Any, Optional, Union
+
 from .._http import HTTPResponse
 
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
     from openjd.adaptor_runtime_client import Action
     from ._adaptor_server import AdaptorServer
+    from ._win_adaptor_server import WinAdaptorServer
 
 
 class AdaptorServerResponseGenerator:
@@ -22,7 +24,7 @@ class AdaptorServerResponseGenerator:
 
     def __init__(
         self,
-        server: AdaptorServer,
+        server: Union[AdaptorServer, WinAdaptorServer],
         response_fn: Callable,
         query_string_params: Dict[str, Any],
     ) -> None:

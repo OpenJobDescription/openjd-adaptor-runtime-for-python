@@ -13,6 +13,10 @@ from openjd.adaptor_runtime._background.server_config import (
     NAMED_PIPE_BUFFER_SIZE,
     DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS,
 )
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from openjd.adaptor_runtime._named_pipe import ResourceRequestHandler
 from openjd.adaptor_runtime._osname import OSName
 
 import win32pipe
@@ -157,7 +161,9 @@ class NamedPipeServer(ABC):
             threading.Thread(target=self.request_handler(self, pipe_handle).instance_thread).start()
 
     @abstractmethod
-    def request_handler(self, server: NamedPipeServer, pipe_handle: HANDLE):
+    def request_handler(
+        self, server: NamedPipeServer, pipe_handle: HANDLE
+    ) -> "ResourceRequestHandler":
         return NotImplemented
 
     def shutdown(self) -> None:

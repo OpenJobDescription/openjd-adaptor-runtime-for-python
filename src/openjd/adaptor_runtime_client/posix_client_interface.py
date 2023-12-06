@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import signal as _signal
+import warnings
+
 from .base_client_interface import Response as _Response
 from typing import Dict as _Dict
 
@@ -15,22 +17,42 @@ from urllib.parse import urlencode as _urlencode
 # See socket.settimeout
 _REQUEST_TIMEOUT = None
 
+SOCKET_PATH_DEPRECATED_MESSAGE = (
+    "The 'socket_path' parameter is deprecated; use 'server_path' instead"
+)
+
 
 class HTTPClientInterface(BaseClientInterface):
-    socket_path: str
-
-    def __init__(self, socket_path: str) -> None:
+    def __init__(self, server_path: str, **kwargs) -> None:
         """When the client is created, we need the port number to connect to the server.
 
         Args:
-            socket_path (str): The path to the UNIX domain socket to use.
+            server_path (str): The path to the UNIX domain socket to use.
         """
-        super().__init__()
-        self.socket_path = socket_path
+
+        socket_path = kwargs.get("socket_path")
+        if socket_path is not None:
+            warnings.warn(SOCKET_PATH_DEPRECATED_MESSAGE, DeprecationWarning)
+            if server_path is not None:
+                raise ValueError("Cannot use both 'server_path' and 'socket_path'")
+            server_path = socket_path
+
+        super().__init__(server_path)
+
         # NOTE: The signals SIGKILL and SIGSTOP cannot be caught, blocked, or ignored.
         # Reference: https://man7.org/linux/man-pages/man7/signal.7.html
         # SIGTERM graceful shutdown.
         _signal.signal(_signal.SIGTERM, self.graceful_shutdown)
+
+    @property
+    def socket_path(self):
+        warnings.warn(SOCKET_PATH_DEPRECATED_MESSAGE, DeprecationWarning)
+        return self.server_path
+
+    @socket_path.setter
+    def socket_path(self, value):
+        warnings.warn(SOCKET_PATH_DEPRECATED_MESSAGE, DeprecationWarning)
+        self.server_path = value
 
     def _send_request(
         self, method: str, request_path: str, *, query_string_params: _Dict | None = None

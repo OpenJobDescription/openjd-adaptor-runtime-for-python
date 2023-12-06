@@ -1,14 +1,20 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 from .action import Action
-from .posix_client_interface import (
-    HTTPClientInterface,
+from .base_client_interface import (
+    PathMappingRule,
 )
+from ..adaptor_runtime._osname import OSName
 
-from .base_client_interface import PathMappingRule
+if OSName.is_posix():
+    from .posix_client_interface import HTTPClientInterface as ClientInterface
 
-__all__ = [
-    "Action",
-    "HTTPClientInterface",
-    "PathMappingRule",
-]
+    # This is just for backward compatible
+    from .posix_client_interface import HTTPClientInterface
+
+    __all__ = ["Action", "PathMappingRule", "HTTPClientInterface", "ClientInterface"]
+
+else:
+    from .win_client_interface import WinClientInterface as ClientInterface  # type: ignore
+
+    __all__ = ["Action", "PathMappingRule", "ClientInterface"]

@@ -9,9 +9,9 @@ from openjd.adaptor_runtime_client import Action as _Action
 
 from openjd.adaptor_runtime.adaptors import Adaptor
 from openjd.adaptor_runtime.application_ipc import ActionsQueue as _ActionsQueue
-from openjd.adaptor_runtime.application_ipc import AdaptorServer as _AdaptorServer
-
 from .fake_app_client import FakeAppClient as _FakeAppClient
+from openjd.adaptor_runtime._osname import OSName
+from openjd.adaptor_runtime.application_ipc import AdaptorServer as _AdaptorServer
 
 
 @pytest.fixture
@@ -76,7 +76,7 @@ class TestAdaptorIPC:
         server_thread.start()
 
         # Create a client passing in the port number from the server.
-        client = _FakeAppClient(f"{test_server.server_address}")
+        client = _FakeAppClient(test_server.server_path)
         mapped_path = client.map_path(source_path)
 
         # Giving time to avoid a race condition in which we close the thread before setup.
@@ -111,14 +111,18 @@ class TestAdaptorIPC:
         server_thread.start()
 
         # Create a client passing in the port number from the server.
-        client = _FakeAppClient(test_server.socket_path)
+        client = _FakeAppClient(test_server.server_path)
 
         # Create a thread for the client.
         client_thread = _threading.Thread(target=start_test_client, args=(client,))
         client_thread.start()
 
         # Giving time to avoid a race condition in which we close the thread before setup.
-        _sleep(1)
+        if OSName.is_linux():
+            _sleep(1)
+        else:
+            # TODO: Need to investigate why Windows is slower
+            _sleep(5)
 
         # Cleanup
         test_server.shutdown()
@@ -148,14 +152,18 @@ class TestAdaptorIPC:
         server_thread.start()
 
         # Create a client passing in the port number from the server.
-        client = _FakeAppClient(test_server.socket_path)
+        client = _FakeAppClient(test_server.server_path)
 
         # Create a thread for the client.
         client_thread = _threading.Thread(target=start_test_client, args=(client,))
         client_thread.start()
 
         # Giving time to avoid a race condition in which we close the thread before setup.
-        _sleep(1)
+        if OSName.is_linux():
+            _sleep(1)
+        else:
+            # TODO: Need to investigate why Windows is slower
+            _sleep(5)
 
         # Confirming the test ran successfully.
         mocked_hw.assert_called_once_with(hw_args)
@@ -174,6 +182,11 @@ class TestAdaptorIPC:
         # Creating a thread to delay the close action to "force" long polling on the client.
         close_thread = _threading.Thread(target=enqueue_close_action)
         close_thread.start()
+
+        if OSName.is_windows():
+            # Need to wait for the action finish
+            # TODO: Need to investigate why Windows is slower
+            _sleep(3)
 
         # Cleanup
         test_server.shutdown()
