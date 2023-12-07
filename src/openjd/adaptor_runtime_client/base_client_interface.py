@@ -47,11 +47,18 @@ class Response:
 
 class BaseClientInterface(_ABC):
     actions: _Dict[str, _Callable[..., None]]
+    server_path: str
 
-    def __init__(self) -> None:
+    def __init__(self, server_path: str) -> None:
         """
-        When the client is created, we need the port number to connect to the server.
+        When the client is created, we need the server address to connect to the server.
+
+        Args:
+            server_path(str): Server address used for connection.
+                In linux, this will be used for socket path.
+                In Windows, this will be used for pipe name.
         """
+        self.server_path = server_path
         self.actions = {
             "close": self.close,
         }

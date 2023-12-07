@@ -5,7 +5,7 @@ from .._osname import OSName
 
 if OSName.is_posix():
     from ._adaptor_server import AdaptorServer
-
-    __all__ = ["ActionsQueue", "AdaptorServer"]
 else:
-    __all__ = ["ActionsQueue"]
+    from ._win_adaptor_server import WinAdaptorServer as AdaptorServer  # type: ignore
+
+__all__ = ["ActionsQueue", "AdaptorServer"]

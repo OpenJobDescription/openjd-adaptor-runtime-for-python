@@ -6,10 +6,10 @@ from typing import Any as _Any
 from typing import Dict as _Dict
 from typing import Optional as _Optional
 
-from openjd.adaptor_runtime_client import HTTPClientInterface as _HTTPClientInterface
+from openjd.adaptor_runtime_client import ClientInterface as _ClientInterface
 
 
-class FakeAppClient(_HTTPClientInterface):
+class FakeAppClient(_ClientInterface):
     def __init__(self, socket_path: str) -> None:
         super().__init__(socket_path)
         self.actions.update({"hello_world": self.hello_world})

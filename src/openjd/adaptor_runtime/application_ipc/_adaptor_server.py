@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import warnings
+
 from .._osname import OSName
 
 if OSName.is_windows():
@@ -19,6 +21,10 @@ from ._http_request_handler import AdaptorHTTPRequestHandler
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
     from ..adaptors import BaseAdaptor
     from ._actions_queue import ActionsQueue
+
+SOCKET_PATH_DUPLICATED_MESSAGE = (
+    "The 'socket_path' parameter is deprecated; use 'server_path' instead"
+)
 
 
 class AdaptorServer(UnixStreamServer):
@@ -39,7 +45,17 @@ class AdaptorServer(UnixStreamServer):
 
         self.actions_queue = actions_queue
         self.adaptor = adaptor
-        self.socket_path = socket_path
+        self.server_path = socket_path
+
+    @property
+    def socket_path(self):
+        warnings.warn(SOCKET_PATH_DUPLICATED_MESSAGE, DeprecationWarning)
+        return self.server_path
+
+    @socket_path.setter
+    def socket_path(self, value):
+        warnings.warn(SOCKET_PATH_DUPLICATED_MESSAGE, DeprecationWarning)
+        self.server_path = value
 
     def shutdown(self) -> None:  # pragma: no cover
         super().shutdown()
