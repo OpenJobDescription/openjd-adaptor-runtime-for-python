@@ -244,8 +244,7 @@ class ServerResponseGenerator:
         except Exception as e:
             _logger.error(f"Failed to submit work: {e}")
             raise e
-        # Wait for the worker thread to start working before sending the response
-        server._future_runner.wait_for_start()
+        future_runner.wait_for_start()
 
     def submit(
         self, fn: Callable, *args, force_immediate=False, **kwargs
