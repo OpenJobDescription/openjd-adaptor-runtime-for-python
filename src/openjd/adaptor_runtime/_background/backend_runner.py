@@ -10,6 +10,7 @@ from threading import Thread, Event
 from types import FrameType
 from typing import Optional, Union
 
+from .server_response import ServerResponseGenerator
 from .._osname import OSName
 from ..adaptors import AdaptorRunner
 from .._http import SocketDirectories
@@ -53,14 +54,10 @@ class BackendRunner:
         _logger.info("Interruption signal recieved.")
         # OpenJD dictates that a SIGTERM/SIGINT results in a cancel workflow being
         # kicked off.
-        # TODO: Do a code refactoring to move the `submit` to the `server_response`
-        if OSName.is_posix():
-            if self._server is not None:
-                self._server.submit(  # type: ignore
-                    self._adaptor_runner._cancel, force_immediate=True
-                )
-        else:
-            raise NotImplementedError("Signal is not implemented in Windows.")
+        if self._server is not None:
+            ServerResponseGenerator.submit_task(
+                self._server, self._adaptor_runner._cancel, force_immediate=True
+            )
 
     def run(self) -> None:
         """

@@ -152,7 +152,8 @@ class TestBackendRunner:
         mock_os_remove.assert_has_calls([call(conn_file_path), call(socket_path)])
 
     @patch.object(backend_runner.signal, "signal")
-    def test_signal_hook(self, signal_mock: MagicMock) -> None:
+    @patch.object(backend_runner.ServerResponseGenerator, "submit_task")
+    def test_signal_hook(self, mock_submit, signal_mock: MagicMock) -> None:
         # Test that we create the signal hook, and that it initiates a cancelation
         # as expected.
 
@@ -171,4 +172,4 @@ class TestBackendRunner:
         # THEN
         signal_mock.assert_any_call(signal.SIGINT, runner._sigint_handler)
         signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
-        submit_mock.assert_called_with(adaptor_runner._cancel, force_immediate=True)
+        mock_submit.assert_called_with(server_mock, adaptor_runner._cancel, force_immediate=True)
