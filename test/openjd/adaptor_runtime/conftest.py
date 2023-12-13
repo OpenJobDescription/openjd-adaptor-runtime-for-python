@@ -40,6 +40,12 @@ def pytest_collection_modifyitems(items):
                 "configuration",
                 "test_configuration_manager.py",
             ),
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)),
+                "unit",
+                "named_pipe",
+                "test_named_pipe_helper.py",
+            ),
         ]
         skip_marker = pytest.mark.skip(reason="Skipping tests on Windows")
         for item in items:
