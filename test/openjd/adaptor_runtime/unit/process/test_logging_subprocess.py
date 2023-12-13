@@ -64,7 +64,7 @@ class TestLoggingSubprocess(object):
 
         # EXPECT
         mock_popen.assert_called_with(
-            args,
+            args=args,
             encoding="utf-8",
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -111,19 +111,6 @@ class TestLoggingSubprocess(object):
         stderr_logger.join.assert_called_once()
         proc.stdout.close.assert_called_once()
         proc.stderr.close.assert_called_once()
-
-    @mock.patch.object(logging_subprocess.sys, "platform", "win32")
-    def test_terminate_fails_on_windows(self, mock_popen: mock.Mock):
-        args = ["cat", "foo.txt"]
-        proc = mock.Mock()
-        proc.poll.return_value = None
-        proc.pid = 1
-        mock_popen.return_value = proc
-        logger = mock.Mock()
-        subject = LoggingSubprocess(args=args, logger=logger)
-
-        with pytest.raises(NotImplementedError):
-            subject.terminate()
 
     def test_terminate_no_process(self, mock_popen: mock.Mock, mock_stream_logger: mock.Mock):
         # GIVEN

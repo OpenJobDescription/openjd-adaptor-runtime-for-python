@@ -43,11 +43,11 @@ class BackendRunner:
         self._connection_file_path = connection_file_path
         self._log_buffer = log_buffer
         self._server: Optional[Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer]] = None
-        # TODO: Signal handler needed to be checked in Windows
-        #  The current plan is to use CTRL_BREAK.
+        signal.signal(signal.SIGINT, self._sigint_handler)
         if OSName.is_posix():
-            signal.signal(signal.SIGINT, self._sigint_handler)
             signal.signal(signal.SIGTERM, self._sigint_handler)
+        else:
+            signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
 
     def _sigint_handler(self, signum: int, frame: Optional[FrameType]) -> None:
         """Signal handler that is invoked when the process receives a SIGINT/SIGTERM"""

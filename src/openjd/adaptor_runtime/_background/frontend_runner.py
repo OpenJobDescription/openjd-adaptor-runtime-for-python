@@ -60,11 +60,11 @@ class FrontendRunner:
         self._heartbeat_interval = heartbeat_interval
         self._connection_file_path = connection_file_path
         self._canceled = Event()
-        # TODO: Signal handler needed to be checked in Windows
-        #  The current plan is to use CTRL_BREAK.
+        signal.signal(signal.SIGINT, self._sigint_handler)
         if OSName.is_posix():
-            signal.signal(signal.SIGINT, self._sigint_handler)
             signal.signal(signal.SIGTERM, self._sigint_handler)
+        else:
+            signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
 
     def init(
         self, adaptor_module: ModuleType, init_data: dict = {}, path_mapping_data: dict = {}
