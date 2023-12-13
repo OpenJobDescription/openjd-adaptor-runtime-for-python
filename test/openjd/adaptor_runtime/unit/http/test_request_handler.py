@@ -145,7 +145,7 @@ class TestAuthentication:
         @pytest.fixture
         def mock_handler(self) -> MagicMock:
             mock_socket = MagicMock(spec=socket.socket)
-            mock_socket.family = socket.AddressFamily.AF_UNIX
+            mock_socket.family = socket.AddressFamily.AF_UNIX  # type: ignore[attr-defined]
 
             mock_handler = MagicMock(spec=RequestHandler)
             mock_handler.connection = mock_socket
