@@ -7,13 +7,12 @@ import threading
 from threading import Event
 import time
 
-from typing import List, Optional
+from typing import List
 
-from openjd.adaptor_runtime._background.server_config import (
-    NAMED_PIPE_BUFFER_SIZE,
-    DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS,
-)
+from openjd.adaptor_runtime._background.server_config import DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS
 from typing import TYPE_CHECKING
+
+from openjd.adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
 
 if TYPE_CHECKING:
     from openjd.adaptor_runtime._named_pipe import ResourceRequestHandler
@@ -24,6 +23,7 @@ import win32file
 import pywintypes
 import winerror
 import win32api
+
 from pywintypes import HANDLE
 
 from abc import ABC, abstractmethod
@@ -91,34 +91,6 @@ class NamedPipeServer(ABC):
         #   Unlike Linux Server, time out can only be set in the Server side instead of the client side.
         self._time_out = DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS
 
-    def _create_pipe(self, pipe_name: str) -> Optional[HANDLE]:
-        """
-        Creates a new instance of a named pipe or an additional instance if the pipe already exists.
-
-        Args:
-            pipe_name (str): Name of the pipe for which the instance is to be created.
-
-        Returns:
-            HANDLE: The handler for the created named pipe instance.
-
-        """
-
-        pipe_handle = win32pipe.CreateNamedPipe(
-            pipe_name,
-            # A bi-directional pipe; both server and client processes can read from and write to the pipe.
-            # win32file.FILE_FLAG_OVERLAPPED is used for async communication.
-            win32pipe.PIPE_ACCESS_DUPLEX | win32file.FILE_FLAG_OVERLAPPED,
-            win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
-            win32pipe.PIPE_UNLIMITED_INSTANCES,
-            NAMED_PIPE_BUFFER_SIZE,  # nOutBufferSize
-            NAMED_PIPE_BUFFER_SIZE,  # nInBufferSize
-            self._time_out,
-            None,  # TODO: Add lpSecurityAttributes here to limit the access
-        )
-        if pipe_handle == win32file.INVALID_HANDLE_VALUE:
-            return None
-        return pipe_handle
-
     def serve_forever(self) -> None:
         """
         Runs the Named Pipe Server continuously until a shutdown signal is received.
@@ -127,11 +99,8 @@ class NamedPipeServer(ABC):
         and corresponding threads for handling client-server communication.
         """
         _logger.info(f"Creating Named Pipe with name: {self._pipe_name}")
-        print(f"Creating Named Pipe with name: {self._pipe_name}")
-        # During shutdown, a `True` will be pushed to the `_cancel_queue` for ending this loop
-        # TODO: Using threading.event instead of a queue to signal and termination
         while not self._shutdown_event.is_set():
-            pipe_handle = self._create_pipe(self._pipe_name)
+            pipe_handle = NamedPipeHelper.create_named_pipe_server(self._pipe_name, self._time_out)
             if pipe_handle is None:
                 error_msg = (
                     f"Failed to create named pipe instance: "
@@ -141,7 +110,6 @@ class NamedPipeServer(ABC):
                 raise RuntimeError(error_msg)
             self._named_pipe_instances.append(pipe_handle)
             _logger.debug("Waiting for connection from the client...")
-            print("Waiting for connection from the client...")
 
             try:
                 win32pipe.ConnectNamedPipe(pipe_handle, None)
@@ -150,14 +118,9 @@ class NamedPipeServer(ABC):
                     _logger.info(
                         "NamedPipe Server is shutdown. Exit the main thread in the backend server."
                     )
-                    print(
-                        "NamedPipe Server is shutdown. Exit the main thread in the backend server."
-                    )
                     break
                 else:
                     _logger.error(f"Error encountered while connecting to NamedPipe: {e} ")
-                    print(f"Error encountered while connecting to NamedPipe: {e} ")
-            print("Handling response")
             threading.Thread(target=self.request_handler(self, pipe_handle).instance_thread).start()
 
     @abstractmethod
