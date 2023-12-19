@@ -114,7 +114,7 @@ class RequestHandler(server.BaseHTTPRequestHandler):
         # Verify we have a UNIX socket.
         if not (
             isinstance(self.connection, socket.socket)
-            and self.connection.family == socket.AddressFamily.AF_UNIX
+            and self.connection.family == socket.AddressFamily.AF_UNIX  # type: ignore[attr-defined]
         ):
             raise UnsupportedPlatformException(
                 "Failed to handle request because it was not made through a UNIX socket"
@@ -122,14 +122,14 @@ class RequestHandler(server.BaseHTTPRequestHandler):
 
         # Get the credentials of the peer process
         cred_buffer = self.connection.getsockopt(
-            socket.SOL_SOCKET,
-            socket.SO_PEERCRED,
-            socket.CMSG_SPACE(ctypes.sizeof(UCred)),
+            socket.SOL_SOCKET,  # type: ignore[attr-defined]
+            socket.SO_PEERCRED,  # type: ignore[attr-defined]
+            socket.CMSG_SPACE(ctypes.sizeof(UCred)),  # type: ignore[attr-defined]
         )
         peer_cred = UCred.from_buffer_copy(cred_buffer)
 
         # Only allow connections from a process running as the same user
-        return peer_cred.uid == os.getuid()
+        return peer_cred.uid == os.getuid()  # type: ignore[attr-defined]
 
 
 class UCred(ctypes.Structure):

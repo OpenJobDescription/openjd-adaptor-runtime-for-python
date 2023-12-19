@@ -367,7 +367,7 @@ class UnixHTTPConnection(http_client.HTTPConnection):
         super(UnixHTTPConnection, self).__init__("localhost", **kwargs)
 
     def connect(self):
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)  # type: ignore[attr-defined]
         sock.settimeout(self.timeout)
         sock.connect(self.socket_path)
         self.sock = sock

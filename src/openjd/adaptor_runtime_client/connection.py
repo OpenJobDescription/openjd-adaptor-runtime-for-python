@@ -39,7 +39,7 @@ class UnixHTTPConnection(_HTTPConnection):  # pragma: no cover
         super(UnixHTTPConnection, self).__init__(host, **kwargs)
 
     def connect(self):
-        sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)  # type: ignore[attr-defined]
         sock.settimeout(self.timeout)
         sock.connect(self.host)
         self.sock = sock
@@ -55,7 +55,7 @@ class UnixHTTPConnection(_HTTPConnection):  # pragma: no cover
         # Verify we have a UNIX socket.
         if not (
             isinstance(self.sock, _socket.socket)
-            and self.sock.family == _socket.AddressFamily.AF_UNIX
+            and self.sock.family == _socket.AddressFamily.AF_UNIX  # type: ignore[attr-defined]
         ):
             raise NotImplementedError(
                 "Failed to handle request because it was not made through a UNIX socket"
@@ -63,11 +63,11 @@ class UnixHTTPConnection(_HTTPConnection):  # pragma: no cover
 
         # Get the credentials of the peer process
         cred_buffer = self.sock.getsockopt(
-            _socket.SOL_SOCKET,
-            _socket.SO_PEERCRED,
-            _socket.CMSG_SPACE(_ctypes.sizeof(UCred)),
+            _socket.SOL_SOCKET,  # type: ignore[attr-defined]
+            _socket.SO_PEERCRED,  # type: ignore[attr-defined]
+            _socket.CMSG_SPACE(_ctypes.sizeof(UCred)),  # type: ignore[attr-defined]
         )
         peer_cred = UCred.from_buffer_copy(cred_buffer)
 
         # Only allow connections from a process running as the same user
-        return peer_cred.uid == _os.getuid()
+        return peer_cred.uid == _os.getuid()  # type: ignore[attr-defined]

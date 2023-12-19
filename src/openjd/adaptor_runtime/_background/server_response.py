@@ -10,7 +10,7 @@ import time
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
-from typing import Callable, Dict, TYPE_CHECKING, Any, Union
+from typing import Callable, Dict, TYPE_CHECKING, Any, Union, Optional
 
 if TYPE_CHECKING:
     from .backend_named_pipe_server import WinBackgroundNamedPipeServer
@@ -98,7 +98,7 @@ class ServerResponseGenerator:
         self.body = body
         self.query_string_params = query_string_params
 
-    def generate_cancel_put_response(self) -> Union[HTTPResponse | None]:
+    def generate_cancel_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle PUT request to /cancel path.
 
@@ -117,9 +117,7 @@ class ServerResponseGenerator:
             force_immediate=True,
         )
 
-    def generate_heartbeat_get_response(
-        self, parse_ack_id_fn: Callable
-    ) -> Union[HTTPResponse | None]:
+    def generate_heartbeat_get_response(self, parse_ack_id_fn: Callable) -> Optional[HTTPResponse]:
         """
         Handle Get request to /heartbeat path.
 
@@ -171,7 +169,7 @@ class ServerResponseGenerator:
         self.server._shutdown_event.set()
         return self.response_method(HTTPStatus.OK)
 
-    def generate_run_put_response(self) -> Union[HTTPResponse | None]:
+    def generate_run_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle Put request to /run path.
 
@@ -187,19 +185,20 @@ class ServerResponseGenerator:
             self.body if self.body else {},
         )
 
-    def generate_start_put_response(self) -> Union[HTTPResponse | None]:
+    def generate_start_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle Put request to /start path.
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
         if self.server._future_runner.is_running:
             return self.response_method(HTTPStatus.BAD_REQUEST)
 
         return self.submit(self.server._adaptor_runner._start)
 
-    def generate_stop_put_response(self) -> Union[HTTPResponse | None]:
+    def generate_stop_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle Put request to /stop path.
 
@@ -244,12 +243,11 @@ class ServerResponseGenerator:
         except Exception as e:
             _logger.error(f"Failed to submit work: {e}")
             raise e
-        # Wait for the worker thread to start working before sending the response
-        server._future_runner.wait_for_start()
+        future_runner.wait_for_start()
 
     def submit(
         self, fn: Callable, *args, force_immediate=False, **kwargs
-    ) -> Union[HTTPResponse | None]:
+    ) -> Optional[HTTPResponse]:
         """
         Submits work to the server and generate a response for the client.
 
