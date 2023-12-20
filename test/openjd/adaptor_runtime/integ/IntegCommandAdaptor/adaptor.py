@@ -3,6 +3,8 @@
 import os
 from typing import List
 from logging import getLogger
+
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.adaptors import CommandAdaptor
 from openjd.adaptor_runtime.process import ManagedProcess
 
@@ -14,7 +16,12 @@ class IntegManagedProcess(ManagedProcess):
         super().__init__(run_data)
 
     def get_executable(self) -> str:
-        return os.path.abspath(os.path.join(os.path.sep, "bin", "echo"))
+        if OSName.is_windows():
+            # In Windows, we cannot directly execute the powershell script.
+            # Need to use PowerShell.exe to run the command.
+            return "powershell.exe"
+        else:
+            return os.path.abspath(os.path.join(os.path.sep, "bin", "echo"))
 
     def get_arguments(self) -> List[str]:
         return self.run_data.get("args", "")

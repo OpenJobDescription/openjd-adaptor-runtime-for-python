@@ -5,9 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import socketserver
-from http import HTTPStatus
-from queue import Queue
-from typing import Callable
+from threading import Event
 from .._osname import OSName
 from .server_response import ServerResponseGenerator, AsyncFutureRunner
 from ..adaptors import AdaptorRunner
@@ -36,35 +34,16 @@ class BackgroundHTTPServer(UnixStreamServer):
         self,
         socket_path: str,
         adaptor_runner: AdaptorRunner,
-        cancel_queue: Queue,
+        shutdown_event: Event,
         *,
         log_buffer: LogBuffer | None = None,
         bind_and_activate: bool = True,
     ) -> None:  # pragma: no cover
         super().__init__(socket_path, BackgroundRequestHandler, bind_and_activate)  # type: ignore
         self._adaptor_runner = adaptor_runner
-        self._cancel_queue = cancel_queue
+        self._shutdown_event = shutdown_event
         self._future_runner = AsyncFutureRunner()
         self._log_buffer = log_buffer
-
-    def submit(self, fn: Callable, *args, force_immediate=False, **kwargs) -> HTTPResponse:
-        """
-        Submits work to the server.
-
-        Args:
-            force_immediate (bool): Force the server to immediately start the work. This work will
-            be performed concurrently with any ongoing work.
-        """
-        future_runner = self._future_runner if not force_immediate else AsyncFutureRunner()
-        try:
-            future_runner.submit(fn, *args, **kwargs)
-        except Exception as e:
-            _logger.error(f"Failed to submit work: {e}")
-            return HTTPResponse(HTTPStatus.INTERNAL_SERVER_ERROR, body=str(e))
-
-        # Wait for the worker thread to start working before sending the response
-        self._future_runner.wait_for_start()
-        return HTTPResponse(HTTPStatus.OK)
 
 
 class BackgroundRequestHandler(RequestHandler):

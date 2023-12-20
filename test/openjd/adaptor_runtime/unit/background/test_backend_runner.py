@@ -39,12 +39,12 @@ class TestBackendRunner:
 
     @patch.object(backend_runner.json, "dump")
     @patch.object(backend_runner.os, "remove")
-    @patch.object(backend_runner, "Queue")
+    @patch.object(backend_runner, "Event")
     @patch.object(backend_runner, "Thread")
     def test_run(
         self,
         mock_thread: MagicMock,
-        mock_queue: MagicMock,
+        mock_event: MagicMock,
         mock_os_remove: MagicMock,
         mock_json_dump: MagicMock,
         mock_server_cls: MagicMock,
@@ -69,12 +69,12 @@ class TestBackendRunner:
         assert caplog.messages == [
             "Running in background daemon mode.",
             f"Listening on {socket_path}",
-            "HTTP server has shutdown.",
+            "Background server has been shut down.",
         ]
         mock_server_cls.assert_called_once_with(
             socket_path,
             adaptor_runner,
-            mock_queue.return_value,
+            mock_event.return_value,
             log_buffer=None,
         )
         mock_thread.assert_called_once()
@@ -112,12 +112,12 @@ class TestBackendRunner:
 
     @patch.object(backend_runner, "secure_open")
     @patch.object(backend_runner.os, "remove")
-    @patch.object(backend_runner, "Queue")
+    @patch.object(backend_runner, "Event")
     @patch.object(backend_runner, "Thread")
     def test_run_raises_when_writing_connection_file_fails(
         self,
         mock_thread: MagicMock,
-        mock_queue: MagicMock,
+        mock_event: MagicMock,
         mock_os_remove: MagicMock,
         open_mock: MagicMock,
         socket_path: str,
@@ -137,13 +137,13 @@ class TestBackendRunner:
 
         # THEN
         assert raised_err.value is err
-        mock_queue.return_value.put.assert_called_once_with(True)
+        mock_event.return_value.set.assert_called_once()
         assert caplog.messages == [
             "Running in background daemon mode.",
             f"Listening on {socket_path}",
             "Error writing to connection file: ",
             "Shutting down server...",
-            "HTTP server has shutdown.",
+            "Background server has been shut down.",
         ]
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
@@ -152,7 +152,8 @@ class TestBackendRunner:
         mock_os_remove.assert_has_calls([call(conn_file_path), call(socket_path)])
 
     @patch.object(backend_runner.signal, "signal")
-    def test_signal_hook(self, signal_mock: MagicMock) -> None:
+    @patch.object(backend_runner.ServerResponseGenerator, "submit_task")
+    def test_signal_hook(self, mock_submit, signal_mock: MagicMock) -> None:
         # Test that we create the signal hook, and that it initiates a cancelation
         # as expected.
 
@@ -163,7 +164,7 @@ class TestBackendRunner:
         server_mock = MagicMock()
         submit_mock = MagicMock()
         server_mock.submit = submit_mock
-        runner._http_server = server_mock
+        runner._server = server_mock
 
         # WHEN
         runner._sigint_handler(MagicMock(), MagicMock())
@@ -171,4 +172,4 @@ class TestBackendRunner:
         # THEN
         signal_mock.assert_any_call(signal.SIGINT, runner._sigint_handler)
         signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
-        submit_mock.assert_called_with(adaptor_runner._cancel, force_immediate=True)
+        mock_submit.assert_called_with(server_mock, adaptor_runner._cancel, force_immediate=True)

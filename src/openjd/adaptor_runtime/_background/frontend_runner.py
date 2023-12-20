@@ -15,8 +15,9 @@ import urllib.parse as urllib_parse
 from threading import Event
 from types import FrameType
 from types import ModuleType
-from typing import Optional
+from typing import Optional, Dict
 
+from .._osname import OSName
 from ..process._logging import _ADAPTOR_OUTPUT_LEVEL
 from .model import (
     AdaptorState,
@@ -27,6 +28,9 @@ from .model import (
     DataclassMapper,
     HeartbeatResponse,
 )
+
+if OSName.is_windows():
+    from openjd.adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
 
 _logger = logging.getLogger(__name__)
 
@@ -50,12 +54,17 @@ class FrontendRunner:
             heartbeat_interval (float, optional): Interval between heartbeats, in seconds.
                 Defaults to 1.
         """
+        # TODO: Need to figure out how to set up the timeout for the Windows NamedPipe Server
+        #  For Namedpipe, we can only set a timeout on the server side not on the client side.
         self._timeout_s = timeout_s
         self._heartbeat_interval = heartbeat_interval
         self._connection_file_path = connection_file_path
         self._canceled = Event()
-        signal.signal(signal.SIGINT, self._sigint_handler)
-        signal.signal(signal.SIGTERM, self._sigint_handler)
+        # TODO: Signal handler needed to be checked in Windows
+        #  The current plan is to use CTRL_BREAK.
+        if OSName.is_posix():
+            signal.signal(signal.SIGINT, self._sigint_handler)
+            signal.signal(signal.SIGTERM, self._sigint_handler)
 
     def init(
         self, adaptor_module: ModuleType, init_data: dict = {}, path_mapping_data: dict = {}
@@ -109,7 +118,8 @@ class FrontendRunner:
 
         # Wait for backend process to create connection file
         try:
-            _wait_for_file(self._connection_file_path, timeout_s=5)
+            # TODO: Need to investigate why more time is required in Windows
+            _wait_for_file(self._connection_file_path, timeout_s=5 if OSName.is_posix() else 15)
         except TimeoutError:
             _logger.error(
                 "Backend process failed to write connection file in time at: "
@@ -166,8 +176,8 @@ class FrontendRunner:
         """
         params: dict[str, str] | None = {"ack_id": ack_id} if ack_id else None
         response = self._send_request("GET", "/heartbeat", params=params)
-
-        return DataclassMapper(HeartbeatResponse).map(json.load(response.fp))
+        body = json.load(response.fp) if OSName.is_posix() else json.loads(response["body"])  # type: ignore
+        return DataclassMapper(HeartbeatResponse).map(body)
 
     def _heartbeat_until_state_complete(self, state: AdaptorState) -> None:
         """
@@ -214,6 +224,31 @@ class FrontendRunner:
             raise AdaptorFailedException(failure_message)
 
     def _send_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict | None = None,
+        json_body: dict | None = None,
+    ) -> http_client.HTTPResponse | Dict:
+        if OSName.is_windows():
+            return NamedPipeHelper.send_named_pipe_request(
+                self.connection_settings.socket,
+                self._timeout_s,
+                method,
+                path,
+                json_body=json_body,
+                params=params if params else None,
+            )
+        else:
+            return self._send_linux_request(
+                method,
+                path,
+                params=params if params else None,
+                json_body=json_body if json_body else None,
+            )
+
+    def _send_linux_request(
         self,
         method: str,
         path: str,
@@ -332,7 +367,7 @@ class UnixHTTPConnection(http_client.HTTPConnection):
         super(UnixHTTPConnection, self).__init__("localhost", **kwargs)
 
     def connect(self):
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)  # type: ignore[attr-defined]
         sock.settimeout(self.timeout)
         sock.connect(self.socket_path)
         self.sock = sock

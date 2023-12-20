@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import time
 from logging import INFO
 from typing import List
@@ -11,6 +12,7 @@ from unittest import mock
 
 import pytest
 
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.app_handlers import RegexCallback, RegexHandler
 from openjd.adaptor_runtime.process import ManagedProcess
 
@@ -26,10 +28,16 @@ class TestManagedProcess(object):
                 super(FakeManagedProcess, self).__init__(run_data)
 
             def get_executable(self) -> str:
-                return "echo"
+                if OSName.is_windows():
+                    return "powershell.exe"
+                else:
+                    return "echo"
 
             def get_arguments(self) -> List[str]:
-                return ["Hello World!"]
+                if OSName.is_windows():
+                    return ["echo", "Hello World!"]
+                else:
+                    return ["Hello World!"]
 
             def get_startup_directory(self) -> str | None:
                 return None
@@ -59,12 +67,13 @@ class TestIntegrationRegexHandlerManagedProcess(object):
         # GIVEN
         class FakeManagedProcess(ManagedProcess):
             def get_executable(self) -> str:
-                return os.path.join(
-                    os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
-                )
+                return sys.executable
 
             def get_arguments(self) -> List[str]:
-                return [output, str(echo_count)]
+                test_file = os.path.join(
+                    os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
+                )
+                return [test_file, output, str(echo_count)]
 
             def get_startup_directory(self) -> str | None:
                 return None

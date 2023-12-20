@@ -1,6 +1,11 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 from ._actions_queue import ActionsQueue
-from ._adaptor_server import AdaptorServer
+from .._osname import OSName
 
-__all__ = ["ActionsQueue", "AdaptorServer", "ServerAddress"]
+if OSName.is_posix():
+    from ._adaptor_server import AdaptorServer
+else:
+    from ._win_adaptor_server import WinAdaptorServer as AdaptorServer  # type: ignore
+
+__all__ = ["ActionsQueue", "AdaptorServer"]

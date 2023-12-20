@@ -5,12 +5,14 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 import time
 from logging import DEBUG
 from unittest import mock
 
 import pytest
 
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.app_handlers import RegexCallback, RegexHandler
 from openjd.adaptor_runtime.process import LoggingSubprocess
 from openjd.adaptor_runtime.process._logging_subprocess import _STDERR_LEVEL, _STDOUT_LEVEL
@@ -33,41 +35,46 @@ class TestIntegrationLoggingSubprocess(object):
 
     @pytest.mark.timeout(5)
     @pytest.mark.parametrize("grace_period, expected_output", expected_stop_params)
+    # TODO: Windows signal Implementation
+    @pytest.mark.skipif(OSName.is_windows(), reason="Signal is not implemented in Windows yet.")
     def test_stop_process(self, grace_period, expected_output, caplog: pytest.LogCaptureFixture):
         """
         Testing that we stop the process immediately and after SIGTERM fails.
         """
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "no_sigterm.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "signals_test.py"
         )
         caplog.set_level(DEBUG)
-        p = LoggingSubprocess(args=[test_file])
+        p = LoggingSubprocess(args=[sys.executable, test_file, "False"])
 
         # This is because we are giving the subprocess time to load and
         # register the sigterm signal handler with the OS.
-        while "Starting no_sigterm.sh Script" not in caplog.text:
-            True
+        while "Starting signals_test.py Script" not in caplog.text:
+            time.sleep(0.2)
 
         p.terminate(grace_period)
 
+        assert "Starting signals_test.py Script" in caplog.text
         for output in expected_output:
             assert output in caplog.text
 
     @pytest.mark.timeout(5)
+    # TODO: Windows signal Implementation
+    @pytest.mark.skipif(OSName.is_windows(), reason="Signal is not implemented in Windows yet.")
     def test_terminate_process(self, caplog):
         """
         Testing that the process was terminated successfully. This means that the process ended
         when SIGTERM was sent and SIGKILL was not needed.
         """
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "print_signals.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "signals_test.py"
         )
         caplog.set_level(DEBUG)
-        p = LoggingSubprocess(args=[test_file])
+        p = LoggingSubprocess(args=[sys.executable, test_file, "True"])
 
         # This is because we are giving the subprocess time to load and ignore the sigterm signal.
-        while "Starting print_signals.sh Script" not in caplog.text:
-            True
+        while "Starting signals_test.py Script" not in caplog.text:
+            time.sleep(0.2)
 
         p.terminate(5)  # Sometimes, when this is 1 second the process doesn't terminate in time.
 
@@ -75,7 +82,7 @@ class TestIntegrationLoggingSubprocess(object):
             "Sending the SIGTERM signal to pid=" in caplog.text
         )  # Asserting the SIGTERM signal was sent to the subprocess
         assert (
-            "Trapped: TERM" in caplog.text
+            "Trapped: SIGTERM" in caplog.text
         )  # Asserting the SIGTERM was received by the subprocess.
         assert (
             "now sending the SIGKILL signal." not in caplog.text
@@ -89,8 +96,10 @@ class TestIntegrationLoggingSubprocess(object):
     @pytest.mark.parametrize("startup_dir", startup_dir_params)
     def test_startup_directory(self, startup_dir: str | None, caplog):
         caplog.set_level(logging.INFO)
-
-        args = ["pwd"]
+        if OSName.is_windows():
+            args = ["powershell.exe", "pwd"]
+        else:
+            args = ["pwd"]
         ls = LoggingSubprocess(args=args, startup_directory=startup_dir)
 
         # Sometimes we assert too quickly, so we are waiting for the pwd command to finish
@@ -100,18 +109,28 @@ class TestIntegrationLoggingSubprocess(object):
         # Explicitly cleanup the IO threads to ensure all output is logged
         ls._cleanup_io_threads()
 
-        assert "Running command: pwd" in caplog.text
+        assert f"Running command: {' '.join(args)}" in caplog.text
 
         if startup_dir is not None:
             assert startup_dir in caplog.text
 
-    def test_startup_directory_empty(self):
+    @pytest.mark.skipif(not OSName.is_posix(), reason="Only run this test in Linux.")
+    def test_startup_directory_empty_posix(self):
         """When calling LoggingSubprocess with an empty cwd, FileNotFoundError will be raised."""
         args = ["pwd"]
         with pytest.raises(FileNotFoundError) as excinfo:
             LoggingSubprocess(args=args, startup_directory="")
-
         assert "[Errno 2] No such file or directory: ''" in str(excinfo.value)
+
+    @pytest.mark.skipif(not OSName.is_windows(), reason="Only run this test in Windows.")
+    def test_startup_directory_empty_windows(self):
+        """When calling LoggingSubprocess with an empty cwd, OSError will be raised."""
+        args = ["powershell.exe", "pwd"]
+        with pytest.raises(OSError) as exc_info:
+            LoggingSubprocess(args=args, startup_directory="")
+        assert "The filename, directory name, or volume label syntax is incorrect" in str(
+            exc_info.value
+        )
 
     @pytest.mark.parametrize("log_level", [_STDOUT_LEVEL, _STDERR_LEVEL])
     def test_log_levels(self, log_level: int, caplog):
@@ -120,11 +139,11 @@ class TestIntegrationLoggingSubprocess(object):
         message = "Hello World"
 
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
         )
         # WHEN
         p = LoggingSubprocess(
-            args=[test_file, message, "1"],
+            args=[sys.executable, test_file, message, "1"],
         )
         p.wait()
 
@@ -157,17 +176,19 @@ class TestIntegrationRegexHandler(object):
         regex_callbacks = [RegexCallback([regex], callback)]
         regex_handler = RegexHandler(regex_callbacks)
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
         )
         # WHEN
         p = LoggingSubprocess(
-            args=[test_file, output, str(echo_count)],
+            args=[sys.executable, test_file, output, str(echo_count)],
             stdout_handler=regex_handler if stdout else None,
             stderr_handler=regex_handler if stderr else None,
         )
         p.wait()
         time.sleep(0.01)  # magic sleep - logging handler has a delay and test can exit too fast
-
+        print(
+            [sys.executable, test_file, output, str(echo_count)],
+        )
         # THEN
         assert callback.call_count == echo_count * (stdout + stderr)
         assert all(c[0][0].re == regex for c in callback.call_args_list)
@@ -198,7 +219,7 @@ class TestIntegrationRegexHandler(object):
         stderr_handlers = regex_handlers[num_procs:]
 
         test_file = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.sh"
+            os.path.abspath(os.path.dirname(__file__)), "scripts", "echo_sleep_n_times.py"
         )
 
         # WHEN
@@ -206,7 +227,7 @@ class TestIntegrationRegexHandler(object):
         for i in range(num_procs):
             procs.append(
                 LoggingSubprocess(
-                    args=[test_file, output, str(echo_count)],
+                    args=[sys.executable, test_file, output, str(echo_count)],
                     stdout_handler=stdout_handlers[i],
                     stderr_handler=stderr_handlers[i],
                 )

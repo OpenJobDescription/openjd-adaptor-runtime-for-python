@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import posixpath
 import stat
 from typing import Generic, List, Type, TypeVar
 
@@ -51,24 +50,21 @@ def create_adaptor_configuration_manager(
     elif isinstance(schema_path, list):
         schema_paths.extend(schema_path)
 
-    system_config_path_map = {
-        "Linux": posixpath.abspath(
-            posixpath.join(
-                posixpath.sep,
-                "etc",
-                "openjd",
-                "adaptors",
-                adaptor_name,
-                f"{adaptor_name}.json",
-            )
-        )
-    }
+    system_config_path_prefix = "/etc" if OSName.is_posix() else os.environ["PROGRAMDATA"]
+    system_config_path = os.path.join(
+        system_config_path_prefix,
+        "openjd",
+        "adaptors",
+        adaptor_name,
+        f"{adaptor_name}.json",
+    )
+
     user_config_rel_path = os.path.join(".openjd", "adaptors", adaptor_name, f"{adaptor_name}.json")
 
     return ConfigurationManager(
         config_cls=config_cls,
         default_config_path=default_config_path,
-        system_config_path_map=system_config_path_map,
+        system_config_path=system_config_path,
         user_config_rel_path=user_config_rel_path,
         schema_path=schema_paths,
         additional_config_paths=additional_config_paths,
@@ -119,7 +115,7 @@ class ConfigurationManager(Generic[_ConfigType]):
         *,
         config_cls: Type[_ConfigType],
         default_config_path: str,
-        system_config_path_map: dict,
+        system_config_path: str,
         user_config_rel_path: str,
         schema_path: str | List[str] | None = None,
         additional_config_paths: list[str] = [],
@@ -130,8 +126,7 @@ class ConfigurationManager(Generic[_ConfigType]):
         Args:
             config_cls (Type[T]): The Configuration class that this class manages.
             default_config_path (str): The path to the default configuration JSON file.
-            system_config_path_map (dict): A dictionary containing a mapping of OS names to system
-            configuration file path.
+            system_config_path (str): The path to the system config file.
             user_config_rel_path (str): The path to the user configuration file relative to the
             user's home directory.
             schema_path (str, List[str], Optional): The path(s) to the JSON Schema file to use.
@@ -143,7 +138,7 @@ class ConfigurationManager(Generic[_ConfigType]):
         self._config_cls = config_cls
         self._schema_path = schema_path
         self._default_config_path = default_config_path
-        self._system_config_path_map = system_config_path_map
+        self._system_config_path = system_config_path
         self._user_config_rel_path = user_config_rel_path
         self._additional_config_paths = additional_config_paths
 
@@ -164,20 +159,9 @@ class ConfigurationManager(Generic[_ConfigType]):
         """
         Gets the system-level configuration file path.
 
-        Raises:
-            NotImplementedError: Raised when no mapping exists for the system config path on
-            the current system/OS.
         """
-        try:
-            system = OSName()
-        except ValueError:  # Can happen on unsupported platforms like Java
-            raise NotImplementedError()
 
-        path = self._system_config_path_map.get(system, None)
-        if path is None:
-            raise NotImplementedError()
-
-        return path
+        return self._system_config_path
 
     def get_system_config(self) -> _ConfigType | None:
         """
@@ -248,7 +232,7 @@ class ConfigurationManager(Generic[_ConfigType]):
 
         system_config = self.get_system_config()
         if system_config:
-            _logger.info(f"Applying system-level configuration: {self.get_system_config_path()}")
+            _logger.info(f"Applying system-level configuration: {self._system_config_path}")
             old_config = config
             config = config.override(system_config)
             log_diffs(config, old_config)

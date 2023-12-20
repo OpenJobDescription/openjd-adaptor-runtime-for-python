@@ -10,9 +10,10 @@ import time
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
-from typing import Callable, Dict, TYPE_CHECKING, Any
+from typing import Callable, Dict, TYPE_CHECKING, Any, Union, Optional
 
 if TYPE_CHECKING:
+    from .backend_named_pipe_server import WinBackgroundNamedPipeServer
     from .http_server import BackgroundHTTPServer
 
 
@@ -75,10 +76,10 @@ class ServerResponseGenerator:
 
     def __init__(
         self,
-        server: BackgroundHTTPServer,
+        server: Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer],
         response_fn: Callable,
-        body: Dict,
-        query_string_params: Dict[str, Any],
+        body: Dict | None = None,
+        query_string_params: Dict[str, Any] | None = None,
     ):
         """
         Response generator
@@ -97,12 +98,13 @@ class ServerResponseGenerator:
         self.body = body
         self.query_string_params = query_string_params
 
-    def generate_cancel_put_response(self) -> HTTPResponse:
+    def generate_cancel_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle PUT request to /cancel path.
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
         if not (
             self.server._future_runner.is_running
@@ -115,7 +117,7 @@ class ServerResponseGenerator:
             force_immediate=True,
         )
 
-    def generate_heartbeat_get_response(self, parse_ack_id_fn: Callable) -> HTTPResponse:
+    def generate_heartbeat_get_response(self, parse_ack_id_fn: Callable) -> Optional[HTTPResponse]:
         """
         Handle Get request to /heartbeat path.
 
@@ -124,6 +126,7 @@ class ServerResponseGenerator:
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
         # Failure messages are in the form: "<log-level>: openjd_fail: <message>"
         _FAILURE_REGEX = f"^(?:\\w+: )?{re.escape(_OPENJD_FAIL_STDOUT_PREFIX)}"
@@ -160,17 +163,19 @@ class ServerResponseGenerator:
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
 
-        self.server._cancel_queue.put(True)
+        self.server._shutdown_event.set()
         return self.response_method(HTTPStatus.OK)
 
-    def generate_run_put_response(self) -> HTTPResponse:
+    def generate_run_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle Put request to /run path.
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
         if self.server._future_runner.is_running:
             return self.response_method(HTTPStatus.BAD_REQUEST)
@@ -180,24 +185,26 @@ class ServerResponseGenerator:
             self.body if self.body else {},
         )
 
-    def generate_start_put_response(self) -> HTTPResponse:
+    def generate_start_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle Put request to /start path.
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
         if self.server._future_runner.is_running:
             return self.response_method(HTTPStatus.BAD_REQUEST)
 
         return self.submit(self.server._adaptor_runner._start)
 
-    def generate_stop_put_response(self) -> HTTPResponse:
+    def generate_stop_put_response(self) -> Optional[HTTPResponse]:
         """
         Handle Put request to /stop path.
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
 
         if self.server._future_runner.is_running:
@@ -215,9 +222,34 @@ class ServerResponseGenerator:
         finally:
             self.server._adaptor_runner._cleanup()
 
-    def submit(self, fn: Callable, *args, force_immediate=False, **kwargs) -> HTTPResponse:
+    @staticmethod
+    def submit_task(
+        server: Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer],
+        fn: Callable,
+        *args,
+        force_immediate=False,
+        **kwargs,
+    ):
         """
         Submits work to the server.
+
+        Args:
+            force_immediate (bool): Force the server to immediately start the work. This work will
+            be performed concurrently with any ongoing work.
+        """
+        future_runner = server._future_runner if not force_immediate else AsyncFutureRunner()
+        try:
+            future_runner.submit(fn, *args, **kwargs)
+        except Exception as e:
+            _logger.error(f"Failed to submit work: {e}")
+            raise e
+        future_runner.wait_for_start()
+
+    def submit(
+        self, fn: Callable, *args, force_immediate=False, **kwargs
+    ) -> Optional[HTTPResponse]:
+        """
+        Submits work to the server and generate a response for the client.
 
         Args:
             force_immediate (bool): Force the server to immediately start the work. This work will
@@ -225,14 +257,13 @@ class ServerResponseGenerator:
 
         Returns:
             Linux: return HTTPResponse.
+            Windows: return None. Response will be sent in self.response_method immediately.
         """
-        future_runner = self.server._future_runner if not force_immediate else AsyncFutureRunner()
         try:
-            future_runner.submit(fn, *args, **kwargs)
+            ServerResponseGenerator.submit_task(
+                self.server, fn, *args, force_immediate=force_immediate, **kwargs
+            )
         except Exception as e:
-            _logger.error(f"Failed to submit work: {e}")
             return self.response_method(HTTPStatus.INTERNAL_SERVER_ERROR, body=str(e))
 
-        # Wait for the worker thread to start working before sending the response
-        self.server._future_runner.wait_for_start()
         return self.response_method(HTTPStatus.OK)

@@ -58,7 +58,7 @@ class ConfigurationManagerMock(ConfigurationManager):
         *,
         schema_path="",
         default_config_path="",
-        system_config_path_map={},
+        system_config_path="",
         user_config_rel_path="",
         additional_config_paths=[],
     ) -> None:
@@ -66,7 +66,7 @@ class ConfigurationManagerMock(ConfigurationManager):
             config_cls=Configuration,
             schema_path=schema_path,
             default_config_path=default_config_path,
-            system_config_path_map=system_config_path_map,
+            system_config_path=system_config_path,
             user_config_rel_path=user_config_rel_path,
             additional_config_paths=additional_config_paths,
         )

@@ -22,11 +22,12 @@ from openjd.adaptor_runtime._background.frontend_runner import (
     HTTPError,
     _load_connection_settings,
 )
+from openjd.adaptor_runtime._osname import OSName
 
 mod_path = (Path(__file__).parent).resolve()
 sys.path.append(str(mod_path))
 if (_pypath := os.environ.get("PYTHONPATH")) is not None:
-    os.environ["PYTHONPATH"] = ":".join((_pypath, str(mod_path)))
+    os.environ["PYTHONPATH"] = os.pathsep.join((_pypath, str(mod_path)))
 else:
     os.environ["PYTHONPATH"] = str(mod_path)
 from sample_adaptor import SampleAdaptor  # noqa: E402
@@ -60,7 +61,8 @@ class TestDaemonMode:
         caplog: pytest.LogCaptureFixture,
     ) -> Generator[tuple[FrontendRunner, psutil.Process], None, None]:
         caplog.set_level(0)
-        frontend = FrontendRunner(connection_file_path)
+        # TODO: Investigate why we need more time in Windows.
+        frontend = FrontendRunner(connection_file_path, timeout_s=5.0 if OSName.is_posix() else 15)
         frontend.init(sys.modules[SampleAdaptor.__module__])
         conn_settings = _load_connection_settings(connection_file_path)
 
@@ -75,10 +77,15 @@ class TestDaemonMode:
             backend_proc.kill()
         except psutil.NoSuchProcess:
             pass  # Already stopped
-        try:
-            os.remove(conn_settings.socket)
-        except FileNotFoundError:
-            pass  # Already deleted
+
+        # We don't need to call the `remove` for the NamedPipe server.
+        # NamedPipe servers are managed by Named Pipe File System it is not a regular file.
+        # Once all handles are closed, the system automatically cleans up the named pipe.
+        if OSName.is_posix():
+            try:
+                os.remove(conn_settings.socket)
+            except FileNotFoundError:
+                pass  # Already deleted
 
     def test_init(
         self,
@@ -92,12 +99,17 @@ class TestDaemonMode:
         assert os.path.exists(connection_file_path)
 
         connection_settings = _load_connection_settings(connection_file_path)
-        assert any(
-            [
-                conn.laddr == connection_settings.socket
-                for conn in backend_proc.connections(kind="unix")
-            ]
-        )
+
+        if OSName.is_windows():
+            # TODO: Need to figure out what we need to validate here
+            pass
+        else:
+            assert any(
+                [
+                    conn.laddr == connection_settings.socket
+                    for conn in backend_proc.connections(kind="unix")
+                ]
+            )
 
     def test_shutdown(
         self,
@@ -114,7 +126,8 @@ class TestDaemonMode:
         # THEN
         assert all(
             [
-                _wait_for_file_deletion(p, timeout_s=1)
+                # TODO: Investigate why we need more time in Windows
+                _wait_for_file_deletion(p, timeout_s=(1 if OSName.is_posix() else 5))
                 for p in [connection_file_path, conn_settings.socket]
             ]
         )
@@ -185,7 +198,10 @@ class TestDaemonMode:
 
         # WHEN
         new_response = frontend._heartbeat(response.output.id)
-
+        # In Windows, we need to shut down the namedpipe client,
+        # or the connection of the NamedPipe server remains open
+        if OSName.is_windows():
+            frontend.shutdown()
         # THEN
         assert f"Received ACK for chunk: {response.output.id}" in new_response.output.output
 

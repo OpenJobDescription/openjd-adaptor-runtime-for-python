@@ -4,7 +4,7 @@ import json
 import os
 import socketserver
 from http import HTTPStatus
-from queue import Queue
+from threading import Event
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -148,60 +148,6 @@ class TestAsyncFutureRunner:
 
         # THEN
         assert mock_sleep.called_once_with(AsyncFutureRunner._WAIT_FOR_START_INTERVAL)
-
-
-class TestBackgroundHTTPServer:
-    """
-    Tests for the BackgroundHTTPServer class
-    """
-
-    class TestSubmit:
-        """
-        Tests for the BackgroundHTTPServer.submit method
-        """
-
-        def test_submits_work(self):
-            # GIVEN
-            def my_fn():
-                pass
-
-            args = ("one", "two")
-            kwargs = {"three": 3, "four": 4}
-
-            mock_server = MagicMock(spec=BackgroundHTTPServer)
-            mock_future_runner = MagicMock()
-            mock_server._future_runner = mock_future_runner
-
-            # WHEN
-            result = BackgroundHTTPServer.submit(mock_server, my_fn, *args, **kwargs)
-
-            # THEN
-            mock_future_runner.submit.assert_called_once_with(my_fn, *args, **kwargs)
-            mock_future_runner.wait_for_start.assert_called_once()
-            assert result.status == HTTPStatus.OK
-
-        def test_returns_500_if_fails_to_submit_work(self, caplog: pytest.LogCaptureFixture):
-            # GIVEN
-            def my_fn():
-                pass
-
-            args = ("one", "two")
-            kwargs = {"three": 3, "four": 4}
-
-            mock_server = MagicMock(spec=BackgroundHTTPServer)
-            mock_future_runner = MagicMock()
-            exc = Exception()
-            mock_future_runner.submit.side_effect = exc
-            mock_server._future_runner = mock_future_runner
-
-            # WHEN
-            result = BackgroundHTTPServer.submit(mock_server, my_fn, *args, **kwargs)
-
-            # THEN
-            mock_future_runner.submit.assert_called_once_with(my_fn, *args, **kwargs)
-            assert result.status == HTTPStatus.INTERNAL_SERVER_ERROR
-            assert result.body == str(exc)
-            assert "Failed to submit work: " in caplog.text
 
 
 class TestBackgroundRequestHandler:
@@ -554,8 +500,8 @@ class TestShutdownHandler:
         # GIVEN
         mock_request_handler = MagicMock()
         mock_server = MagicMock(spec=BackgroundHTTPServer)
-        mock_cancel_queue = MagicMock(spec=Queue)
-        mock_server._cancel_queue = mock_cancel_queue
+        mock_shutdown_event = MagicMock(spec=Event)
+        mock_server._shutdown_event = mock_shutdown_event
         mock_request_handler.server = mock_server
         mock_request_handler.headers = {"Content-Length": 0}
         mock_request_handler.path = ""
@@ -565,7 +511,7 @@ class TestShutdownHandler:
         response = handler.put()
 
         # THEN
-        mock_cancel_queue.put.assert_called_once_with(True)
+        mock_shutdown_event.set.assert_called_once()
         assert response.status == HTTPStatus.OK
         assert response.body is None
 
