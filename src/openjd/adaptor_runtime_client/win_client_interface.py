@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .base_client_interface import Response as _Response
 import http.client
+import signal as _signal
 
 
 from .base_client_interface import BaseClientInterface
@@ -19,8 +20,8 @@ class WinClientInterface(BaseClientInterface):
         Args:
             server_path (str): Used as pipe name in Named Pipe Server.
         """
-        # TODO: Add a logic to handle CTRL-Break signal here
         super().__init__(server_path)
+        _signal.signal(_signal.SIGTERM, self.graceful_shutdown)  # type: ignore[attr-defined]
 
     def _send_request(
         self,
