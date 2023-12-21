@@ -128,8 +128,7 @@ class NamedPipeHelper:
         pipe_handle = win32pipe.CreateNamedPipe(
             pipe_name,
             # A bi-directional pipe; both server and client processes can read from and write to the pipe.
-            # win32file.FILE_FLAG_OVERLAPPED is used for async communication.
-            win32pipe.PIPE_ACCESS_DUPLEX | win32file.FILE_FLAG_OVERLAPPED,
+            win32pipe.PIPE_ACCESS_DUPLEX,
             win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
             win32pipe.PIPE_UNLIMITED_INSTANCES,
             NAMED_PIPE_BUFFER_SIZE,  # nOutBufferSize
