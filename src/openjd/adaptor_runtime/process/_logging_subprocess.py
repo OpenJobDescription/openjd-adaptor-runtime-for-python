@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import logging
+import os
+import signal
 import subprocess
-import sys
 import uuid
 from types import TracebackType
-from typing import Any, Sequence, TypeVar
+from typing import Any, Sequence, TypeVar, Dict
 
+from .._osname import OSName
 from ..app_handlers import RegexHandler
 from ._logging import _STDERR_LEVEL, _STDOUT_LEVEL
 from ._stream_logger import StreamLogger
@@ -51,14 +53,19 @@ class LoggingSubprocess(object):
         self._logger.info("Running command: %s", subprocess.list2cmdline(args))
 
         # Create the subprocess
-        self._process = subprocess.Popen(
-            args,
+        popen_params: Dict[str, Any] = dict(
+            args=args,
             stdin=subprocess.PIPE,
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
             encoding=encoding,
             cwd=startup_directory,
         )
+        if OSName.is_windows():
+            # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
+            # Without this one, current process will also get the SIGBREAK and may react incorrectly.
+            popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
+        self._process = subprocess.Popen(**popen_params)
 
         if not self._process.stdout:  # pragma: no cover
             raise RuntimeError("process stdout not set")
@@ -171,17 +178,21 @@ class LoggingSubprocess(object):
             self._process.kill()
             self._process.wait()
         else:
-            # On Windows, process.kill is an alias for process.terminate. We may want to replicate
-            # the behaviour of this function on Windows.
-            # Here is a blog post for reference: https://maruel.ca/post/python_windows_signal/
-            if sys.platform == "win32":
-                raise NotImplementedError()
-
-            self._logger.info(
-                f"Sending the SIGTERM signal to pid={self._process.pid} and waiting {grace_time_s}"
-                " seconds for it to exit."
-            )
-            self._process.terminate()  # SIGTERM
+            if OSName.is_windows():
+                self._logger.info(
+                    f"Sending the SIGBREAK signal to pid={self._process.pid} and waiting {grace_time_s}"
+                    " seconds for it to exit."
+                )
+                # We use `CREATE_NEW_PROCESS_GROUP` to create the process,
+                # so pid here is also the process group id and SIGBREAK can be only sent to the process group.
+                # Any processes in the process group will receive the SIGBREAK signal.
+                os.kill(self._process.pid, signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
+            else:
+                self._logger.info(
+                    f"Sending the SIGTERM signal to pid={self._process.pid} and waiting {grace_time_s}"
+                    " seconds for it to exit."
+                )
+                self._process.terminate()  # SIGTERM
 
             try:
                 self._process.wait(timeout=grace_time_s)
@@ -189,7 +200,8 @@ class LoggingSubprocess(object):
             except subprocess.TimeoutExpired:
                 self._logger.info(
                     f"Process (pid={self._process.pid}) did not complete in the allotted time "
-                    "after the SIGTERM signal, now sending the SIGKILL signal."
+                    f"after the {'SIGTERM' if OSName.is_posix() else 'SIGBREAK'} signal, "
+                    f"now sending the SIGKILL signal."
                 )
                 self._process.kill()  # SIGKILL, on Windows, this is an alias for terminate
                 self._process.wait()

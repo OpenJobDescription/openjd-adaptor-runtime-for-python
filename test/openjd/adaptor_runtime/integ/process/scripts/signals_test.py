@@ -5,6 +5,7 @@ import sys
 import time
 from datetime import datetime
 import logging
+from openjd.adaptor_runtime._osname import OSName
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ def func_trap(signum, frame):
 
 
 def set_signal_handlers():
-    signals = [signal.SIGTERM, signal.SIGINT]
+    signals = [signal.SIGINT, signal.SIGTERM if OSName.is_posix() else signal.SIGBREAK]  # type: ignore[attr-defined]
     for sig in signals:
         signal.signal(sig, func_trap)
 

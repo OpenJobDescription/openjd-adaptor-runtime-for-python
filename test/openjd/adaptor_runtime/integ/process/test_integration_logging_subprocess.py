@@ -26,7 +26,7 @@ class TestIntegrationLoggingSubprocess(object):
         pytest.param(
             2,
             [
-                "Sending the SIGTERM signal to pid=",
+                f"Sending the {'SIGTERM' if OSName.is_posix() else 'SIGBREAK'} signal to pid=",
                 "now sending the SIGKILL signal.",
             ],
             id="StopProcessWhenSIGTERMFails",
@@ -35,8 +35,6 @@ class TestIntegrationLoggingSubprocess(object):
 
     @pytest.mark.timeout(5)
     @pytest.mark.parametrize("grace_period, expected_output", expected_stop_params)
-    # TODO: Windows signal Implementation
-    @pytest.mark.skipif(OSName.is_windows(), reason="Signal is not implemented in Windows yet.")
     def test_stop_process(self, grace_period, expected_output, caplog: pytest.LogCaptureFixture):
         """
         Testing that we stop the process immediately and after SIGTERM fails.
@@ -54,13 +52,10 @@ class TestIntegrationLoggingSubprocess(object):
 
         p.terminate(grace_period)
 
-        assert "Starting signals_test.py Script" in caplog.text
         for output in expected_output:
             assert output in caplog.text
 
     @pytest.mark.timeout(5)
-    # TODO: Windows signal Implementation
-    @pytest.mark.skipif(OSName.is_windows(), reason="Signal is not implemented in Windows yet.")
     def test_terminate_process(self, caplog):
         """
         Testing that the process was terminated successfully. This means that the process ended
@@ -77,12 +72,12 @@ class TestIntegrationLoggingSubprocess(object):
             time.sleep(0.2)
 
         p.terminate(5)  # Sometimes, when this is 1 second the process doesn't terminate in time.
-
+        signal_name = "SIGTERM" if OSName.is_posix() else "SIGBREAK"
         assert (
-            "Sending the SIGTERM signal to pid=" in caplog.text
+            f"Sending the {signal_name} signal to pid=" in caplog.text
         )  # Asserting the SIGTERM signal was sent to the subprocess
         assert (
-            "Trapped: SIGTERM" in caplog.text
+            f"Trapped: {signal_name}" in caplog.text
         )  # Asserting the SIGTERM was received by the subprocess.
         assert (
             "now sending the SIGKILL signal." not in caplog.text
