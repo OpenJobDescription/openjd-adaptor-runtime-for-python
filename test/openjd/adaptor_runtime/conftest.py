@@ -22,6 +22,11 @@ def pytest_collection_modifyitems(items):
             ),
             os.path.join(
                 os.path.abspath(os.path.dirname(__file__)),
+                "integ",
+                "_utils",
+            ),
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)),
                 "unit",
                 "adaptors",
                 "configuration",
