@@ -4,6 +4,9 @@ import logging
 
 import win32file
 import pywintypes
+import win32security
+import win32con
+import getpass
 import winerror
 import time
 import win32pipe
@@ -58,6 +61,84 @@ class NamedPipeHelper:
     This class provides static methods to interact with Named Pipes,
     facilitating data transmission between the server and the client.
     """
+
+    @staticmethod
+    def create_security_attributes():
+        """
+        Creates and returns security attributes for a named pipe,
+        allowing access only to the current user and denying network access.
+
+        Returns:
+            win32security.SECURITY_ATTRIBUTES: A SECURITY_ATTRIBUTES object configured with the custom security descriptor.
+        """
+
+        # Get the username of the current user
+        username = getpass.getuser()
+
+        # Get the SID for the current user
+        # TODO: Verify this by using the AD user
+        user_sid, _, _ = win32security.LookupAccountName(
+            "", username  # Search for the account on the local computer.
+        )
+
+        # Users who log on across a network. "S-1-5-2" is a group identifier added to the token of a process
+        # when it was logged on across a network.
+        # https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
+        network_sid = win32security.ConvertStringSidToSid("S-1-5-2")
+
+        # Create a security descriptor and DACL
+        security_descriptor = win32security.SECURITY_DESCRIPTOR()
+        dacl = win32security.ACL()
+
+        # Add a rule that allows the current user full control
+        dacl.AddAccessAllowedAce(
+            win32security.ACL_REVISION, win32con.GENERIC_READ | win32con.GENERIC_WRITE, user_sid
+        )
+
+        # Add a rule that denies network access
+        dacl.AddAccessDeniedAce(win32security.ACL_REVISION, win32con.GENERIC_ALL, network_sid)
+
+        # Set the ACL to the security descriptor
+        security_descriptor.SetSecurityDescriptorDacl(
+            1,  # A flag that indicates the presence of a DACL in the security descriptor.
+            dacl,  # The DACL itself
+            0,  # 0 means False. DACL has been explicitly specified by a user
+        )
+
+        # Create security attributes
+        security_attributes = win32security.SECURITY_ATTRIBUTES()
+        security_attributes.SECURITY_DESCRIPTOR = security_descriptor
+
+        return security_attributes
+
+    @staticmethod
+    def create_named_pipe_server(pipe_name: str, time_out_in_seconds: float) -> Optional[HANDLE]:
+        """
+        Creates a new instance of a named pipe or an additional instance if the pipe already exists.
+
+        Args:
+            pipe_name (str): Name of the pipe for which the instance is to be created.
+            time_out_in_seconds (float): time out in seconds in service side.
+
+        Returns:
+            HANDLE: The handler for the created named pipe instance.
+
+        """
+
+        pipe_handle = win32pipe.CreateNamedPipe(
+            pipe_name,
+            # A bi-directional pipe; both server and client processes can read from and write to the pipe.
+            win32pipe.PIPE_ACCESS_DUPLEX,
+            win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
+            win32pipe.PIPE_UNLIMITED_INSTANCES,
+            NAMED_PIPE_BUFFER_SIZE,  # nOutBufferSize
+            NAMED_PIPE_BUFFER_SIZE,  # nInBufferSize
+            time_out_in_seconds,
+            NamedPipeHelper.create_security_attributes(),
+        )
+        if pipe_handle == win32file.INVALID_HANDLE_VALUE:
+            return None
+        return pipe_handle
 
     @staticmethod
     def _handle_pipe_exception(e: pywintypes.error) -> None:
@@ -156,7 +237,7 @@ class NamedPipeHelper:
                     # Give the read / write permission
                     win32file.GENERIC_READ | win32file.GENERIC_WRITE,
                     0,  # Disable the sharing Mode
-                    None,  # TODO: Need to set the security descriptor. Right now, None means default security
+                    NamedPipeHelper.create_security_attributes(),
                     win32file.OPEN_EXISTING,  # Open existing pipe
                     0,  # No Additional flags
                     None,  # A valid handle to a template file, This parameter is ignored when opening an existing pipe.
