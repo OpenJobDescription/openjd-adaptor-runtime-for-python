@@ -69,12 +69,12 @@ def secure_open(
         yield f
 
 
-def get_file_owner_in_windows(filepath):
+def get_file_owner_in_windows(filepath: "StrOrBytesPath") -> str:
     """
     Retrieves the owner of the specified file in Windows OS.
 
     Args:
-        filepath (str): The path to the file whose owner needs to be determined.
+        filepath (StrOrBytesPath): The path to the file whose owner needs to be determined.
 
     Returns:
         str: A string in the format 'DOMAIN\\Username' representing the file's owner.
@@ -85,7 +85,7 @@ def get_file_owner_in_windows(filepath):
     return f"{domain}\\{name}"
 
 
-def set_file_permissions_in_windows(filepath):
+def set_file_permissions_in_windows(filepath: "StrOrBytesPath") -> None:
     """
     Sets read and write permissions for the owner of the specified file.
 
@@ -93,7 +93,7 @@ def set_file_permissions_in_windows(filepath):
     does not consider existing DACLs.
 
     Args:
-        filepath (str): The path to the file for which permissions are to be set.
+        filepath (StrOrBytesPath): The path to the file for which permissions are to be set.
     """
     user_name = get_file_owner_in_windows(filepath)
     user_sid = win32security.LookupAccountName("", user_name)[0]
