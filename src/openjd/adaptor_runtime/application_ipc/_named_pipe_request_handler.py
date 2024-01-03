@@ -2,7 +2,7 @@
 
 import json
 from http import HTTPStatus
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, Dict, List
 
 from ._adaptor_server_response import AdaptorServerResponseGenerator
 from .._named_pipe import ResourceRequestHandler
@@ -36,6 +36,14 @@ class WinAdaptorServerResourceRequestHandler(ResourceRequestHandler):
         """
         super().__init__(server, pipe_handle)
 
+    @property
+    def request_path_and_method_dict(self) -> Dict[str, List[str]]:
+        return {
+            "/path_mapping": ["GET"],
+            "/path_mapping_rules": ["GET"],
+            "/action": ["GET"],
+        }
+
     def handle_request(self, data: str):
         """
         Processes an incoming request and routes it to the correct response handler based on the method
@@ -45,9 +53,10 @@ class WinAdaptorServerResourceRequestHandler(ResourceRequestHandler):
             data: A string containing the message sent from the client.
         """
         request_dict = json.loads(data)
-        # Ignore the leading `/`
-        path = request_dict["path"][1:]
+        path = request_dict["path"]
         method: str = request_dict["method"]
+        if not self.validate_request_path_and_method(path, method):
+            return
 
         if "params" in request_dict and request_dict["params"] != "null":
             query_string_params = json.loads(request_dict["params"])
@@ -58,7 +67,8 @@ class WinAdaptorServerResourceRequestHandler(ResourceRequestHandler):
             cast("WinAdaptorServer", self.server), self.send_response, query_string_params
         )
         try:
-            method_name = f"generate_{path}_{method.lower()}_response"
+            # Ignore the leading `/` in path
+            method_name = f"generate_{path[1:]}_{method.lower()}_response"
             getattr(server_operation, method_name)()
         except Exception as e:
             error_message = (

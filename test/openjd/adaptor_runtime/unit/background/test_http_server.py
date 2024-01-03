@@ -26,6 +26,7 @@ from openjd.adaptor_runtime._background.http_server import (
 from openjd.adaptor_runtime._background.server_response import (
     AsyncFutureRunner,
     ThreadPoolExecutor,
+    ServerResponseGenerator,
 )
 from openjd.adaptor_runtime._background.log_buffers import InMemoryLogBuffer
 from openjd.adaptor_runtime._background.model import AdaptorState, BufferedOutput
@@ -248,7 +249,7 @@ class TestHeartbeatHandler:
             }
         )
 
-    @patch.object(HeartbeatHandler, "_parse_ack_id")
+    @patch.object(ServerResponseGenerator, "_parse_ack_id")
     @patch.object(InMemoryLogBuffer, "chunk")
     def test_gets_log_buffer_chunk(
         self,
@@ -299,7 +300,7 @@ class TestHeartbeatHandler:
         argvalues=[[True], [False]],
         ids=["Valid ACK ID", "Nonvalid ACK ID"],
     )
-    @patch.object(HeartbeatHandler, "_parse_ack_id")
+    @patch.object(ServerResponseGenerator, "_parse_ack_id")
     @patch.object(InMemoryLogBuffer, "clear")
     @patch.object(InMemoryLogBuffer, "chunk")
     def test_processes_ack_id(
@@ -357,7 +358,7 @@ class TestHeartbeatHandler:
             }
         )
 
-    @patch.object(HeartbeatHandler, "_parse_ack_id")
+    @patch.object(ServerResponseGenerator, "_parse_ack_id")
     @patch.object(InMemoryLogBuffer, "chunk")
     def test_sets_failed_if_adaptor_fails(
         self,
@@ -416,14 +417,26 @@ class TestHeartbeatHandler:
 
         @patch("urllib.parse.urlparse")
         @patch("urllib.parse.parse_qs")
+        @patch(
+            "openjd.adaptor_runtime._background.http_server.BackgroundResourceRequestHandler.body",
+            new_callable=PropertyMock,
+        )
+        @patch(
+            "openjd.adaptor_runtime._background.http_server.BackgroundResourceRequestHandler.server",
+            new_callable=PropertyMock,
+        )
         def test_parses_ack_id(
             self,
+            mock_server: MagicMock,
+            mock_body: MagicMock,
             mock_parse_qs: MagicMock,
             mock_urlparse: MagicMock,
         ):
             # GIVEN
             ack_id = "123"
-            parsed_qs = {HeartbeatHandler._ACK_ID_KEY: [ack_id]}
+            mock_server.return_value = MagicMock()
+            mock_body.return_value = ""
+            parsed_qs = {ServerResponseGenerator._ACK_ID_KEY: [ack_id]}
             mock_url = MagicMock()
             mock_urlparse.return_value = mock_url
             mock_parse_qs.return_value = parsed_qs
@@ -432,7 +445,7 @@ class TestHeartbeatHandler:
             handler = HeartbeatHandler(mock_handler)
 
             # WHEN
-            result = handler._parse_ack_id()
+            result = handler.server_response._parse_ack_id()
 
             # THEN
             mock_urlparse.assert_called_once_with(mock_handler.path)
@@ -441,12 +454,24 @@ class TestHeartbeatHandler:
 
         @patch("urllib.parse.urlparse")
         @patch("urllib.parse.parse_qs")
+        @patch(
+            "openjd.adaptor_runtime._background.http_server.BackgroundResourceRequestHandler.body",
+            new_callable=PropertyMock,
+        )
+        @patch(
+            "openjd.adaptor_runtime._background.http_server.BackgroundResourceRequestHandler.server",
+            new_callable=PropertyMock,
+        )
         def test_returns_none_if_ack_id_not_found(
             self,
+            mock_server: MagicMock,
+            mock_body: MagicMock,
             mock_parse_qs: MagicMock,
             mock_urlparse: MagicMock,
         ):
             # GIVEN
+            mock_server.return_value = MagicMock()
+            mock_body.return_value = ""
             mock_url = MagicMock()
             mock_urlparse.return_value = mock_url
             mock_parse_qs.return_value = {}
@@ -455,7 +480,7 @@ class TestHeartbeatHandler:
             handler = HeartbeatHandler(mock_handler)
 
             # WHEN
-            result = handler._parse_ack_id()
+            result = handler.server_response._parse_ack_id()
 
             # THEN
             mock_urlparse.assert_called_once_with(mock_handler.path)
@@ -464,14 +489,26 @@ class TestHeartbeatHandler:
 
         @patch("urllib.parse.urlparse")
         @patch("urllib.parse.parse_qs")
+        @patch(
+            "openjd.adaptor_runtime._background.http_server.BackgroundResourceRequestHandler.body",
+            new_callable=PropertyMock,
+        )
+        @patch(
+            "openjd.adaptor_runtime._background.http_server.BackgroundResourceRequestHandler.server",
+            new_callable=PropertyMock,
+        )
         def test_raises_if_more_than_one_ack_id(
             self,
+            mock_server: MagicMock,
+            mock_body: MagicMock,
             mock_parse_qs: MagicMock,
             mock_urlparse: MagicMock,
         ):
             # GIVEN
+            mock_server.return_value = MagicMock()
+            mock_body.return_value = ""
             ack_id = "123"
-            parsed_qs = {HeartbeatHandler._ACK_ID_KEY: [ack_id, ack_id]}
+            parsed_qs = {ServerResponseGenerator._ACK_ID_KEY: [ack_id, ack_id]}
             mock_url = MagicMock()
             mock_urlparse.return_value = mock_url
             mock_parse_qs.return_value = parsed_qs
@@ -481,13 +518,13 @@ class TestHeartbeatHandler:
 
             # WHEN
             with pytest.raises(ValueError) as raised_err:
-                handler._parse_ack_id()
+                handler.server_response._parse_ack_id()
 
             # THEN
             mock_urlparse.assert_called_once_with(mock_handler.path)
             mock_parse_qs.assert_called_once_with(mock_url.query)
             assert raised_err.match(
-                f"Expected one value for {HeartbeatHandler._ACK_ID_KEY}, but found: 2"
+                f"Expected one value for {ServerResponseGenerator._ACK_ID_KEY}, but found: 2"
             )
 
 

@@ -232,13 +232,17 @@ class FrontendRunner:
         json_body: dict | None = None,
     ) -> http_client.HTTPResponse | Dict:
         if OSName.is_windows():  # pragma: is-posix
+            if params:
+                # This is used for aligning to the Linux's behavior in order to reuse the code in handler.
+                # In linux, query string params will always be put in a list.
+                params = {key: [value] for key, value in params.items()}
             return NamedPipeHelper.send_named_pipe_request(
                 self.connection_settings.socket,
                 self._timeout_s,
                 method,
                 path,
                 json_body=json_body,
-                params=params if params else None,
+                params=params,
             )
         else:  # pragma: is-windows
             return self._send_linux_request(
