@@ -9,7 +9,7 @@ import re
 import sys
 import time
 from http import HTTPStatus
-from typing import Generator
+from typing import Generator, Dict
 from unittest.mock import patch
 from pathlib import Path
 
@@ -149,6 +149,44 @@ class TestDaemonMode:
 
         # THEN
         assert "on_start" in caplog.text
+
+    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
+    def test_incorrect_request_path_in_windows(
+        self,
+        initialized_setup: tuple[FrontendRunner, psutil.Process],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        # GIVEN
+        frontend, _ = initialized_setup
+
+        # WHEN
+        response: Dict = frontend._send_request("GET", "incorrect_path")  # type: ignore
+
+        # THEN
+        assert response["status"] == 400
+        assert (
+            "Incorrect request path incorrect_path. Only support following request path: /run /shutdown /heartbeat /start /stop /cancel"
+            in response["body"]
+        )
+
+    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
+    def test_incorrect_request_method_in_windows(
+        self,
+        initialized_setup: tuple[FrontendRunner, psutil.Process],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        # GIVEN
+        frontend, _ = initialized_setup
+
+        # WHEN
+        response: Dict = frontend._send_request("none", "/start")  # type: ignore
+
+        # THEN
+        assert response["status"] == 400
+        assert (
+            "Incorrect request path none for the /start. Only support following request method: PUT"
+            == response["body"]
+        )
 
     @pytest.mark.parametrize(
         argnames=["run_data"],

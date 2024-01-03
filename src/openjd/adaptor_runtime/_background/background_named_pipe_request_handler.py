@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import json
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, Dict, List
 
 from .._named_pipe import ResourceRequestHandler
 
@@ -38,6 +38,17 @@ class WinBackgroundResourceRequestHandler(ResourceRequestHandler):
         """
         super().__init__(server, pipe_handle)
 
+    @property
+    def request_path_and_method_dict(self) -> Dict[str, List[str]]:
+        return {
+            "/run": ["PUT"],
+            "/shutdown": ["PUT"],
+            "/heartbeat": ["GET"],
+            "/start": ["PUT"],
+            "/stop": ["PUT"],
+            "/cancel": ["PUT"],
+        }
+
     def handle_request(self, data: str):
         """
         Processes an incoming request and routes it to the correct response handler based on the method
@@ -65,6 +76,8 @@ class WinBackgroundResourceRequestHandler(ResourceRequestHandler):
             query_string_params,
         )
         try:
+            if not self.validate_request_path_and_method(path, method):
+                return
             # Ignore the leading `/` in the path
             method_name = f"generate_{path[1:]}_{method.lower()}_response"
             getattr(server_operation, method_name)()

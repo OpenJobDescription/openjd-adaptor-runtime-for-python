@@ -1,8 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import json
-from typing import TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Dict, List
 
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
     from openjd.adaptor_runtime._named_pipe import NamedPipeServer
@@ -104,6 +103,43 @@ class ResourceRequestHandler(ABC):
         response = {"status": status, "body": body}
         _logger.debug(f"NamedPipe Server: Send Response: {response}")
         NamedPipeHelper.write_to_pipe(self.pipe_handle, json.dumps(response))
+
+    def validate_request_path_and_method(self, request_path: str, request_method) -> bool:
+        """
+        Validate if request path or method is valid.
+
+        Args:
+            request_path(str): request path needed to be validated
+            request_method(str): request method needed to be validated
+        """
+        if request_path not in self.request_path_and_method_dict.keys():
+            error_message = (
+                f"Incorrect request path {request_path}. "
+                f"Only support following request path: {' '.join(self.request_path_and_method_dict.keys())}"
+            )
+            _logger.error(error_message)
+
+            self.send_response(HTTPStatus.BAD_REQUEST, error_message)
+            return False
+
+        if request_method not in self.request_path_and_method_dict[request_path]:
+            error_message = (
+                f"Incorrect request path {request_method} for the {request_path}. "
+                f"Only support following request method: {' '.join(self.request_path_and_method_dict[request_path])}"
+            )
+            _logger.error(error_message)
+            self.send_response(HTTPStatus.BAD_REQUEST, error_message)
+            return False
+
+        return True
+
+    @property
+    @abstractmethod
+    def request_path_and_method_dict(self) -> Dict[str, List[str]]:
+        """
+        This property is a dict used for storing all valid request path and request method.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def handle_request(self, data: str):
