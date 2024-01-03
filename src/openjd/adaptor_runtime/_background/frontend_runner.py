@@ -61,9 +61,9 @@ class FrontendRunner:
         self._connection_file_path = connection_file_path
         self._canceled = Event()
         signal.signal(signal.SIGINT, self._sigint_handler)
-        if OSName.is_posix():
+        if OSName.is_posix():  # pragma: is-windows
             signal.signal(signal.SIGTERM, self._sigint_handler)
-        else:
+        else:  # pragma: is-posix
             signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
 
     def init(
@@ -231,7 +231,7 @@ class FrontendRunner:
         params: dict | None = None,
         json_body: dict | None = None,
     ) -> http_client.HTTPResponse | Dict:
-        if OSName.is_windows():
+        if OSName.is_windows():  # pragma: is-posix
             return NamedPipeHelper.send_named_pipe_request(
                 self.connection_settings.socket,
                 self._timeout_s,
@@ -240,7 +240,7 @@ class FrontendRunner:
                 json_body=json_body,
                 params=params if params else None,
             )
-        else:
+        else:  # pragma: is-windows
             return self._send_linux_request(
                 method,
                 path,
@@ -255,7 +255,7 @@ class FrontendRunner:
         *,
         params: dict | None = None,
         json_body: dict | None = None,
-    ) -> http_client.HTTPResponse:
+    ) -> http_client.HTTPResponse:  # pragma: is-windows
         conn = UnixHTTPConnection(self.connection_settings.socket, timeout=self._timeout_s)
 
         if params:
