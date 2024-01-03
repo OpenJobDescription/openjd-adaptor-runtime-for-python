@@ -117,6 +117,7 @@ addopts = [
 [tool.coverage.run]
 branch = true
 parallel = true
+plugins = ["coverage_conditional_plugin"]
 
 
 [tool.coverage.paths]
@@ -124,6 +125,29 @@ source = [
   "src/"
 ]
 
+[tool.coverage.coverage_conditional_plugin.omit]
+# Source files to exclude from coverage on Posix
+"sys_platform != 'win32'" = [
+  "src/openjd/adaptor_runtime/_background/backend_named_pipe_server.py",
+  "src/openjd/adaptor_runtime/_background/background_named_pipe_request_handler.py",
+  "src/openjd/adaptor_runtime/_named_pipe/*.py",
+  "src/openjd/adaptor_runtime/application_ipc/_win_adaptor_server.py",
+  "src/openjd/adaptor_runtime/application_ipc/_named_pipe_request_handler.py",
+  "src/openjd/adaptor_runtime_client/win_client_interface.py"
+]
+# Source files to exclude from coverage on Windows
+"sys_platform == 'win32'" = [
+  "src/openjd/adaptor_runtime/_background/http_server.py",
+  "src/openjd/adaptor_runtime/application_ipc/_adaptor_server.py",
+  "src/openjd/adaptor_runtime/application_ipc/_http_request_handler.py",
+  "src/openjd/adaptor_runtime_client/connection.py",
+  "src/openjd/adaptor_runtime_client/posix_client_interface.py",
+]
+
+[tool.coverage.coverage_conditional_plugin.rules]
+is-windows = "sys_platform == 'win32'"
+is-posix = "sys_platform != 'win32'"
+
 [tool.coverage.report]
 show_missing = true
-fail_under = 79
+fail_under = 93
