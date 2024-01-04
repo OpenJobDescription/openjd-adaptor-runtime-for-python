@@ -50,13 +50,14 @@ def secure_open(
         "path": path,
         "flags": _get_flags_from_mode_str(open_mode),
     }
-    if flags != 0 and OSName.is_posix():  # not O_RDONLY
+    # not O_RDONLY
+    if flags != 0 and OSName.is_posix():  # pragma: is-windows
         os_open_kwargs["mode"] = stat.S_IWUSR | stat.S_IRUSR | mask
 
     fd = os.open(**os_open_kwargs)  # type: ignore
 
     # not O_RDONLY. Use ACL to set the permission for the file owner.
-    if flags != 0 and OSName.is_windows():
+    if flags != 0 and OSName.is_windows():  # pragma: is-posix
         if mask != 0:
             raise NotImplementedError("Additional masks are not supported in Windows.")
         set_file_permissions_in_windows(path)
@@ -69,7 +70,7 @@ def secure_open(
         yield f
 
 
-def get_file_owner_in_windows(filepath: "StrOrBytesPath") -> str:
+def get_file_owner_in_windows(filepath: "StrOrBytesPath") -> str:  # pragma: is-posix
     """
     Retrieves the owner of the specified file in Windows OS.
 
@@ -85,7 +86,7 @@ def get_file_owner_in_windows(filepath: "StrOrBytesPath") -> str:
     return f"{domain}\\{name}"
 
 
-def set_file_permissions_in_windows(filepath: "StrOrBytesPath") -> None:
+def set_file_permissions_in_windows(filepath: "StrOrBytesPath") -> None:  # pragma: is-posix
     """
     Sets read and write permissions for the owner of the specified file.
 
