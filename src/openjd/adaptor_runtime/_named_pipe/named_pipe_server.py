@@ -12,7 +12,10 @@ from typing import List
 from openjd.adaptor_runtime._background.server_config import DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS
 from typing import TYPE_CHECKING
 
-from openjd.adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
+from openjd.adaptor_runtime._named_pipe.named_pipe_helper import (
+    NamedPipeHelper,
+    NamedPipeTimeoutError,
+)
 
 if TYPE_CHECKING:
     from openjd.adaptor_runtime._named_pipe import ResourceRequestHandler
@@ -142,6 +145,18 @@ class NamedPipeServer(ABC):
         #  from it before shutting down server or the client won't get the response.
         time.sleep(1)
         error_list: List[Exception] = []
+        try:
+            # It is possible that the Server already start waiting for a connection from client.
+            # We need to connect to it to unblock the I/O.
+            NamedPipeHelper.establish_named_pipe_connection(self._pipe_name, 1)
+        except NamedPipeTimeoutError as e:
+            # The named pipe server may be already shutdown.
+            # The connection above may fail, so we don't care the NamedPipeTimeoutError that may raise here.
+            _logger.debug(
+                f"Encountered the following error during re-connection before shutdown: {e}"
+            )
+        except Exception as e:
+            error_list.append(e)
         while self._named_pipe_instances:
             pipe_handle = self._named_pipe_instances.pop()
             try:
