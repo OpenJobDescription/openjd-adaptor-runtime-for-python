@@ -127,7 +127,7 @@ class TestDaemonMode:
         assert all(
             [
                 # TODO: Investigate why we need more time in Windows
-                _wait_for_file_deletion(p, timeout_s=(1 if OSName.is_posix() else 10))
+                _wait_for_file_deletion(p, timeout_s=(1 if OSName.is_posix() else 5))
                 for p in [connection_file_path, conn_settings.socket]
             ]
         )
