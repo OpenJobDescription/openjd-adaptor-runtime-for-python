@@ -118,24 +118,9 @@ class HeartbeatHandler(BackgroundResourceRequestHandler):
     """
 
     path: str = "/heartbeat"
-    _ACK_ID_KEY = ServerResponseGenerator.ACK_ID_KEY
 
     def get(self) -> HTTPResponse:
-        return self.server_response.generate_heartbeat_get_response(self._parse_ack_id)
-
-    def _parse_ack_id(self) -> str | None:
-        """
-        Parses chunk ID ACK from the query string. Returns None if the chunk ID ACK was not found.
-        """
-        if self._ACK_ID_KEY in self.query_string_params:
-            ack_ids: list[str] = self.query_string_params[self._ACK_ID_KEY]
-            if len(ack_ids) > 1:
-                raise ValueError(
-                    f"Expected one value for {self._ACK_ID_KEY}, but found: {len(ack_ids)}"
-                )
-            return ack_ids[0]
-
-        return None
+        return self.server_response.generate_heartbeat_get_response()
 
 
 class ShutdownHandler(BackgroundResourceRequestHandler):

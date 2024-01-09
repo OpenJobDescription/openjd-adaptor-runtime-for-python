@@ -45,8 +45,7 @@ class WinAdaptorServerResourceRequestHandler(ResourceRequestHandler):
             data: A string containing the message sent from the client.
         """
         request_dict = json.loads(data)
-        # Ignore the leading `/`
-        path = request_dict["path"][1:]
+        path = request_dict["path"]
         method: str = request_dict["method"]
 
         if "params" in request_dict and request_dict["params"] != "null":
@@ -58,7 +57,8 @@ class WinAdaptorServerResourceRequestHandler(ResourceRequestHandler):
             cast("WinAdaptorServer", self.server), self.send_response, query_string_params
         )
         try:
-            method_name = f"generate_{path}_{method.lower()}_response"
+            # Ignore the leading `/` in path
+            method_name = f"generate_{path[1:]}_{method.lower()}_response"
             getattr(server_operation, method_name)()
         except Exception as e:
             error_message = (
