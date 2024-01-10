@@ -60,27 +60,27 @@ class ResourceRequestHandler(ABC):
         It should be run in a thread as it continuously listens for incoming requests.
         """
         _logger.debug("An instance thread is created to handle communication.")
-        while True:
+        try:
+            request_data = NamedPipeHelper.read_from_pipe(self.pipe_handle)
+            _logger.debug(f"Got following request from client: {request_data}")
+            self.handle_request(request_data)
+        except PipeDisconnectedException as e:
+            # Server is closed
+            _logger.info(f"NamedPipe Server is closed during reading message. {str(e)}")
+            # Server is closed. No need to flush buffers or close handle.
+            return
+        except Exception:
+            error_message = traceback.format_exc()
+            _logger.error(
+                f"Encountered an error while reading from the named pipe: {error_message}."
+            )
+            # Try to send back the error message
             try:
-                request_data = NamedPipeHelper.read_from_pipe(self.pipe_handle)
-                _logger.debug(f"Got following request from client: {request_data}")
-                self.handle_request(request_data)
-            except PipeDisconnectedException as e:
-                # Server is closed
-                _logger.info(f"NamedPipe Server is closed during reading message. {str(e)}")
-                break
+                self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR, error_message)
             except Exception:
-                error_message = traceback.format_exc()
                 _logger.error(
-                    f"Encountered an error while reading from the named pipe: {error_message}."
+                    f"Encountered an error while sending the error response: {traceback.format_exc()}."
                 )
-                # Try to send back the error message
-                try:
-                    self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR, error_message)
-                except Exception:
-                    _logger.error(
-                        f"Encountered an error while sending the error response: {traceback.format_exc()}."
-                    )
         try:
             # Flush the pipe to allow the client to read the pipe's contents before disconnecting.
             # Then disconnect the pipe, and close the handle to this pipe instance.
