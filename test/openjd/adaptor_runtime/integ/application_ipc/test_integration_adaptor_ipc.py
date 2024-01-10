@@ -218,11 +218,8 @@ class TestAdaptorIPC:
         server_thread.join()
 
         # THEN
-        assert (
-            "Incorrect request path none. Only support following request path: /path_mapping /path_mapping_rules /action"
-            == result["body"]
-        )
-        assert 400 == result["status"]
+        assert "Incorrect request path none." == result["body"]
+        assert 404 == result["status"]
 
     @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
     def test_adaptor_ipc_with_incorrect_request_method(self, adaptor: Adaptor):
@@ -241,8 +238,5 @@ class TestAdaptorIPC:
         server_thread.join()
 
         # THEN
-        assert (
-            "Incorrect request path none for the /action. Only support following request method: GET"
-            == result["body"]
-        )
-        assert 400 == result["status"]
+        assert "Incorrect request method none for the path /action." == result["body"]
+        assert 405 == result["status"]

@@ -112,23 +112,18 @@ class ResourceRequestHandler(ABC):
             request_path(str): request path needed to be validated
             request_method(str): request method needed to be validated
         """
-        if request_path not in self.request_path_and_method_dict.keys():
-            error_message = (
-                f"Incorrect request path {request_path}. "
-                f"Only support following request path: {' '.join(self.request_path_and_method_dict.keys())}"
-            )
+        if request_path not in self.request_path_and_method_dict:
+            error_message = f"Incorrect request path {request_path}."
             _logger.error(error_message)
-
-            self.send_response(HTTPStatus.BAD_REQUEST, error_message)
+            self.send_response(HTTPStatus.NOT_FOUND, error_message)
             return False
 
         if request_method not in self.request_path_and_method_dict[request_path]:
             error_message = (
-                f"Incorrect request path {request_method} for the {request_path}. "
-                f"Only support following request method: {' '.join(self.request_path_and_method_dict[request_path])}"
+                f"Incorrect request method {request_method} for the path {request_path}."
             )
             _logger.error(error_message)
-            self.send_response(HTTPStatus.BAD_REQUEST, error_message)
+            self.send_response(HTTPStatus.METHOD_NOT_ALLOWED, error_message)
             return False
 
         return True

@@ -160,14 +160,11 @@ class TestDaemonMode:
         frontend, _ = initialized_setup
 
         # WHEN
-        response: Dict = frontend._send_request("GET", "incorrect_path")  # type: ignore
+        response: Dict = frontend._send_request("GET", "None")  # type: ignore
 
         # THEN
-        assert response["status"] == 400
-        assert (
-            "Incorrect request path incorrect_path. Only support following request path: /run /shutdown /heartbeat /start /stop /cancel"
-            in response["body"]
-        )
+        assert response["status"] == 404
+        assert "Incorrect request path None." == response["body"]
 
     @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
     def test_incorrect_request_method_in_windows(
@@ -182,11 +179,8 @@ class TestDaemonMode:
         response: Dict = frontend._send_request("none", "/start")  # type: ignore
 
         # THEN
-        assert response["status"] == 400
-        assert (
-            "Incorrect request path none for the /start. Only support following request method: PUT"
-            == response["body"]
-        )
+        assert response["status"] == 405
+        assert "Incorrect request method none for the path /start." == response["body"]
 
     @pytest.mark.parametrize(
         argnames=["run_data"],
