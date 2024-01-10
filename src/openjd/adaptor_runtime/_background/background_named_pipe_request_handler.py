@@ -65,30 +65,9 @@ class WinBackgroundResourceRequestHandler(ResourceRequestHandler):
             query_string_params,
         )
         try:
-            # TODO: Code refactoring to get rid of the `if...elif..` by using getattr
-            if path == "/run" and method == "PUT":
-                server_operation.generate_run_put_response()
-
-            elif path == "/shutdown" and method == "PUT":
-                server_operation.generate_shutdown_put_response()
-
-            elif path == "/heartbeat" and method == "GET":
-                _ACK_ID_KEY = ServerResponseGenerator.ACK_ID_KEY
-
-                def _parse_ack_id():
-                    if _ACK_ID_KEY in query_string_params:
-                        return query_string_params[_ACK_ID_KEY]
-
-                server_operation.generate_heartbeat_get_response(_parse_ack_id)
-
-            elif path == "/start" and method == "PUT":
-                server_operation.generate_start_put_response()
-
-            elif path == "/stop" and method == "PUT":
-                server_operation.generate_stop_put_response()
-
-            elif path == "/cancel" and method == "PUT":
-                server_operation.generate_cancel_put_response()
+            # Ignore the leading `/` in the path
+            method_name = f"generate_{path[1:]}_{method.lower()}_response"
+            getattr(server_operation, method_name)()
         except Exception as e:
             _logger.error(
                 f"Error encountered in request handling. "

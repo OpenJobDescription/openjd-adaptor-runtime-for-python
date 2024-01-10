@@ -72,7 +72,7 @@ class ServerResponseGenerator:
     Response methods follow format: `generate_{request_path}_{method}_response`
     """
 
-    ACK_ID_KEY = "ack_id"
+    _ACK_ID_KEY = "ack_id"
 
     def __init__(
         self,
@@ -117,17 +117,29 @@ class ServerResponseGenerator:
             force_immediate=True,
         )
 
-    def generate_heartbeat_get_response(self, parse_ack_id_fn: Callable) -> Optional[HTTPResponse]:
+    def _parse_ack_id(self) -> str | None:
+        """
+        Parses chunk ID ACK from the query string. Returns None if the chunk ID ACK was not found.
+        """
+        if self.query_string_params and self._ACK_ID_KEY in self.query_string_params:
+            ack_ids: list[str] = self.query_string_params[self._ACK_ID_KEY]
+            if len(ack_ids) > 1:
+                raise ValueError(
+                    f"Expected one value for {self._ACK_ID_KEY}, but found: {len(ack_ids)}"
+                )
+            return ack_ids[0]
+
+        return None
+
+    def generate_heartbeat_get_response(self) -> Optional[HTTPResponse]:
         """
         Handle Get request to /heartbeat path.
-
-        Args:
-            parse_ack_id_fn(Callable): A function used for extracting the ack id.
 
         Returns:
             Linux: return HTTPResponse.
             Windows: return None. Response will be sent in self.response_method immediately.
         """
+
         # Failure messages are in the form: "<log-level>: openjd_fail: <message>"
         _FAILURE_REGEX = f"^(?:\\w+: )?{re.escape(_OPENJD_FAIL_STDOUT_PREFIX)}"
 
@@ -136,7 +148,7 @@ class ServerResponseGenerator:
             output = BufferedOutput(BufferedOutput.EMPTY, "")
         else:
             # Check for chunk ID ACKs
-            ack_id = parse_ack_id_fn()
+            ack_id = self._parse_ack_id()
             if ack_id:
                 if self.server._log_buffer.clear(ack_id):
                     _logger.debug(f"Received ACK for chunk: {ack_id}")
