@@ -11,13 +11,21 @@ import winerror
 import time
 import win32pipe
 import json
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from pywintypes import HANDLE
+from enum import Enum
+import os
+import threading
 
 
 from openjd.adaptor_runtime._background.server_config import NAMED_PIPE_BUFFER_SIZE
 
 _logger = logging.getLogger(__name__)
+
+
+class NamedPipeOperation(str, Enum):
+    CONNECT = "connect"
+    READ = "read"
 
 
 class PipeDisconnectedException(Exception):
@@ -43,6 +51,28 @@ class PipeDisconnectedException(Exception):
 class NamedPipeTimeoutError(Exception):
     """A custom error raised on timeouts when waiting for another error."""
 
+    def __init__(
+        self, operation: NamedPipeOperation, duration: float, error: Optional[Exception] = None
+    ):
+        """NamedPipe timeout exception.
+
+        Args:
+            operation (NamedPipeOperation): The type of NamedPipe operation that timed out.
+            duration (float): The duration waited in seconds.
+            error (Exception): The original error that was raised, if an error was raised by the operation.
+        """
+        self.error = error
+
+        message = f"NamedPipe Server {operation.value} timeout after {duration} seconds."
+        if error:
+            message = os.linesep.join([message, f"Original error: {error}"])
+
+        super().__init__(message)
+
+
+class NamedPipeConnectTimeoutError(NamedPipeTimeoutError):
+    """A custom error raised on connect timeouts when waiting for another error."""
+
     def __init__(self, duration: float, error: Exception):
         """Initialize TimeoutError with original error.
 
@@ -51,7 +81,19 @@ class NamedPipeTimeoutError(Exception):
             error (Exception): The original error that was raised.
         """
         self.error = error
-        super().__init__(f"Timeout after {duration}s, original error: {error}")
+        super().__init__(NamedPipeOperation.CONNECT, duration, error)
+
+
+class NamedPipeReadTimeoutError(NamedPipeTimeoutError):
+    """A custom error raised on read timeouts."""
+
+    def __init__(self, duration: float):
+        """Initialize TimeoutError with original error.
+
+        Args:
+            duration (float): The duration waited in seconds.
+        """
+        super().__init__(NamedPipeOperation.READ, duration)
 
 
 class NamedPipeHelper:
@@ -161,17 +203,17 @@ class NamedPipeHelper:
             raise
 
     @staticmethod
-    def read_from_pipe(handle: HANDLE) -> str:  # type: ignore
+    def read_from_pipe_target(handle: HANDLE, data_parts):
         """
-        Reads data from a Named Pipe.
+        Reads data from a Named Pipe. Times out after timeout_in_seconds.
+        Note: This method should be executed in a thread with a timeout.
+              win32.ReadFile can hang up, causing this to execute indefinitely.
 
         Args:
             handle (HANDLE): The handle to the Named Pipe.
-
-        Returns:
-            str: The data read from the Named Pipe.
+            data_parts (List[str]): The data read. This is an out parameter.
+                                     The list is mutated and read by the caller.
         """
-        data_parts = []
         while True:
             try:
                 return_code, data = win32file.ReadFile(handle, NAMED_PIPE_BUFFER_SIZE)
@@ -179,7 +221,7 @@ class NamedPipeHelper:
                 if return_code == winerror.ERROR_MORE_DATA:
                     continue
                 elif return_code == winerror.NO_ERROR:
-                    return "".join(data_parts)
+                    return
                 else:
                     raise IOError(
                         f"Got error when reading from the Named Pipe with error code: {return_code}"
@@ -187,6 +229,33 @@ class NamedPipeHelper:
             # Server maybe shutdown during reading.
             except pywintypes.error as e:
                 NamedPipeHelper._handle_pipe_exception(e)
+
+    @staticmethod
+    def read_from_pipe(handle: HANDLE, timeout_in_seconds: float = 5.0) -> str:  # type: ignore
+        """
+        Reads data from a Named Pipe. Times out after timeout_in_seconds.
+
+        Args:
+            handle (HANDLE): The handle to the Named Pipe.
+
+        Returns:
+            str: The data read from the Named Pipe.
+        """
+        data_parts: List[str] = []
+        start_time = time.time()
+
+        t = threading.Thread(
+            target=NamedPipeHelper.read_from_pipe_target, args=(handle, data_parts)
+        )
+        t.start()
+        t.join(timeout=timeout_in_seconds)
+        duration = time.time() - start_time
+
+        if t.is_alive():
+            handle.close()
+            raise NamedPipeReadTimeoutError(duration)
+
+        return "".join(data_parts)
 
     @staticmethod
     def write_to_pipe(handle: HANDLE, message: str) -> None:  # type: ignore
@@ -251,10 +320,10 @@ class NamedPipeHelper:
                     # Check timeout limit
                     if duration > timeout_in_seconds:
                         _logger.error(
-                            f"NamedPipe Server readiness timeout. Duration: {duration} seconds, "
+                            f"NamedPipe Server connect timeout. Duration: {duration} seconds, "
                             f"Timeout limit: {timeout_in_seconds} seconds."
                         )
-                        raise NamedPipeTimeoutError(duration, e)
+                        raise NamedPipeConnectTimeoutError(duration, e)
                     continue
                 _logger.error(f"Could not open pipe: {e}")
                 raise e
@@ -321,7 +390,7 @@ class NamedPipeHelper:
                 message_dict["params"] = json.dumps(params)
             message = json.dumps(message_dict)
             NamedPipeHelper.write_to_pipe(handle, message)
-            result = NamedPipeHelper.read_from_pipe(handle)
+            result = NamedPipeHelper.read_from_pipe(handle, timeout_in_seconds)
         finally:
             handle.close()
         return json.loads(result)
