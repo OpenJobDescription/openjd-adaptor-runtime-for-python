@@ -26,26 +26,30 @@ class TestFromFile:
         }
         config = {"key": "value"}
 
-        # fmt: off
-        with tempfile.NamedTemporaryFile(mode="w+") as schema_file, \
-                tempfile.NamedTemporaryFile(mode="w+") as config_file:
-            json.dump(json_schema, schema_file.file)
-            json.dump(config, config_file.file)
-            schema_file.seek(0)
-            config_file.seek(0)
+        # On Windows, delete=False is needed, because the OS doesn't allow a named temporary file to be opened a second
+        # time while the first file handle is still open.
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w+", delete=False
+            ) as schema_file, tempfile.NamedTemporaryFile(mode="w+", delete=False) as config_file:
+                json.dump(json_schema, schema_file.file)
+                json.dump(config, config_file.file)
+                schema_file.seek(0)
+                config_file.seek(0)
 
             # WHEN
             result = Configuration.from_file(
                 config_path=config_file.name,
                 schema_path=schema_file.name,
             )
-        # fmt: on
 
-        # THEN
-        assert result._config == config
-
-        schema_file.close()
-        config_file.close()
+            # THEN
+            assert result._config == config
+        finally:
+            if os.path.exists(schema_file.name):
+                os.remove(schema_file.name)
+            if os.path.exists(config_file.name):
+                os.remove(config_file.name)
 
     def test_raises_when_config_file_fails_to_open(
         self, tmp_path: _pathlib.Path, caplog: pytest.LogCaptureFixture
