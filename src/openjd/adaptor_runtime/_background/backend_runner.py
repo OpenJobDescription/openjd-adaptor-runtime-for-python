@@ -19,6 +19,7 @@ from .._utils import secure_open
 if OSName.is_posix():
     from .http_server import BackgroundHTTPServer
 if OSName.is_windows():
+    from .._named_pipe.named_pipe_helper import NamedPipeHelper
     from .backend_named_pipe_server import WinBackgroundNamedPipeServer
 from .log_buffers import LogBuffer
 from .model import ConnectionSettings
@@ -74,9 +75,7 @@ class BackendRunner:
                 "runtime", create_dir=True
             )
         else:
-            # TODO: Do a code refactoring to generate the namedpipe server path by using the SocketDirectories
-            #  Need to check if the pipe name is used and the max length.
-            server_path = rf"\\.\pipe\AdaptorNamedPipe_{str(os.getpid())}"
+            server_path = NamedPipeHelper.generate_pipe_name("AdaptorNamedPipe")
 
         try:
             if OSName.is_windows():
