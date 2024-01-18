@@ -26,7 +26,7 @@ class TestIntegrationLoggingSubprocess(object):
         pytest.param(
             2,
             [
-                f"Sending the {'SIGTERM' if OSName.is_posix() else 'SIGBREAK'} signal to pid=",
+                f"Sending the {'SIGTERM' if OSName.is_posix() else 'CTRL_BREAK_EVENT'} signal to pid=",
                 "now sending the SIGKILL signal.",
             ],
             id="StopProcessWhenSIGTERMFails",
@@ -72,12 +72,12 @@ class TestIntegrationLoggingSubprocess(object):
             time.sleep(0.2)
 
         p.terminate(5)  # Sometimes, when this is 1 second the process doesn't terminate in time.
-        signal_name = "SIGTERM" if OSName.is_posix() else "SIGBREAK"
         assert (
-            f"Sending the {signal_name} signal to pid=" in caplog.text
+            f"Sending the {'SIGTERM' if OSName.is_posix() else 'CTRL_BREAK_EVENT'} signal to pid="
+            in caplog.text
         )  # Asserting the SIGTERM signal was sent to the subprocess
         assert (
-            f"Trapped: {signal_name}" in caplog.text
+            f"Trapped: {'SIGTERM' if OSName.is_posix() else 'SIGBREAK'}" in caplog.text
         )  # Asserting the SIGTERM was received by the subprocess.
         assert (
             "now sending the SIGKILL signal." not in caplog.text

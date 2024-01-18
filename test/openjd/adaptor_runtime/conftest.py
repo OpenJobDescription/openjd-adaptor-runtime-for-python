@@ -46,6 +46,16 @@ def pytest_collection_modifyitems(items):
                 "named_pipe",
                 "test_named_pipe_helper.py",
             ),
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)),
+                "unit",
+                "process",
+            ),
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)),
+                "unit",
+                "utils",
+            ),
         ]
         skip_marker = pytest.mark.skip(reason="Skipping tests on Windows")
         for item in items:
