@@ -67,3 +67,34 @@ class TestNamedPipeHelper:
             named_pipe_helper.NamedPipeHelper.read_from_pipe(mock_handle, 1.0)
 
         mock_handle.close.assert_called_once()
+
+    @patch("os.getpid", return_value=1)
+    @patch(
+        "openjd.adaptor_runtime._named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
+        return_value=False,
+    )
+    def test_generate_pipe_name(self, mock_check_named_pipe_exists, mock_getpid):
+        name = named_pipe_helper.NamedPipeHelper.generate_pipe_name("AdaptorTest")
+        assert name == r"\\.\pipe\AdaptorTest_1"
+
+    @patch("os.getpid", return_value=1)
+    @patch(
+        "openjd.adaptor_runtime._named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
+        side_effect=[True, False],
+    )
+    def test_generate_pipe_name2(self, mock_check_named_pipe_exists, mock_getpid):
+        # This test is to ensure that the pipe name will change when it already exists.
+        name = named_pipe_helper.NamedPipeHelper.generate_pipe_name("AdaptorTest")
+        assert r"\\.\pipe\AdaptorTest_1_0_" in name
+
+    @patch("os.getpid", return_value=1)
+    @patch(
+        "openjd.adaptor_runtime._named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
+        return_value=True,
+    )
+    def test_failed_to_generate_pipe_name(self, mock_check_named_pipe_exists, mock_getpid):
+        with pytest.raises(
+            named_pipe_helper.NamedPipeNamingError,
+            match="Cannot find an available pipe name.",
+        ):
+            named_pipe_helper.NamedPipeHelper.generate_pipe_name("AdaptorTest")

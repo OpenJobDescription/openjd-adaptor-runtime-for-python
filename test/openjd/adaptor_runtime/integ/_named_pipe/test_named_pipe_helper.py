@@ -1,4 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+import time
 
 from openjd.adaptor_runtime._osname import OSName
 import json
@@ -67,6 +68,29 @@ class TestNamedPipeHelper:
 
         # THEN
         assert response == json.loads(expected_response)
+
+    def test_check_named_pipe_exists(self):
+        """
+        Test if the script can check if a named pipe exists.
+        """
+
+        # GIVEN
+        pipe_name = r"\\.\pipe\test_if_named_pipe_exist"
+        assert not NamedPipeHelper.check_named_pipe_exists(pipe_name)
+        server_handle = NamedPipeHelper.create_named_pipe_server(pipe_name, TIMEOUT_SECONDS)
+
+        # WHEN
+        is_existed = False
+        # Need to wait for launching the NamedPipe Server
+        for _ in range(10):
+            if NamedPipeHelper.check_named_pipe_exists(pipe_name):
+                is_existed = True
+                break
+            time.sleep(1)
+
+        # THEN
+        win32file.CloseHandle(server_handle)
+        assert is_existed
 
     @pytest.mark.skipif(
         os.getenv("GITHUB_ACTIONS") != "true",
