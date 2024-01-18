@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import logging
+from random import randint
 
 import win32file
 import pywintypes
@@ -94,6 +95,12 @@ class NamedPipeReadTimeoutError(NamedPipeTimeoutError):
             duration (float): The duration waited in seconds.
         """
         super().__init__(NamedPipeOperation.READ, duration)
+
+
+class NamedPipeNamingError(Exception):
+    """Exception raised for errors in naming a named pipe."""
+
+    pass
 
 
 class NamedPipeHelper:
@@ -394,3 +401,51 @@ class NamedPipeHelper:
         finally:
             handle.close()
         return json.loads(result)
+
+    @staticmethod
+    def check_named_pipe_exists(pipe_name: str) -> bool:
+        """
+        Checks if a named pipe exists.
+
+        Args:
+            pipe_name (str): The name of the pipe to check.
+
+        Returns:
+            bool: True if the pipe exists, False otherwise.
+        """
+        try:
+            handle = win32file.CreateFile(
+                pipe_name,
+                win32file.GENERIC_READ,
+                0,  # Disable the sharing Mode
+                None,  # Don't need any security attributes
+                win32file.OPEN_EXISTING,  # Open existing pipe
+                0,  # No Additional flags
+                None,  # A valid handle to a template file, This parameter is ignored when opening an existing pipe.
+            )
+            handle.close()
+        except pywintypes.error as e:
+            if e.winerror == winerror.ERROR_FILE_NOT_FOUND:
+                return False
+        return True
+
+    @staticmethod
+    def generate_pipe_name(prefix: str) -> str:
+        """
+        Generates a unique named pipe name.
+
+        Args:
+            prefix (str): The prefix to use for the pipe name.
+
+        Returns:
+            str: The unique named pipe name.
+        """
+
+        pipe_name = rf"\\.\pipe\{prefix}_{str(os.getpid())}"
+
+        for i in range(5):
+            if not NamedPipeHelper.check_named_pipe_exists(pipe_name):
+                return pipe_name
+            else:
+                pipe_name = rf"\\.\pipe\{prefix}_{str(os.getpid())}_{str(i)}_{str(randint(0, 999))}"
+        raise NamedPipeNamingError("Cannot find an available pipe name.")

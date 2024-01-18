@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from threading import Event
 from pywintypes import HANDLE
 
 from ._named_pipe_request_handler import WinAdaptorServerResourceRequestHandler
 from .._named_pipe import ResourceRequestHandler
+from .._named_pipe.named_pipe_helper import NamedPipeHelper
 from .._named_pipe.named_pipe_server import NamedPipeServer
 
 
@@ -34,9 +34,8 @@ class WinAdaptorServer(NamedPipeServer):
             actions_queue: A queue used for storing all actions sent by the client.
             adaptor: The adaptor class used for reacting to the request.
         """
-        # TODO: Do a code refactoring to generate the namedpipe server path
-        #  Need to check if the pipe name is used and the max length.
-        self.server_path = rf"\\.\pipe\AdaptorServerNamedPipe_{str(os.getpid())}"
+        self.server_path = NamedPipeHelper.generate_pipe_name("AdaptorServerNamedPipe")
+
         shutdown_event = Event()
         super().__init__(self.server_path, shutdown_event)
 
