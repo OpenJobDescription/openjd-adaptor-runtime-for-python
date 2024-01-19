@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import signal
 import subprocess
 import uuid
@@ -179,20 +178,18 @@ class LoggingSubprocess(object):
             self._process.wait()
         else:
             if OSName.is_windows():
-                self._logger.info(
-                    f"Sending the SIGBREAK signal to pid={self._process.pid} and waiting {grace_time_s}"
-                    " seconds for it to exit."
-                )
                 # We use `CREATE_NEW_PROCESS_GROUP` to create the process,
                 # so pid here is also the process group id and SIGBREAK can be only sent to the process group.
                 # Any processes in the process group will receive the SIGBREAK signal.
-                os.kill(self._process.pid, signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
+                signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]
             else:
-                self._logger.info(
-                    f"Sending the SIGTERM signal to pid={self._process.pid} and waiting {grace_time_s}"
-                    " seconds for it to exit."
-                )
-                self._process.terminate()  # SIGTERM
+                signal_type = signal.SIGTERM
+
+            self._logger.info(
+                f"Sending the {signal_type.name} signal to pid={self._process.pid} and waiting {grace_time_s}"
+                " seconds for it to exit."
+            )
+            self._process.send_signal(signal_type)
 
             try:
                 self._process.wait(timeout=grace_time_s)

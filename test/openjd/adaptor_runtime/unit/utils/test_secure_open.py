@@ -6,6 +6,7 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime._utils import secure_open
 
 READ_FLAGS = os.O_RDONLY
@@ -43,7 +44,8 @@ FLAG_DICT = {
     ],
 )
 @patch.object(os, "open")
-def test_secure_open(mock_os_open, path, open_mode, mask, expected_os_open_kwargs):
+@pytest.mark.skipif(not OSName.is_linux(), reason="Linux-specific tests")
+def test_secure_open_in_linux(mock_os_open, path, open_mode, mask, expected_os_open_kwargs):
     # WHEN
     with patch("builtins.open", mock_open()) as mocked_open:
         secure_open_kwargs = {"mask": mask} if mask else {}
@@ -53,6 +55,38 @@ def test_secure_open(mock_os_open, path, open_mode, mask, expected_os_open_kwarg
     # THEN
     if open_mode == "r":
         del expected_os_open_kwargs["mode"]
+    mock_os_open.assert_called_once_with(**expected_os_open_kwargs)
+    mocked_open.assert_called_once_with(mock_os_open.return_value, open_mode)
+
+
+@pytest.mark.parametrize(
+    argnames=["path", "open_mode", "expected_os_open_kwargs"],
+    argvalues=[
+        (
+            "/path/to/file",
+            "".join((mode, update_flag)),
+            {
+                "path": "/path/to/file",
+                "flags": FLAG_DICT[mode] | FLAG_DICT[update_flag],
+            },
+        )
+        for mode in ("r", "w", "a", "x")
+        for update_flag in ("", "+")
+    ],
+)
+@patch.object(os, "open")
+@patch("openjd.adaptor_runtime._utils._secure_open.set_file_permissions_in_windows")
+@pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+def test_secure_open_in_windows(
+    mock_file_permission_setting, mock_os_open, path, open_mode, expected_os_open_kwargs
+):
+    # WHEN
+    with patch("builtins.open", mock_open()) as mocked_open:
+        secure_open_kwargs = {}
+        with secure_open(path, open_mode, **secure_open_kwargs):
+            pass
+
+    # THEN
     mock_os_open.assert_called_once_with(**expected_os_open_kwargs)
     mocked_open.assert_called_once_with(mock_os_open.return_value, open_mode)
 
@@ -71,7 +105,10 @@ def test_secure_open(mock_os_open, path, open_mode, mask, expected_os_open_kwarg
     ],
 )
 @patch.object(os, "open")
-def test_secure_open_passes_open_kwargs(mock_os_open, path, open_mode, encoding, newline):
+@patch("openjd.adaptor_runtime._utils._secure_open.set_file_permissions_in_windows")
+def test_secure_open_passes_open_kwargs(
+    mock_file_permission_setting, mock_os_open, path, open_mode, encoding, newline
+):
     # WHEN
     open_kwargs = {}
     if encoding:

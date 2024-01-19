@@ -3,6 +3,7 @@
 """Tests for StreamLogger"""
 from __future__ import annotations
 
+import signal
 import subprocess
 from logging import INFO
 from typing import List
@@ -11,6 +12,7 @@ from unittest import mock
 import pytest
 
 import openjd.adaptor_runtime.process._logging_subprocess as logging_subprocess
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.process import LoggingSubprocess
 
 
@@ -63,7 +65,7 @@ class TestLoggingSubprocess(object):
         LoggingSubprocess(args=args, logger=logger)
 
         # EXPECT
-        mock_popen.assert_called_with(
+        popen_params = dict(
             args=args,
             encoding="utf-8",
             stdin=subprocess.PIPE,
@@ -71,6 +73,9 @@ class TestLoggingSubprocess(object):
             stderr=subprocess.PIPE,
             cwd=None,
         )
+        if OSName.is_windows():
+            popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
+        mock_popen.assert_called_with(**popen_params)
 
     def test_is_running(self, mock_popen: mock.Mock):
         # GIVEN
@@ -182,7 +187,10 @@ class TestLoggingSubprocess(object):
         subject.terminate()
 
         # THEN
-        proc.terminate.assert_called_once()
+        if OSName.is_windows():
+            proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
+        else:
+            proc.send_signal.assert_called_once_with(signal.SIGTERM)
         proc.kill.assert_not_called()
         proc.wait.assert_called_once()
         stdout_logger.join.assert_called_once()
@@ -218,7 +226,10 @@ class TestLoggingSubprocess(object):
         subject.terminate(timeout)
 
         # THEN
-        proc.terminate.assert_called_once()
+        if OSName.is_windows():
+            proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
+        else:
+            proc.send_signal.assert_called_once_with(signal.SIGTERM)
         proc.kill.assert_called_once()
         assert proc.wait.call_count == 2
         stdout_logger.join.assert_called_once()
@@ -285,7 +296,10 @@ class TestLoggingSubprocess(object):
 
         subject.terminate()
 
-        proc.terminate.assert_called_once()
+        if OSName.is_windows():
+            proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
+        else:
+            proc.send_signal.assert_called_once_with(signal.SIGTERM)
         proc.kill.assert_not_called()
         proc.wait.assert_called_once()
         stdout_logger.join.assert_called_once()
@@ -335,7 +349,10 @@ class TestLoggingSubprocess(object):
 
         subject.terminate(timeout)
 
-        proc.terminate.assert_called_once()
+        if OSName.is_windows():
+            proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
+        else:
+            proc.send_signal.assert_called_once_with(signal.SIGTERM)
         proc.kill.assert_called_once()
         assert proc.wait.call_count == 2
         stdout_logger.join.assert_called_once()
@@ -370,7 +387,10 @@ class TestLoggingSubprocess(object):
 
     def test_context_manager(self):
         # GIVEN
-        args = ["cat", "foo.txt"]
+        if OSName.is_windows():
+            args = ["powershell", "echo", "foo"]
+        else:
+            args = ["echo", "foo"]
         logger = mock.Mock()
 
         # WHEN
@@ -455,14 +475,18 @@ class TestLoggingSubprocess(object):
 
         # cwd will equal the startup direcotry, since that is None by default,
         # we expect cwd to be None.
-        mock_popen_autospec.assert_called_once_with(
-            args,
+        popen_params = dict(
+            args=args,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
             cwd=None,
         )
+        if OSName.is_windows():
+            popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
+
+        mock_popen_autospec.assert_called_once_with(**popen_params)
 
     @mock.patch.object(logging_subprocess.subprocess, "Popen", autospec=True)
     def test_start_directory(self, mock_popen_autospec: mock.Mock):
@@ -473,11 +497,15 @@ class TestLoggingSubprocess(object):
         args = ["cat", "foo.txt"]
         LoggingSubprocess(args=args, startup_directory="startup_dir")
 
-        mock_popen_autospec.assert_called_once_with(
-            args,
+        popen_params = dict(
+            args=args,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
             cwd="startup_dir",
         )
+        if OSName.is_windows():
+            popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
+
+        mock_popen_autospec.assert_called_once_with(**popen_params)

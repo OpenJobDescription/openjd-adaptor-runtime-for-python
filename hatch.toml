@@ -13,6 +13,8 @@ test-windows = """pytest --cov-config pyproject.toml {args:} \
   test/openjd/adaptor_runtime/integ/background \
   test/openjd/adaptor_runtime/integ/process \
   test/openjd/adaptor_runtime/unit/adaptors/configuration/test_configuration_manager.py \
+  test/openjd/adaptor_runtime/unit/process \
+  test/openjd/adaptor_runtime/unit/utils \
   --cov-fail-under=50"""
 
 typing = "mypy {args:src test}"
