@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, PropertyMock, call, mock_open, patch
 import pytest
 
 import openjd.adaptor_runtime._background.frontend_runner as frontend_runner
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.adaptors import AdaptorState
 from openjd.adaptor_runtime._background.frontend_runner import (
     AdaptorFailedException,
@@ -38,13 +39,13 @@ class TestFrontendRunner:
     """
 
     @pytest.fixture
-    def socket_path(self) -> str:
-        return "/path/to/socket"
+    def server_name(self) -> str:
+        return "/path/to/socket" if OSName.is_posix() else r"\\.\pipe\TestPipe"
 
     @pytest.fixture(autouse=True)
-    def mock_connection_settings(self, socket_path: str) -> Generator[MagicMock, None, None]:
+    def mock_connection_settings(self, server_name: str) -> Generator[MagicMock, None, None]:
         with patch.object(FrontendRunner, "connection_settings", new_callable=PropertyMock) as mock:
-            mock.return_value = ConnectionSettings(socket_path)
+            mock.return_value = ConnectionSettings(server_name)
             yield mock
 
     class TestInit:
@@ -117,7 +118,10 @@ class TestFrontendRunner:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
+            if OSName.is_posix():
+                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
+            else:
+                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=15)
             mock_heartbeat.assert_called_once()
 
         def test_raises_when_adaptor_module_not_package(self):
@@ -223,7 +227,10 @@ class TestFrontendRunner:
             ]
             mock_exists.assert_called_once_with(conn_file_path)
             mock_Popen.assert_called_once()
-            mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
+            if OSName.is_posix():
+                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
+            else:
+                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=15)
 
     class TestHeartbeat:
         """
@@ -240,6 +247,8 @@ class TestFrontendRunner:
             mock_json_load: MagicMock,
         ):
             # GIVEN
+            if OSName.is_windows():
+                mock_send_request.return_value = {"body": '{"key1": "value1"}'}
             mock_response = mock_send_request.return_value
             runner = FrontendRunner("")
 
@@ -248,8 +257,11 @@ class TestFrontendRunner:
 
             # THEN
             assert response is mock_map.return_value
-            mock_json_load.assert_called_once_with(mock_response.fp)
-            mock_map.assert_called_once_with(mock_json_load.return_value)
+            if OSName.is_posix():
+                mock_json_load.assert_called_once_with(mock_response.fp)
+                mock_map.assert_called_once_with(mock_json_load.return_value)
+            else:
+                mock_map.assert_called_once_with({"key1": "value1"})
             mock_send_request.assert_called_once_with("GET", "/heartbeat", params=None)
 
         @patch.object(frontend_runner.json, "load")
@@ -263,6 +275,8 @@ class TestFrontendRunner:
         ):
             # GIVEN
             ack_id = "ack_id"
+            if OSName.is_windows():
+                mock_send_request.return_value = {"body": '{"key1": "value1"}'}
             mock_response = mock_send_request.return_value
             runner = FrontendRunner("")
 
@@ -271,8 +285,11 @@ class TestFrontendRunner:
 
             # THEN
             assert response is mock_map.return_value
-            mock_json_load.assert_called_once_with(mock_response.fp)
-            mock_map.assert_called_once_with(mock_json_load.return_value)
+            if OSName.is_posix():
+                mock_json_load.assert_called_once_with(mock_response.fp)
+                mock_map.assert_called_once_with(mock_json_load.return_value)
+            else:
+                mock_map.assert_called_once_with({"key1": "value1"})
             mock_send_request.assert_called_once_with(
                 "GET", "/heartbeat", params={"ack_id": ack_id}
             )
@@ -445,7 +462,8 @@ class TestFrontendRunner:
             # THEN
             mock_send_request.assert_called_once_with("PUT", "/cancel")
 
-    class TestSendRequest:
+    @pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+    class TestSendRequestInLinux:
         """
         Tests for the FrontendRunner._send_request method
         """
@@ -585,6 +603,182 @@ class TestFrontendRunner:
             mock_getresponse.assert_called_once()
             assert response is mock_getresponse.return_value
 
+    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+    class TestSendRequestInWindows:
+        """
+        Tests for the FrontendRunner._send_request method in Windows
+        """
+
+        @pytest.fixture
+        def mock_response(self) -> str:
+            return '{"status": 200, "body": "message"}'
+
+        @pytest.fixture
+        def mock_read_from_pipe(self, mock_response: MagicMock) -> Generator[MagicMock, None, None]:
+            with patch.object(
+                frontend_runner.NamedPipeHelper, "read_from_pipe"
+            ) as mock_read_from_pipe:
+                mock_read_from_pipe.return_value = mock_response
+                yield mock_read_from_pipe
+
+        def test_sends_request(
+            self,
+            mock_read_from_pipe: MagicMock,
+            mock_response: str,
+        ):
+            # GIVEN
+            method = "GET"
+            path = "/path"
+            conn_file_path = r"C:\conn\file\path"
+
+            runner = FrontendRunner(conn_file_path)
+
+            # WHEN
+            with patch.object(
+                frontend_runner.NamedPipeHelper, "write_to_pipe"
+            ) as mock_write_to_pipe:
+                with patch.object(
+                    frontend_runner.NamedPipeHelper, "establish_named_pipe_connection"
+                ) as mock_establish_named_pipe_connection:
+                    response = runner._send_request(method, path)
+
+            # THEN
+            mock_write_to_pipe.assert_called_once_with(
+                mock_establish_named_pipe_connection(), '{"method": "GET", "path": "/path"}'
+            )
+            mock_read_from_pipe.assert_called_once()
+            assert response == json.loads(mock_response)
+
+        def test_raises_when_request_fails(
+            self,
+            mock_read_from_pipe: MagicMock,
+            mock_response: str,
+            caplog: pytest.LogCaptureFixture,
+        ):
+            # GIVEN
+            import pywintypes
+
+            error_instance = pywintypes.error(1, "FunctionName", "An error message")
+            mock_read_from_pipe.side_effect = error_instance
+            method = "GET"
+            path = "/path"
+            conn_file_path = r"C:\conn\file\path"
+            runner = FrontendRunner(conn_file_path)
+
+            # WHEN
+            with patch.object(
+                frontend_runner.NamedPipeHelper, "write_to_pipe"
+            ) as mock_write_to_pipe:
+                with patch.object(
+                    frontend_runner.NamedPipeHelper, "establish_named_pipe_connection"
+                ) as mock_establish_named_pipe_connection:
+                    with pytest.raises(pywintypes.error) as raised_exc:
+                        runner._send_request(method, path)
+
+            # THEN
+            assert raised_exc.value is error_instance
+            assert f"Failed to send {path} request: " in caplog.text
+            mock_write_to_pipe.assert_called_once_with(
+                mock_establish_named_pipe_connection(), '{"method": "GET", "path": "/path"}'
+            )
+            mock_read_from_pipe.assert_called_once()
+
+        def test_raises_when_error_response_received(
+            self,
+            mock_response: str,
+            caplog: pytest.LogCaptureFixture,
+        ):
+            # GIVEN
+            method = "GET"
+            path = "/path"
+            conn_file_path = r"C:\conn\file\path"
+            runner = FrontendRunner(conn_file_path)
+
+            # WHEN
+            with patch.object(
+                frontend_runner.NamedPipeHelper, "read_from_pipe"
+            ) as mock_read_from_pipe_error:
+                with patch.object(
+                    frontend_runner.NamedPipeHelper, "write_to_pipe"
+                ) as mock_write_to_pipe:
+                    with patch.object(
+                        frontend_runner.NamedPipeHelper, "establish_named_pipe_connection"
+                    ) as mock_establish_named_pipe_connection:
+                        with pytest.raises(HTTPError) as raised_err:
+                            mock_read_from_pipe_error.return_value = (
+                                '{"status": 500, "body": "some errors"}'
+                            )
+                            runner._send_request(method, path)
+
+            # THEN
+            errmsg = "Received unexpected HTTP status code 500"
+            assert errmsg in caplog.text
+            assert raised_err.match(re.escape(errmsg))
+            mock_write_to_pipe.assert_called_once_with(
+                mock_establish_named_pipe_connection(), '{"method": "GET", "path": "/path"}'
+            )
+            mock_read_from_pipe_error.assert_called_once()
+
+        def test_formats_query_string(
+            self,
+            mock_read_from_pipe,
+            mock_response: str,
+            caplog: pytest.LogCaptureFixture,
+        ):
+            # GIVEN
+            method = "GET"
+            path = "/path"
+            conn_file_path = r"C:\conn\file\path"
+            params = {"first param": 1, "second_param": ["one", "two three"]}
+            runner = FrontendRunner(conn_file_path)
+
+            # WHEN
+            with patch.object(
+                frontend_runner.NamedPipeHelper, "write_to_pipe"
+            ) as mock_write_to_pipe:
+                with patch.object(
+                    frontend_runner.NamedPipeHelper, "establish_named_pipe_connection"
+                ) as mock_establish_named_pipe_connection:
+                    response = runner._send_request(method, path, params=params)
+
+            # THEN
+            mock_write_to_pipe.assert_called_once_with(
+                mock_establish_named_pipe_connection(),
+                '{"method": "GET", "path": "/path", "params": "{\\"first param\\": [1], \\"second_param\\": [[\\"one\\", \\"two three\\"]]}"}',
+            )
+            mock_read_from_pipe.assert_called_once()
+            assert response == json.loads(mock_response)
+
+        def test_sends_body(
+            self,
+            mock_read_from_pipe,
+            mock_response: str,
+            caplog: pytest.LogCaptureFixture,
+        ):
+            # GIVEN
+            method = "GET"
+            path = "/path"
+            conn_file_path = r"C:\conn\file\path"
+            json_body = {"the": "body"}
+            runner = FrontendRunner(conn_file_path)
+
+            # WHEN
+            with patch.object(
+                frontend_runner.NamedPipeHelper, "write_to_pipe"
+            ) as mock_write_to_pipe:
+                with patch.object(
+                    frontend_runner.NamedPipeHelper, "establish_named_pipe_connection"
+                ) as mock_establish_named_pipe_connection:
+                    response = runner._send_request(method, path, json_body=json_body)
+
+            # THEN
+            mock_write_to_pipe.assert_called_once_with(
+                mock_establish_named_pipe_connection(),
+                '{"method": "GET", "path": "/path", "body": "{\\"the\\": \\"body\\"}"}',
+            )
+            mock_read_from_pipe.assert_called_once()
+            assert response == json.loads(mock_response)
+
     class TestSignalHandling:
         @patch.object(FrontendRunner, "cancel")
         @patch.object(frontend_runner.signal, "signal")
@@ -601,7 +795,10 @@ class TestFrontendRunner:
 
             # THEN
             signal_mock.assert_any_call(signal.SIGINT, runner._sigint_handler)
-            signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
+            if OSName.is_posix():
+                signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
+            else:
+                signal_mock.assert_any_call(signal.SIGBREAK, runner._sigint_handler)  # type: ignore[attr-defined]
             cancel_mock.assert_called_once()
 
 

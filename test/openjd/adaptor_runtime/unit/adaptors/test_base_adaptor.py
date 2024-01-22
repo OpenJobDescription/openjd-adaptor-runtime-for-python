@@ -9,6 +9,7 @@ import pytest
 from pytest import param
 
 import openjd.adaptor_runtime.adaptors._base_adaptor as base_adaptor
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.adaptors._base_adaptor import (
     _ENV_CONFIG_PATH_TEMPLATE,
     _ENV_CONFIG_SCHEMA_PATH_PREFIX,
@@ -168,9 +169,14 @@ class TestConfigLoading:
         mock_package.return_value = package
         adaptor = FakeAdaptor({})
         adaptor_name = "FakeAdaptor"
-        additional_config_path = f"/path/to/additional/config/{adaptor_name}.json"
-        config_path = f"/path/to/config/{adaptor_name}.json"
-        schema_path = f"/path/to/schema/{adaptor_name}.schema.json"
+        if OSName.is_posix():
+            additional_config_path = f"/path/to/additional/config/{adaptor_name}.json"
+            config_path = f"/path/to/config/{adaptor_name}.json"
+            schema_path = f"/path/to/schema/{adaptor_name}.schema.json"
+        else:
+            additional_config_path = rf"C:\path\to\additional\config\{adaptor_name}.json"
+            config_path = rf"C:\path\to\config\{adaptor_name}.json"
+            schema_path = rf"C:\path\to\schema\{adaptor_name}.schema.json"
 
         mock_file.return_value = config_path
 
