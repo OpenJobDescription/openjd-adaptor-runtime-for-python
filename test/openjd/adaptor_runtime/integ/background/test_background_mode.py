@@ -9,7 +9,7 @@ import re
 import sys
 import time
 from http import HTTPStatus
-from typing import Generator, Dict
+from typing import Generator
 from unittest.mock import patch
 from pathlib import Path
 
@@ -160,11 +160,11 @@ class TestDaemonMode:
         frontend, _ = initialized_setup
 
         # WHEN
-        response: Dict = frontend._send_request("GET", "None")  # type: ignore
-
-        # THEN
-        assert response["status"] == 404
-        assert "Incorrect request path None." == response["body"]
+        with pytest.raises(
+            HTTPError,
+            match="Received unexpected HTTP status code 404: Incorrect request path None.",
+        ):
+            frontend._send_request("GET", "None")
 
     @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
     def test_incorrect_request_method_in_windows(
@@ -176,11 +176,11 @@ class TestDaemonMode:
         frontend, _ = initialized_setup
 
         # WHEN
-        response: Dict = frontend._send_request("none", "/start")  # type: ignore
-
-        # THEN
-        assert response["status"] == 405
-        assert "Incorrect request method none for the path /start." == response["body"]
+        with pytest.raises(
+            HTTPError,
+            match="Received unexpected HTTP status code 405: Incorrect request method none for the path /start.",
+        ):
+            frontend._send_request("none", "/start")  # type: ignore
 
     @pytest.mark.parametrize(
         argnames=["run_data"],
@@ -254,7 +254,7 @@ class TestDaemonMode:
             try:
                 frontend._heartbeat()
             except HTTPError as e:
-                if e.response.status == HTTPStatus.UNAUTHORIZED:
+                if e.response.status == HTTPStatus.UNAUTHORIZED:  # type: ignore[union-attr]
                     pytest.fail("Request failed authentication when it should have succeeded")
                 else:
                     pytest.fail(f"Request failed with an unexpected status code: {e}")

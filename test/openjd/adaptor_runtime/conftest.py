@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-import os
 import platform
+import os
 from typing import Generator
 
 from openjd.adaptor_runtime._osname import OSName
@@ -19,29 +19,7 @@ def pytest_collection_modifyitems(items):
     if OSName.is_windows():
         # Add the tests' paths that we want to enable in Windows
         do_not_skip_paths = [
-            os.path.join(os.path.abspath(os.path.dirname(__file__)), "integ"),
-            os.path.join(
-                os.path.abspath(os.path.dirname(__file__)),
-                "unit",
-                "adaptors",
-                "configuration",
-            ),
-            os.path.join(
-                os.path.abspath(os.path.dirname(__file__)),
-                "unit",
-                "named_pipe",
-                "test_named_pipe_helper.py",
-            ),
-            os.path.join(
-                os.path.abspath(os.path.dirname(__file__)),
-                "unit",
-                "process",
-            ),
-            os.path.join(
-                os.path.abspath(os.path.dirname(__file__)),
-                "unit",
-                "utils",
-            ),
+            os.path.abspath(os.path.dirname(__file__)),
         ]
         skip_marker = pytest.mark.skip(reason="Skipping tests on Windows")
         for item in items:

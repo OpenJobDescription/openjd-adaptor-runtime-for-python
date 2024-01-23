@@ -286,7 +286,10 @@ class TestStart:
 
         # THEN
         signal_mock.assert_any_call(signal.SIGINT, entrypoint._sigint_handler)
-        signal_mock.assert_any_call(signal.SIGTERM, entrypoint._sigint_handler)
+        if OSName.is_posix():
+            signal_mock.assert_any_call(signal.SIGTERM, entrypoint._sigint_handler)
+        else:
+            signal_mock.assert_any_call(signal.SIGBREAK, entrypoint._sigint_handler)  # type: ignore[attr-defined]
         mock_adaptor_runner.return_value._cancel.assert_called_once()
 
     @patch.object(runtime_entrypoint, "InMemoryLogBuffer")

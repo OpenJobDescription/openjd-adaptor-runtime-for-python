@@ -13,6 +13,7 @@ from openjd.adaptor_runtime._http.request_handler import (
     RequestHandler,
     UnsupportedPlatformException,
 )
+from openjd.adaptor_runtime._osname import OSName
 
 
 @pytest.fixture
@@ -132,6 +133,7 @@ class TestRequestHandler:
         mock_wfile.write.assert_called_once_with(body.encode("utf-8"))
 
 
+@pytest.mark.skipif(not OSName.is_linux(), reason="Linux-specific tests")
 class TestAuthentication:
     """
     Tests for the RequestHandler authentication
@@ -195,48 +197,49 @@ class TestAuthentication:
                 "Failed to handle request because it was not made through a UNIX socket"
             )
 
-    class TestDoRequest:
-        """
-        Tests for the RequestHandler._do_request() method
-        """
 
-        def test_does_request_after_auth_succeeds(self) -> None:
-            # GIVEN
-            mock_handler = MagicMock(spec=RequestHandler)
-            mock_handler._authenticate.return_value = True
-            mock_func = Mock()
+class TestDoRequest:
+    """
+    Tests for the RequestHandler._do_request() method
+    """
 
-            # WHEN
-            RequestHandler._do_request(mock_handler, mock_func)
+    def test_does_request_after_auth_succeeds(self) -> None:
+        # GIVEN
+        mock_handler = MagicMock(spec=RequestHandler)
+        mock_handler._authenticate.return_value = True
+        mock_func = Mock()
 
-            # THEN
-            mock_handler._authenticate.assert_called_once()
-            mock_func.assert_called_once()
+        # WHEN
+        RequestHandler._do_request(mock_handler, mock_func)
 
-        def test_responds_with_unauthorized_after_auth_fails(self):
-            # GIVEN
-            mock_handler = MagicMock(spec=RequestHandler)
-            mock_handler._authenticate.return_value = False
+        # THEN
+        mock_handler._authenticate.assert_called_once()
+        mock_func.assert_called_once()
 
-            # WHEN
-            RequestHandler._do_request(mock_handler, Mock())
+    def test_responds_with_unauthorized_after_auth_fails(self):
+        # GIVEN
+        mock_handler = MagicMock(spec=RequestHandler)
+        mock_handler._authenticate.return_value = False
 
-            # THEN
-            mock_handler._authenticate.assert_called_once()
-            mock_handler._respond.assert_called_once_with(HTTPResponse(HTTPStatus.UNAUTHORIZED))
+        # WHEN
+        RequestHandler._do_request(mock_handler, Mock())
 
-        def test_responds_with_500_for_unsupported_platform(self, caplog: pytest.LogCaptureFixture):
-            # GIVEN
-            mock_handler = MagicMock(spec=RequestHandler)
-            exc = UnsupportedPlatformException("not UNIX")
-            mock_handler._authenticate.side_effect = exc
+        # THEN
+        mock_handler._authenticate.assert_called_once()
+        mock_handler._respond.assert_called_once_with(HTTPResponse(HTTPStatus.UNAUTHORIZED))
 
-            # WHEN
-            RequestHandler._do_request(mock_handler, Mock())
+    def test_responds_with_500_for_unsupported_platform(self, caplog: pytest.LogCaptureFixture):
+        # GIVEN
+        mock_handler = MagicMock(spec=RequestHandler)
+        exc = UnsupportedPlatformException("not UNIX")
+        mock_handler._authenticate.side_effect = exc
 
-            # THEN
-            mock_handler._authenticate.assert_called_once()
-            assert str(exc) in caplog.text
-            mock_handler._respond.assert_called_once_with(
-                HTTPResponse(HTTPStatus.INTERNAL_SERVER_ERROR)
-            )
+        # WHEN
+        RequestHandler._do_request(mock_handler, Mock())
+
+        # THEN
+        mock_handler._authenticate.assert_called_once()
+        assert str(exc) in caplog.text
+        mock_handler._respond.assert_called_once_with(
+            HTTPResponse(HTTPStatus.INTERNAL_SERVER_ERROR)
+        )

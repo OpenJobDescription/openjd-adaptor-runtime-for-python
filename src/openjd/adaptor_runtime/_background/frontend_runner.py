@@ -31,6 +31,7 @@ from .model import (
 
 if OSName.is_windows():
     from openjd.adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
+    import pywintypes
 
 _logger = logging.getLogger(__name__)
 
@@ -236,14 +237,24 @@ class FrontendRunner:
                 # This is used for aligning to the Linux's behavior in order to reuse the code in handler.
                 # In linux, query string params will always be put in a list.
                 params = {key: [value] for key, value in params.items()}
-            return NamedPipeHelper.send_named_pipe_request(
-                self.connection_settings.socket,
-                self._timeout_s,
-                method,
-                path,
-                json_body=json_body,
-                params=params,
-            )
+            try:
+                response = NamedPipeHelper.send_named_pipe_request(
+                    self.connection_settings.socket,
+                    self._timeout_s,
+                    method,
+                    path,
+                    json_body=json_body,
+                    params=params,
+                )
+                status = response["status"]
+                if 400 <= status < 600:
+                    errmsg = f"Received unexpected HTTP status code {status}: {response['body']}"
+                    _logger.error(errmsg)
+                    raise HTTPError(response, errmsg)
+            except pywintypes.error as e:
+                _logger.error(f"Failed to send {path} request: {e}")
+                raise
+            return response
         else:  # pragma: is-windows
             return self._send_linux_request(
                 method,
@@ -353,9 +364,9 @@ class AdaptorFailedException(Exception):
 
 
 class HTTPError(http_client.HTTPException):
-    response: http_client.HTTPResponse
+    response: http_client.HTTPResponse | Dict
 
-    def __init__(self, response: http_client.HTTPResponse, *args: object) -> None:
+    def __init__(self, response: http_client.HTTPResponse | Dict, *args: object) -> None:
         super().__init__(*args)
         self.response = response
 
