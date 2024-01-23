@@ -104,8 +104,8 @@ class ResourceRequestHandler(ABC):
             body: A string containing the message body to be sent back to the client.
         """
         response = {"status": status, "body": body}
-        _logger.debug(f"NamedPipe Server: Send Response: {response}")
         NamedPipeHelper.write_to_pipe(self.pipe_handle, json.dumps(response))
+        _logger.debug("NamedPipe Server: Sent Response.")
 
     def validate_request_path_and_method(self, request_path: str, request_method) -> bool:
         """

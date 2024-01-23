@@ -21,7 +21,7 @@ class WinClientInterface(BaseClientInterface):
             server_path (str): Used as pipe name in Named Pipe Server.
         """
         super().__init__(server_path)
-        _signal.signal(_signal.SIGTERM, self.graceful_shutdown)  # type: ignore[attr-defined]
+        _signal.signal(_signal.SIGBREAK, self.graceful_shutdown)  # type: ignore[attr-defined]
 
     def _send_request(
         self,
