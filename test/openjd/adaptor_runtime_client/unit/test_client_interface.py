@@ -2,6 +2,7 @@
 
 from http import HTTPStatus
 import json
+from signal import Signals
 from types import FrameType as _FrameType
 from typing import (
     Any as _Any,
@@ -15,14 +16,15 @@ from urllib.parse import urlencode
 import pytest
 from _pytest.capture import CaptureFixture as _CaptureFixture
 
+from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime_client import (
     Action as _Action,
-    HTTPClientInterface as _HTTPClientInterface,
+    ClientInterface as _ClientInterface,
     PathMappingRule as _PathMappingRule,
 )
 
 
-class FakeClient(_HTTPClientInterface):
+class FakeClient(_ClientInterface):
     """Since we need to override the DCC Client (because it's an interface).
     We are going to use this FakeClient for our testing.
     """
@@ -35,14 +37,15 @@ class FakeClient(_HTTPClientInterface):
         print(f"args = {args}")
 
     def graceful_shutdown(self, signum: int, frame: _Optional[_FrameType]) -> None:
-        print("Received SIGTERM signal.")
+        print(f"Received {Signals(signum).name} signal.")
 
     # This function needs to be overridden.
     def close(self, args: _Optional[_Dict[str, _Any]]) -> None:
         pass
 
 
-class TestClientInterface:
+@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+class TestLinuxClientInterface:
     @pytest.mark.parametrize(
         argnames=("original_path", "new_path"),
         argvalues=[
@@ -334,13 +337,13 @@ class TestClientInterface:
         assert reason == "mocked_reason"
         assert str(action) == str(a1)
 
-    @mock.patch.object(_HTTPClientInterface, "_perform_action")
+    @mock.patch.object(_ClientInterface, "_perform_action")
     def test_poll(self, mocked_perform_action: mock.Mock, capsys: _CaptureFixture) -> None:
         a1 = _Action("render", {"arg1": "val1"})
         a2 = _Action("close")
 
         with mock.patch.object(
-            _HTTPClientInterface,
+            _ClientInterface,
             "_request_next_action",
             side_effect=[
                 (404, "Not found", a1),

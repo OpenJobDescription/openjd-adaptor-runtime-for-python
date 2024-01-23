@@ -1,6 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 import platform
-import os
 from typing import Generator
 
 from openjd.adaptor_runtime._osname import OSName
@@ -11,20 +10,6 @@ import pytest
 if OSName.is_windows():
     import win32net
     import win32netcon
-
-
-# TODO: Remove this one after Windows Development finish
-#  https://docs.pytest.org/en/7.1.x/reference/reference.html#pytest.hookspec.pytest_collection_modifyitems
-def pytest_collection_modifyitems(items):
-    if OSName.is_windows():
-        # Add the tests' paths that we want to enable in Windows
-        do_not_skip_paths = [
-            os.path.abspath(os.path.dirname(__file__)),
-        ]
-        skip_marker = pytest.mark.skip(reason="Skipping tests on Windows")
-        for item in items:
-            if not any(not_skip_path in item.fspath.strpath for not_skip_path in do_not_skip_paths):
-                item.add_marker(skip_marker)
 
 
 # List of platforms that can be used to mark tests as specific to that platform
