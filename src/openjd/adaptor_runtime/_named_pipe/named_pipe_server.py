@@ -125,6 +125,7 @@ class NamedPipeServer(ABC):
                 else:
                     _logger.error(f"Error encountered while connecting to NamedPipe: {e} ")
             threading.Thread(target=self.request_handler(self, pipe_handle).instance_thread).start()
+        _logger.debug("Received Shutdown signal. Function serve_forever ended.")
 
     @abstractmethod
     def request_handler(

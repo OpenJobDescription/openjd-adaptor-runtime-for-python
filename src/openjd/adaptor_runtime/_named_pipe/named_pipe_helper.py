@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from random import randint
 
 import win32file
@@ -16,7 +17,6 @@ from typing import Dict, List, Optional
 from pywintypes import HANDLE
 from enum import Enum
 import os
-import threading
 
 
 from openjd.adaptor_runtime._background.server_config import NAMED_PIPE_BUFFER_SIZE
@@ -210,7 +210,7 @@ class NamedPipeHelper:
             raise
 
     @staticmethod
-    def read_from_pipe_target(handle: HANDLE, data_parts):
+    def read_from_pipe_target(handle: HANDLE):
         """
         Reads data from a Named Pipe. Times out after timeout_in_seconds.
         Note: This method should be executed in a thread with a timeout.
@@ -218,9 +218,8 @@ class NamedPipeHelper:
 
         Args:
             handle (HANDLE): The handle to the Named Pipe.
-            data_parts (List[str]): The data read. This is an out parameter.
-                                     The list is mutated and read by the caller.
         """
+        data_parts: List[str] = []
         while True:
             try:
                 return_code, data = win32file.ReadFile(handle, NAMED_PIPE_BUFFER_SIZE)
@@ -228,7 +227,7 @@ class NamedPipeHelper:
                 if return_code == winerror.ERROR_MORE_DATA:
                     continue
                 elif return_code == winerror.NO_ERROR:
-                    return
+                    return data_parts
                 else:
                     raise IOError(
                         f"Got error when reading from the Named Pipe with error code: {return_code}"
@@ -244,23 +243,25 @@ class NamedPipeHelper:
 
         Args:
             handle (HANDLE): The handle to the Named Pipe.
+            timeout_in_seconds (float): The maximum time in seconds to wait for data before
+                raising a TimeoutError. Defaults to 5 seconds.
 
         Returns:
             str: The data read from the Named Pipe.
         """
-        data_parts: List[str] = []
-        start_time = time.time()
 
-        t = threading.Thread(
-            target=NamedPipeHelper.read_from_pipe_target, args=(handle, data_parts)
-        )
-        t.start()
-        t.join(timeout=timeout_in_seconds)
-        duration = time.time() - start_time
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            start_time = time.time()
+            future = executor.submit(NamedPipeHelper.read_from_pipe_target, handle)
 
-        if t.is_alive():
-            handle.close()
-            raise NamedPipeReadTimeoutError(duration)
+            try:
+                # Retrieve the result of the function with a timeout
+                data_parts = future.result(timeout=timeout_in_seconds)
+            except TimeoutError:
+                # Close the handle will interrupt the ReadFile and the thread will end
+                handle.close()
+                duration = time.time() - start_time
+                raise NamedPipeReadTimeoutError(duration)
 
         return "".join(data_parts)
 
