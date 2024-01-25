@@ -65,7 +65,10 @@ class ResourceRequestHandler(ABC):
             self.handle_request(request_data)
         except PipeDisconnectedException as e:
             # Server is closed
-            _logger.info(f"NamedPipe Server is closed during reading message. {str(e)}")
+            _logger.debug(
+                f"NamedPipe Server is closed during reading message. {str(e)}"
+                f"{self._handler_type_name} instance thread exited."
+            )
             # Server is closed. No need to flush buffers or close handle.
             return
         except Exception:
