@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+from signal import Signals
 from time import sleep as _sleep
 from types import FrameType as _FrameType
 from typing import Any as _Any
 from typing import Dict as _Dict
 from typing import Optional as _Optional
 
-from openjd.adaptor_runtime_client import HTTPClientInterface as _HTTPClientInterface
+from openjd.adaptor_runtime_client import ClientInterface as _ClientInterface
 
 
-class FakeClient(_HTTPClientInterface):
+class FakeClient(_ClientInterface):
     shutdown: bool
 
     def __init__(self, port: str) -> None:
@@ -22,7 +23,7 @@ class FakeClient(_HTTPClientInterface):
         print("closing")
 
     def graceful_shutdown(self, signum: int, frame: _Optional[_FrameType]) -> None:
-        print("Received SIGTERM signal.")
+        print(f"Received {Signals(signum).name} signal.")
         self.shutdown = True
 
     def run(self):
