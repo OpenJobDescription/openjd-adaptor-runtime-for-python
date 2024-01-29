@@ -126,6 +126,12 @@ source = [
 ]
 
 [tool.coverage.coverage_conditional_plugin.omit]
+# Source files to exclude from coverage in both OS
+"True" = [
+    "src/openjd/adaptor_runtime_client/_version.py",
+    "src/openjd/adaptor_runtime/_version.py"
+]
+
 # Source files to exclude from coverage on Posix
 "sys_platform != 'win32'" = [
   "src/openjd/adaptor_runtime/_background/backend_named_pipe_server.py",
@@ -142,6 +148,7 @@ source = [
   "src/openjd/adaptor_runtime/application_ipc/_http_request_handler.py",
   "src/openjd/adaptor_runtime_client/connection.py",
   "src/openjd/adaptor_runtime_client/posix_client_interface.py",
+  "src/openjd/adaptor_runtime/_http/*.py"
 ]
 
 [tool.coverage.coverage_conditional_plugin.rules]

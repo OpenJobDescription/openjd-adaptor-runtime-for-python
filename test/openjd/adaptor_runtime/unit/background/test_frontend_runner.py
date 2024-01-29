@@ -118,10 +118,7 @@ class TestFrontendRunner:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            if OSName.is_posix():
-                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
-            else:
-                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=15)
+            mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
             mock_heartbeat.assert_called_once()
 
         def test_raises_when_adaptor_module_not_package(self):
@@ -227,10 +224,7 @@ class TestFrontendRunner:
             ]
             mock_exists.assert_called_once_with(conn_file_path)
             mock_Popen.assert_called_once()
-            if OSName.is_posix():
-                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
-            else:
-                mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=15)
+            mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
 
     class TestHeartbeat:
         """

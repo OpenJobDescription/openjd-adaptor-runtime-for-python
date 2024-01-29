@@ -1,5 +1,11 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
+from openjd.adaptor_runtime._osname import OSName
+import pytest
+
+if OSName.is_windows():
+    pytest.skip("Posix-specific tests", allow_module_level=True)
+
 import json
 import os
 import socketserver
@@ -7,7 +13,6 @@ from http import HTTPStatus
 from threading import Event
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import pytest
 
 from openjd.adaptor_runtime._background import server_response, http_server
 from openjd.adaptor_runtime.adaptors import AdaptorRunner

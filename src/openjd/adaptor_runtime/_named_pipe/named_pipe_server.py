@@ -90,8 +90,6 @@ class NamedPipeServer(ABC):
         self._named_pipe_instances: List[HANDLE] = []
         self._pipe_name = pipe_name
         self._shutdown_event = shutdown_event
-        # TODO: Need to figure out how to set the itme out for NamedPipe.
-        #   Unlike Linux Server, time out can only be set in the Server side instead of the client side.
         self._time_out = DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS
 
     def serve_forever(self) -> None:

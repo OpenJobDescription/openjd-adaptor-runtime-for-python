@@ -1,10 +1,14 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
+from openjd.adaptor_runtime._osname import OSName
+import pytest
+
+if OSName.is_windows():
+    pytest.skip("Posix-specific tests", allow_module_level=True)
+
 import socket
 from http import HTTPStatus
 from unittest.mock import MagicMock, Mock, patch
-
-import pytest
 
 import openjd.adaptor_runtime._http.request_handler as request_handler
 from openjd.adaptor_runtime._background.http_server import BackgroundRequestHandler

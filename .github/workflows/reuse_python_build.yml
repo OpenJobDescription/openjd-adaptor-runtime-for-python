@@ -68,10 +68,5 @@ jobs:
     - name: Run Linting
       run: hatch run lint
 
-    - name: Run Tests Linux
-      if: ${{ matrix.os == 'ubuntu-latest'}}
+    - name: Run Tests
       run: hatch run test
-
-    - name: Run Tests Windows
-      if: ${{ matrix.os == 'windows-latest'}}
-      run: hatch run test-windows
