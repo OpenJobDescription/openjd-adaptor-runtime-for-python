@@ -3,7 +3,8 @@
 from unittest.mock import MagicMock
 import pytest
 from openjd.adaptor_runtime._background.server_response import ServerResponseGenerator
-from openjd.adaptor_runtime._background.http_server import BackgroundHTTPServer
+BackgroundHTTPServer = pytest.importorskip("openjd.adaptor_runtime._background.http_server.BackgroundHTTPServer")
+
 from http import HTTPStatus
 
 

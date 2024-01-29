@@ -6,19 +6,13 @@ import json
 import logging
 import socketserver
 from threading import Event
-from .._osname import OSName
 from .server_response import ServerResponseGenerator, AsyncFutureRunner
 from ..adaptors import AdaptorRunner
 from .._http import HTTPResponse, RequestHandler, ResourceRequestHandler
 from .log_buffers import LogBuffer
 
 
-if OSName.is_windows():
-    # TODO: This is for avoid type errors when enabling Github CI in Windows
-    #   need to clear this up before GA
-    from socketserver import TCPServer as UnixStreamServer  # type: ignore
-else:
-    from socketserver import UnixStreamServer  # type: ignore
+from socketserver import UnixStreamServer  # type: ignore[attr-defined]
 
 _logger = logging.getLogger(__name__)
 

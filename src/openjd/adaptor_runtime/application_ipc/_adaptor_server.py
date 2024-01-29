@@ -5,14 +5,7 @@ from __future__ import annotations
 import os
 import warnings
 
-from .._osname import OSName
-
-if OSName.is_windows():
-    # TODO: This is for avoid type errors when enabling Github CI in Windows
-    #   need to clear this up before GA
-    from socketserver import TCPServer as UnixStreamServer  # type: ignore
-else:
-    from socketserver import UnixStreamServer  # type: ignore
+from socketserver import UnixStreamServer  # type: ignore[attr-defined]
 from typing import TYPE_CHECKING
 
 from .._http import SocketDirectories

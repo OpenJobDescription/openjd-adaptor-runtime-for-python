@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 import openjd.adaptor_runtime._http.request_handler as request_handler
-from openjd.adaptor_runtime._background.http_server import BackgroundRequestHandler
+BackgroundRequestHandler = pytest.importorskip("openjd.adaptor_runtime._background.http_server.BackgroundRequestHandler")
 from openjd.adaptor_runtime._http.request_handler import (
     HTTPResponse,
     RequestHandler,

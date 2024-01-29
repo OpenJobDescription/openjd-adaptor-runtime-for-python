@@ -55,8 +55,6 @@ class FrontendRunner:
             heartbeat_interval (float, optional): Interval between heartbeats, in seconds.
                 Defaults to 1.
         """
-        # TODO: Need to figure out how to set up the timeout for the Windows NamedPipe Server
-        #  For Namedpipe, we can only set a timeout on the server side not on the client side.
         self._timeout_s = timeout_s
         self._heartbeat_interval = heartbeat_interval
         self._connection_file_path = connection_file_path
@@ -68,7 +66,10 @@ class FrontendRunner:
             signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
 
     def init(
-        self, adaptor_module: ModuleType, init_data: dict = {}, path_mapping_data: dict = {}
+        self,
+        adaptor_module: ModuleType,
+        init_data: dict | None = None,
+        path_mapping_data: dict | None = None,
     ) -> None:
         """
         Creates the backend process then sends a heartbeat request to verify that it has started
@@ -87,6 +88,12 @@ class FrontendRunner:
                 "Cannot init a new backend process with an existing connection file at: "
                 + self._connection_file_path
             )
+
+        if init_data is None:
+            init_data = {}
+
+        if path_mapping_data is None:
+            path_mapping_data = {}
 
         _logger.info("Initializing backend process...")
         args = [
@@ -120,7 +127,7 @@ class FrontendRunner:
         # Wait for backend process to create connection file
         try:
             # TODO: Need to investigate why more time is required in Windows
-            _wait_for_file(self._connection_file_path, timeout_s=5 if OSName.is_posix() else 15)
+            _wait_for_file(self._connection_file_path, timeout_s=5)
         except TimeoutError:
             _logger.error(
                 "Backend process failed to write connection file in time at: "

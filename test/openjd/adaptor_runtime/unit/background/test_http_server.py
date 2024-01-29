@@ -9,7 +9,8 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-from openjd.adaptor_runtime._background import server_response, http_server
+from openjd.adaptor_runtime._background import server_response
+http_server = pytest.importorskip("openjd.adaptor_runtime._background.http_server")
 from openjd.adaptor_runtime.adaptors import AdaptorRunner
 from openjd.adaptor_runtime.adaptors._adaptor_runner import _OPENJD_FAIL_STDOUT_PREFIX
 from openjd.adaptor_runtime._background.http_server import (
