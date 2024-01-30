@@ -152,8 +152,29 @@ class LinuxSocketDirectories(SocketDirectories):
             )
 
 
+class MacOSSocketDirectories(SocketDirectories):
+    """
+    Specialization for socket paths in macOS systems.
+    """
+
+    # This is based on the max length of socket names to 104 bytes
+    # See https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/un.h#L79
+    _socket_path_max_length = 104
+    _socket_dir_max_length = _socket_path_max_length - _PID_MAX_LENGTH_PADDED
+
+    def verify_socket_path(self, path: str) -> None:
+        path_length = len(path.encode("utf-8"))
+        if path_length > self._socket_dir_max_length:
+            raise NonvalidSocketPathException(
+                "Socket base directory path too big. The maximum allowed size is "
+                f"{self._socket_dir_max_length} bytes, but the directory has a size of "
+                f"{path_length}: {path}"
+            )
+
+
 _os_map: dict[str, type[SocketDirectories]] = {
     OSName.LINUX: LinuxSocketDirectories,
+    OSName.MACOS: MacOSSocketDirectories,
 }
 
 

@@ -137,7 +137,7 @@ class TestRequestHandler:
         mock_wfile.write.assert_called_once_with(body.encode("utf-8"))
 
 
-@pytest.mark.skipif(not OSName.is_linux(), reason="Linux-specific tests")
+@pytest.mark.skipif(not OSName.is_linux() or not OSName.is_macos(), reason="Unix-specific tests")
 class TestAuthentication:
     """
     Tests for the RequestHandler authentication
@@ -147,6 +147,8 @@ class TestAuthentication:
         """
         Tests for the RequestHandler._authenticate() method
         """
+
+        cred_cls = request_handler.XUCred if OSName.is_macos() else request_handler.UCred
 
         @pytest.fixture
         def mock_handler(self) -> MagicMock:
@@ -159,7 +161,7 @@ class TestAuthentication:
             return mock_handler
 
         @patch.object(request_handler.os, "getuid")
-        @patch.object(request_handler.UCred, "from_buffer_copy")
+        @patch.object(cred_cls, "from_buffer_copy")
         def test_accepts_same_uid(
             self, mock_from_buffer_copy: MagicMock, mock_getuid: MagicMock, mock_handler: MagicMock
         ) -> None:
@@ -174,7 +176,7 @@ class TestAuthentication:
             assert result
 
         @patch.object(request_handler.os, "getuid")
-        @patch.object(request_handler.UCred, "from_buffer_copy")
+        @patch.object(cred_cls, "from_buffer_copy")
         def test_rejects_different_uid(
             self, mock_from_buffer_copy: MagicMock, mock_getuid: MagicMock, mock_handler: MagicMock
         ) -> None:

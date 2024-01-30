@@ -11,6 +11,7 @@ import pytest
 import openjd.adaptor_runtime._http.sockets as sockets
 from openjd.adaptor_runtime._http.sockets import (
     LinuxSocketDirectories,
+    MacOSSocketDirectories,
     NonvalidSocketPathException,
     NoSocketPathFoundException,
     SocketDirectories,
@@ -252,6 +253,50 @@ class TestLinuxSocketDirectories:
         length = 101
         path = "a" * length
         subject = LinuxSocketDirectories()
+
+        # WHEN
+        with pytest.raises(NonvalidSocketPathException) as raised_exc:
+            subject.verify_socket_path(path)
+
+        # THEN
+        assert raised_exc.match(
+            "Socket base directory path too big. The maximum allowed size is "
+            f"{subject._socket_dir_max_length} bytes, but the directory has a size of "
+            f"{length}: {path}"
+        )
+
+
+class TestMacOSSocketDirectories:
+    @pytest.mark.parametrize(
+        argnames=["path"],
+        argvalues=[
+            ["a"],
+            ["a" * 96],
+        ],
+        ids=["one byte", "96 bytes"],
+    )
+    def test_accepts_paths_within_100_bytes(self, path: str):
+        """
+        Verifies the function accepts paths up to 96 bytes (104 byte max - 8 byte padding
+        for socket name portion (path sep + PID))
+        """
+        # GIVEN
+        subject = MacOSSocketDirectories()
+
+        try:
+            # WHEN
+            subject.verify_socket_path(path)
+        except NonvalidSocketPathException as e:
+            pytest.fail(f"verify_socket_path raised an error when it should not have: {e}")
+        else:
+            # THEN
+            pass  # success
+
+    def test_rejects_paths_over_96_bytes(self):
+        # GIVEN
+        length = 97
+        path = "a" * length
+        subject = MacOSSocketDirectories()
 
         # WHEN
         with pytest.raises(NonvalidSocketPathException) as raised_exc:

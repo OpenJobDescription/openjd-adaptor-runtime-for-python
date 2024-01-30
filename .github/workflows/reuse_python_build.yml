@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11']
-        os: ["ubuntu-latest", "windows-latest"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
     env:
       PYTHON: ${{ matrix.python-version }}
       CODEARTIFACT_REGION: "us-west-2"
@@ -48,8 +48,8 @@ jobs:
         aws-region: us-west-2
         mask-aws-account-id: true
 
-    - name: Setup CodeArtifact Linux
-      if: ${{ matrix.os == 'ubuntu-latest'}}
+    - name: Setup CodeArtifact Unix
+      if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
       run: |
         CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain ${{ secrets.CODEARTIFACT_DOMAIN }} --domain-owner ${{ secrets.CODEARTIFACT_ACCOUNT_ID }} --query authorizationToken --output text --region us-west-2)
         echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
