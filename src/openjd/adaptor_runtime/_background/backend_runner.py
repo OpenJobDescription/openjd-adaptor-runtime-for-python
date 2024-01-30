@@ -45,9 +45,9 @@ class BackendRunner:
         self._log_buffer = log_buffer
         self._server: Optional[Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer]] = None
         signal.signal(signal.SIGINT, self._sigint_handler)
-        if OSName.is_posix():
+        if OSName.is_posix():  # pragma: is-windows
             signal.signal(signal.SIGTERM, self._sigint_handler)
-        else:
+        else:  # pragma: is-posix
             signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
 
     def _sigint_handler(self, signum: int, frame: Optional[FrameType]) -> None:
@@ -70,22 +70,22 @@ class BackendRunner:
         _logger.info("Running in background daemon mode.")
         shutdown_event: Event = Event()
 
-        if OSName.is_posix():
+        if OSName.is_posix():  # pragma: is-windows
             server_path = SocketDirectories.for_os().get_process_socket_path(
                 "runtime", create_dir=True
             )
-        else:
+        else:  # pragma: is-posix
             server_path = NamedPipeHelper.generate_pipe_name("AdaptorNamedPipe")
 
         try:
-            if OSName.is_windows():
+            if OSName.is_windows():  # pragma: is-posix
                 self._server = WinBackgroundNamedPipeServer(
                     server_path,
                     self._adaptor_runner,
                     shutdown_event=shutdown_event,
                     log_buffer=self._log_buffer,
                 )
-            else:
+            else:  # pragma: is-windows
                 self._server = BackgroundHTTPServer(
                     server_path,
                     self._adaptor_runner,
@@ -129,7 +129,7 @@ class BackendRunner:
             # NamedPipe servers are managed by Named Pipe File System it is not a regular file.
             # Once all handles are closed, the system automatically cleans up the named pipe.
             files_for_deletion = [self._connection_file_path]
-            if OSName.is_posix():
+            if OSName.is_posix():  # pragma: is-windows
                 files_for_deletion.append(server_path)
             for path in files_for_deletion:
                 try:

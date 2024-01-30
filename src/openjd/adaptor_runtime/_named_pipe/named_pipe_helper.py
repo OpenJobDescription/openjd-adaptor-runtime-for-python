@@ -125,9 +125,11 @@ class NamedPipeHelper:
         username = getpass.getuser()
 
         # Get the SID for the current user
-        # TODO: Verify this by using the AD user
         user_sid, _, _ = win32security.LookupAccountName(
-            "", username  # Search for the account on the local computer.
+            "",  # systemName: The name of the system or server where the account resides.
+            # Search for the account on the local computer.
+            # If Domain/User Format is used here, it will fetch the Name from the AD.
+            username,
         )
 
         # Users who log on across a network. "S-1-5-2" is a group identifier added to the token of a process

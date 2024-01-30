@@ -60,7 +60,7 @@ class LoggingSubprocess(object):
             encoding=encoding,
             cwd=startup_directory,
         )
-        if OSName.is_windows():
+        if OSName.is_windows():  # pragma: is-posix
             # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
             # Without this one, current process will also get the SIGBREAK and may react incorrectly.
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
@@ -177,12 +177,12 @@ class LoggingSubprocess(object):
             self._process.kill()
             self._process.wait()
         else:
-            if OSName.is_windows():
+            if OSName.is_windows():  # pragma: is-posix
                 # We use `CREATE_NEW_PROCESS_GROUP` to create the process,
                 # so pid here is also the process group id and SIGBREAK can be only sent to the process group.
                 # Any processes in the process group will receive the SIGBREAK signal.
                 signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]
-            else:
+            else:  # pragma: is-windows
                 signal_type = signal.SIGTERM
 
             self._logger.info(

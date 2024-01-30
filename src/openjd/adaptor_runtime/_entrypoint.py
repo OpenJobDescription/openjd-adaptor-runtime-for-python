@@ -163,9 +163,9 @@ class EntryPoint:
             self._adaptor_runner = AdaptorRunner(adaptor=adaptor)
             # To be able to handle cancelation via signals
             signal.signal(signal.SIGINT, self._sigint_handler)
-            if OSName.is_posix():
+            if OSName.is_posix():  # pragma: is-windows
                 signal.signal(signal.SIGTERM, self._sigint_handler)
-            else:
+            else:  # pragma: is-posix
                 signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
             try:
                 self._adaptor_runner._start()
