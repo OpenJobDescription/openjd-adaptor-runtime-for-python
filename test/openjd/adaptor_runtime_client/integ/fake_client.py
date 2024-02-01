@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from argparse import ArgumentParser as _ArgumentParser
 from signal import Signals
 from time import sleep as _sleep
 from types import FrameType as _FrameType
+from threading import Thread as _Thread
 from typing import Any as _Any
 from typing import Dict as _Dict
 from typing import Optional as _Optional
@@ -33,5 +35,18 @@ class FakeClient(_ClientInterface):
             count += 1
 
 
-test_client = FakeClient("1234")
-test_client.run()
+def run_client():
+    test_client = FakeClient("1234")
+    test_client.run()
+
+
+if __name__ == "__main__":
+    parser = _ArgumentParser()
+    parser.add_argument("--run-in-thread", action="store_true")
+    args = parser.parse_args()
+
+    if args.run_in_thread:
+        threaded_client = _Thread(target=run_client)
+        threaded_client.start()
+    else:
+        run_client()
