@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import signal as _signal
+import threading as _threading
 import warnings
 
 from .base_client_interface import Response as _Response
@@ -39,10 +40,11 @@ class HTTPClientInterface(BaseClientInterface):
 
         super().__init__(server_path)
 
-        # NOTE: The signals SIGKILL and SIGSTOP cannot be caught, blocked, or ignored.
-        # Reference: https://man7.org/linux/man-pages/man7/signal.7.html
-        # SIGTERM graceful shutdown.
-        _signal.signal(_signal.SIGTERM, self.graceful_shutdown)
+        if _threading.current_thread() is _threading.main_thread():
+            # NOTE: The signals SIGKILL and SIGSTOP cannot be caught, blocked, or ignored.
+            # Reference: https://man7.org/linux/man-pages/man7/signal.7.html
+            # SIGTERM graceful shutdown.
+            _signal.signal(_signal.SIGTERM, self.graceful_shutdown)
 
     @property
     def socket_path(self):
