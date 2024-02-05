@@ -5,7 +5,7 @@ pytest-cov == 4.1.*
 pytest-timeout == 2.2.*
 pytest-xdist == 3.5.*
 black == 23.*
-ruff == 0.1.*
+ruff == 0.2.*
 mypy == 1.8.*
 psutil == 5.9.*
 types-PyYAML ~= 6.0
