@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import signal
+from pathlib import Path
+from typing import Optional
 from unittest.mock import ANY, MagicMock, Mock, PropertyMock, mock_open, patch
 
 import jsonschema
@@ -389,6 +391,13 @@ class TestStart:
         _parse_args_mock.assert_called_once()
         mock_magic_init.assert_called_once_with(conn_file)
 
+    @pytest.mark.parametrize(
+        argnames=("reentry_exe"),
+        argvalues=[
+            (None,),
+            (Path("reeentry_exe_value"),),
+        ],
+    )
     @patch.object(EntryPoint, "_parse_args")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "init")
@@ -399,6 +408,7 @@ class TestStart:
         mock_magic_init: MagicMock,
         mock_magic_start: MagicMock,
         _parse_args_mock: MagicMock,
+        reentry_exe: Optional[Path],
     ):
         # GIVEN
         conn_file = "/path/to/conn_file"
@@ -414,11 +424,11 @@ class TestStart:
         with patch.dict(
             runtime_entrypoint.sys.modules, {FakeAdaptor.__module__: mock_adaptor_module}
         ):
-            entrypoint.start()
+            entrypoint.start(reentry_exe=reentry_exe)
 
         # THEN
         _parse_args_mock.assert_called_once()
-        mock_magic_init.assert_called_once_with(mock_adaptor_module, {}, {})
+        mock_magic_init.assert_called_once_with(mock_adaptor_module, {}, {}, reentry_exe)
         mock_magic_start.assert_called_once_with(conn_file)
         mock_start.assert_called_once_with()
 

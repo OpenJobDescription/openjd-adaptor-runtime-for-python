@@ -8,8 +8,9 @@ import re
 import signal
 import subprocess
 import sys
+from pathlib import Path
 from types import ModuleType
-from typing import Generator
+from typing import Generator, Optional
 from unittest.mock import MagicMock, PropertyMock, call, mock_open, patch
 
 import pytest
@@ -53,6 +54,13 @@ class TestFrontendRunner:
         Tests for the FrontendRunner.init method
         """
 
+        @pytest.mark.parametrize(
+            argnames=("reentry_exe"),
+            argvalues=[
+                (None,),
+                (Path("reeentry_exe_value"),),
+            ],
+        )
         @patch.object(frontend_runner.sys, "argv")
         @patch.object(frontend_runner.sys, "executable")
         @patch.object(frontend_runner.json, "dumps")
@@ -70,6 +78,7 @@ class TestFrontendRunner:
             mock_sys_executable: MagicMock,
             mock_sys_argv: MagicMock,
             caplog: pytest.LogCaptureFixture,
+            reentry_exe: Optional[Path],
         ):
             # GIVEN
             caplog.set_level("DEBUG")
@@ -87,7 +96,7 @@ class TestFrontendRunner:
             runner = FrontendRunner(conn_file_path)
 
             # WHEN
-            runner.init(adaptor_module, init_data, path_mapping_data)
+            runner.init(adaptor_module, init_data, path_mapping_data, reentry_exe)
 
             # THEN
             assert caplog.messages == [
@@ -97,8 +106,8 @@ class TestFrontendRunner:
                 "Connected successfully",
             ]
             mock_exists.assert_called_once_with(conn_file_path)
-            mock_Popen.assert_called_once_with(
-                [
+            if reentry_exe is None:
+                expected_args = [
                     sys.executable,
                     "-m",
                     adaptor_module.__package__,
@@ -110,7 +119,21 @@ class TestFrontendRunner:
                     json.dumps(init_data),
                     "--path-mapping-rules",
                     json.dumps(path_mapping_data),
-                ],
+                ]
+            else:
+                expected_args = [
+                    str(reentry_exe),
+                    "daemon",
+                    "_serve",
+                    "--connection-file",
+                    conn_file_path,
+                    "--init-data",
+                    json.dumps(init_data),
+                    "--path-mapping-rules",
+                    json.dumps(path_mapping_data),
+                ]
+            mock_Popen.assert_called_once_with(
+                expected_args,
                 shell=False,
                 close_fds=True,
                 start_new_session=True,

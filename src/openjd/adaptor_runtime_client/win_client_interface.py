@@ -9,6 +9,10 @@ import threading as _threading
 
 
 from .base_client_interface import BaseClientInterface
+
+# TODO: We need to remove this relative import, since it won't work with how
+#       we inject this module into DCCs. Likely by copying the function
+#       NamedPipeHelper.send_named_pipe_request into this adaptor_runtime_client namespace.
 from ..adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
 
 _DEFAULT_TIMEOUT_IN_SECONDS = 15
