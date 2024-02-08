@@ -11,6 +11,7 @@ import socket
 import subprocess
 import sys
 import time
+from pathlib import Path
 import urllib.parse as urllib_parse
 from threading import Event
 from types import FrameType
@@ -70,6 +71,7 @@ class FrontendRunner:
         adaptor_module: ModuleType,
         init_data: dict | None = None,
         path_mapping_data: dict | None = None,
+        reentry_exe: Path | None = None,
     ) -> None:
         """
         Creates the backend process then sends a heartbeat request to verify that it has started
@@ -79,6 +81,7 @@ class FrontendRunner:
             adaptor_module (ModuleType): The module of the adaptor running the runtime.
             init_data (dict): Data to pass to the adaptor during initialization.
             path_mapping_data (dict): Path mapping rules to make available to the adaptor while it's running.
+            reentry_exe (Path): The path to the binary executable that for adaptor reentry.
         """
         if adaptor_module.__package__ is None:
             raise Exception(f"Adaptor module is not a package: {adaptor_module}")
@@ -96,19 +99,26 @@ class FrontendRunner:
             path_mapping_data = {}
 
         _logger.info("Initializing backend process...")
-        args = [
-            sys.executable,
-            "-m",
-            adaptor_module.__package__,
-            "daemon",
-            "_serve",
-            "--connection-file",
-            self._connection_file_path,
-            "--init-data",
-            json.dumps(init_data),
-            "--path-mapping-rules",
-            json.dumps(path_mapping_data),
-        ]
+        if reentry_exe is None:
+            args = [
+                sys.executable,
+                "-m",
+                adaptor_module.__package__,
+            ]
+        else:
+            args = [str(reentry_exe)]
+        args.extend(
+            [
+                "daemon",
+                "_serve",
+                "--connection-file",
+                self._connection_file_path,
+                "--init-data",
+                json.dumps(init_data),
+                "--path-mapping-rules",
+                json.dumps(path_mapping_data),
+            ]
+        )
         try:
             process = subprocess.Popen(
                 args,

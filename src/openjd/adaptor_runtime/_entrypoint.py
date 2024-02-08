@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import sys
+from pathlib import Path
 from argparse import ArgumentParser, Namespace
 from types import FrameType as FrameType
 from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar
@@ -92,9 +93,12 @@ class EntryPoint:
         # 'background' command
         self._adaptor_runner: Optional[AdaptorRunner] = None
 
-    def start(self) -> None:
+    def start(self, reentry_exe: Optional[Path] = None) -> None:
         """
         Starts the run of the adaptor.
+
+        Args:
+            reentry_exe (Path): The path to the binary executable that for adaptor reentry.
         """
         formatter = ConditionalFormatter(
             "%(levelname)s: %(message)s", ignore_patterns=[_OPENJD_LOG_REGEX]
@@ -214,7 +218,7 @@ class EntryPoint:
                             f"Adaptor module is not loaded: {self.adaptor_class.__module__}"
                         )
 
-                    frontend.init(adaptor_module, init_data, path_mapping_data)
+                    frontend.init(adaptor_module, init_data, path_mapping_data, reentry_exe)
                     frontend.start()
                 elif subcommand == "run":
                     frontend.run(run_data)
