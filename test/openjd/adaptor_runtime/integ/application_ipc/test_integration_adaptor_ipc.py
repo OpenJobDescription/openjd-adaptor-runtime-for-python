@@ -8,7 +8,7 @@ from unittest import mock as _mock
 import pytest
 from openjd.adaptor_runtime_client import Action as _Action
 
-from openjd.adaptor_runtime.adaptors import Adaptor
+from openjd.adaptor_runtime.adaptors import Adaptor, SemanticVersion
 from openjd.adaptor_runtime.application_ipc import ActionsQueue as _ActionsQueue
 from .fake_app_client import FakeAppClient as _FakeAppClient
 from openjd.adaptor_runtime._osname import OSName
@@ -26,6 +26,10 @@ def adaptor():
 
         def on_run(self, run_data: dict):
             return
+
+        @property
+        def integration_data_interface_version(self) -> SemanticVersion:
+            return SemanticVersion(major=0, minor=1)
 
     path_mapping_rules = [
         {

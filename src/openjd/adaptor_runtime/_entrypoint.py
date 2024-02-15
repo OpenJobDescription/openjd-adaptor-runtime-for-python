@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import sys
+
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 from types import FrameType as FrameType
@@ -25,6 +26,7 @@ from ._utils._logging import (
     _OPENJD_LOG_REGEX,
     ConditionalFormatter,
 )
+from .adaptors import SemanticVersion
 
 if TYPE_CHECKING:  # pragma: no cover
     from .adaptors.configuration import AdaptorConfiguration
@@ -33,6 +35,7 @@ __all__ = ["EntryPoint"]
 
 _U = TypeVar("_U", bound=BaseAdaptor)
 
+_ADAPTOR_CLI_VERSION = SemanticVersion(major=0, minor=1)
 _CLI_HELP_TEXT = {
     "init_data": (
         "Data to pass to the adaptor during initialization. "
@@ -93,6 +96,28 @@ class _IntegrationData(NamedTuple):
     path_mapping_data: dict
 
 
+class _VersionInfo(NamedTuple):
+    adaptor_cli_version: SemanticVersion
+    integration_data_interface_version: SemanticVersion
+
+    def has_compatibility_with(self, expected: "_VersionInfo") -> bool:
+        """Returns a boolean representing if the versions of this adaptor CLI and integration data
+        interface are compatible with the expected adaptor CLI and integration data interface.
+
+        This check is NOT commutative. It is assumed that self contains the versions of the
+        installed (running) Adaptor and that the VersionInfo being passed contains the versions
+        expected by something like a job template.
+
+        Args:
+            other (_VersionInfo): The VersionInfo to compare with.
+        """
+        return self.adaptor_cli_version.has_compatibility_with(
+            expected.adaptor_cli_version
+        ) and self.integration_data_interface_version.has_compatibility_with(
+            expected.integration_data_interface_version
+        )
+
+
 class EntryPoint:
     """
     The main entry point of the adaptor runtime.
@@ -144,6 +169,14 @@ class EntryPoint:
             # is valid here.
             self.config = self.config_manager.get_default_config()
 
+    def _get_version_info(self) -> _VersionInfo:
+        return _VersionInfo(
+            adaptor_cli_version=_ADAPTOR_CLI_VERSION,
+            integration_data_interface_version=self.adaptor_class(
+                {}
+            ).integration_data_interface_version,
+        )
+
     def _get_integration_data(self, parsed_args: Namespace) -> _IntegrationData:
         return _IntegrationData(
             init_data=parsed_args.init_data if hasattr(parsed_args, "init_data") else {},
@@ -162,6 +195,22 @@ class EntryPoint:
         """
         log_config = self._init_loggers()
         parser, parsed_args = self._parse_args()
+        version_info = self._get_version_info()
+
+        if parsed_args.command == "is-compatible":
+            return self._handle_is_compatible(version_info, parsed_args, parser)
+        elif parsed_args.command == "version-info":
+            return print(
+                yaml.dump(
+                    {
+                        "OpenJD Adaptor CLI Version": str(version_info.adaptor_cli_version),
+                        f"{self.adaptor_class.__name__} Data Interface Version": str(
+                            version_info.integration_data_interface_version
+                        ),
+                    },
+                    indent=2,
+                )
+            )
         self._init_config()
         if not parsed_args.command:
             parser.print_help()
@@ -184,6 +233,40 @@ class EntryPoint:
             return self._handle_daemon(
                 adaptor, parsed_args, log_config, integration_data, reentry_exe
             )
+
+    def _handle_is_compatible(
+        self, version_info: _VersionInfo, parsed_args: Namespace, parser: ArgumentParser
+    ):
+        try:
+            expected_version_info = _VersionInfo(
+                SemanticVersion.parse(parsed_args.openjd_adaptor_cli_version),
+                SemanticVersion.parse(parsed_args.integration_data_interface_version),
+            )
+        except ValueError as e:
+            parser.error(str(e))
+            return
+
+        if not version_info.has_compatibility_with(expected_version_info):
+            parser.error(
+                "Installed interface versions are incompatible with expected:"
+                "\nInstalled:"
+                f"\n\tOpenJD Adaptor CLI Version: {version_info.adaptor_cli_version}"
+                f"\n\t{self.adaptor_class.__name__} Data Interface Version: {version_info.integration_data_interface_version}"
+                "\nExpected:"
+                f"\n\tOpenJD Adaptor CLI Version: {expected_version_info.adaptor_cli_version}"
+                f"\n\t{self.adaptor_class.__name__} Data Interface Version: {expected_version_info.integration_data_interface_version}"
+            )
+        else:
+            print(
+                "Installed interface versions are compatible with expected:"
+                "\nInstalled:"
+                f"\n\tOpenJD Adaptor CLI Version: {version_info.adaptor_cli_version}"
+                f"\n\t{self.adaptor_class.__name__} Data Interface Version: {version_info.integration_data_interface_version}"
+                "\nExpected:"
+                f"\n\tOpenJD Adaptor CLI Version: {expected_version_info.adaptor_cli_version}"
+                f"\n\t{self.adaptor_class.__name__} Data Interface Version: {expected_version_info.integration_data_interface_version}"
+            )
+            return
 
     def _handle_run(
         self, adaptor: BaseAdaptor[AdaptorConfiguration], integration_data: _IntegrationData
@@ -280,6 +363,27 @@ class EntryPoint:
         subparser = parser.add_subparsers(dest="command", title="commands")
 
         subparser.add_parser("show-config", help=_CLI_HELP_TEXT["show_config"])
+        subparser.add_parser(
+            "version-info",
+            help="Prints CLI and data interface versions, then the program exits.",
+        )
+
+        compat_parser = subparser.add_parser(
+            "is-compatible",
+            help="Validates compatiblity for the adaptor CLI interface and integration data interface provided",
+        )
+        compat_parser.add_argument(
+            "--openjd-adaptor-cli-version",
+            metavar="<Major.Minor>",
+            help="The version of the openjd adaptor CLI to compare with the installed adaptor.",
+            required=True,
+        )
+        compat_parser.add_argument(
+            "--integration-data-interface-version",
+            metavar="<Major.Minor>",
+            help=f"The version of the {self.adaptor_class.__name__}'s data interface to compare with the installed adaptor.",
+            required=True,
+        )
 
         init_data = ArgumentParser(add_help=False)
         init_data.add_argument(

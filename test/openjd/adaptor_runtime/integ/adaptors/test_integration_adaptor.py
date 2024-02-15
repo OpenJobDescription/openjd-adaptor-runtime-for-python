@@ -6,7 +6,7 @@ import os
 import shutil
 from pathlib import Path
 
-from openjd.adaptor_runtime.adaptors import Adaptor
+from openjd.adaptor_runtime.adaptors import Adaptor, SemanticVersion
 
 
 class TestRun:
@@ -35,6 +35,10 @@ class TestRun:
                 for key, value in run_data.items():
                     print(f"\t{key} = {value}")
                 self.update_status(progress=second_progress, status_message=second_status_message)
+
+            @property
+            def integration_data_interface_version(self) -> SemanticVersion:
+                return SemanticVersion(major=0, minor=1)
 
         # GIVEN
         init_data: dict = {}
@@ -76,6 +80,10 @@ class TestRun:
                 parent_dir = path.parent.absolute()
                 os.remove(str(self.f))
                 shutil.rmtree(parent_dir)
+
+            @property
+            def integration_data_interface_version(self) -> SemanticVersion:
+                return SemanticVersion(major=0, minor=1)
 
         init_dict: dict = {}
         fa = FileAdaptor(init_dict)

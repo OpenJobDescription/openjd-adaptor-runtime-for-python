@@ -19,7 +19,7 @@ from openjd.adaptor_runtime.adaptors.configuration import (
     ConfigurationManager,
     RuntimeConfiguration,
 )
-from openjd.adaptor_runtime.adaptors import BaseAdaptor
+from openjd.adaptor_runtime.adaptors import BaseAdaptor, SemanticVersion
 from openjd.adaptor_runtime._background import BackendRunner, FrontendRunner
 from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime._entrypoint import _load_data
@@ -58,6 +58,9 @@ def mock_getLogger():
 def mock_adaptor_cls():
     mock_adaptor_cls = MagicMock()
     mock_adaptor_cls.return_value.config = AdaptorConfigurationStub()
+    mock_adaptor_cls.return_value.integration_data_interface_version = SemanticVersion(
+        major=1, minor=5
+    )
     mock_adaptor_cls.__name__ = "MockAdaptor"
     return mock_adaptor_cls
 
@@ -82,6 +85,126 @@ class TestStart:
         # THEN
         captured = capsys.readouterr()
         assert "No command was provided." in captured.err
+        sys_exit.assert_called_once_with(2)
+
+    def test_version_info(
+        self,
+        mock_adaptor_cls: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ):
+        # GIVEN
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "version-info",
+            ],
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
+
+            # WHEN
+            entrypoint.start()
+
+        # THEN
+        captured = capsys.readouterr()
+        assert yaml.safe_load(captured.out) == {
+            "OpenJD Adaptor CLI Version": str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
+            "MockAdaptor Data Interface Version": "1.5",
+        }
+
+    @pytest.mark.parametrize("integration_version", ["1.4", "1.5"])
+    def test_is_compatible(
+        self,
+        mock_adaptor_cls: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+        integration_version: str,
+    ):
+        # GIVEN
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "is-compatible",
+                "--openjd-adaptor-cli-version",
+                str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
+                "--integration-data-interface-version",
+                integration_version,
+            ],
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
+
+            # WHEN
+            entrypoint.start()
+
+        # THEN
+        captured = capsys.readouterr()
+        assert "Installed interface versions are compatible with expected:" in captured.out
+
+    def test_bad_version_string(
+        self,
+        mock_adaptor_cls: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ):
+        # GIVEN
+        def exit():
+            raise Exception
+
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "is-compatible",
+                "--openjd-adaptor-cli-version",
+                str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
+                "--integration-data-interface-version",
+                "1.0.0",
+            ],
+        ), patch.object(
+            argparse._sys, "exit"  # type: ignore
+        ) as sys_exit:
+            entrypoint = EntryPoint(mock_adaptor_cls)
+
+            # WHEN
+            entrypoint.start()
+
+        # THEN
+        captured = capsys.readouterr()
+        assert 'Provided version "1.0.0" was not of form Major.Minor' in captured.err
+        sys_exit.assert_called_once_with(2)
+
+    @pytest.mark.parametrize("integration_version", ["0.9", "1.6", "1.40", "1.50", "2.0"])
+    def test_is_not_compatible(
+        self,
+        mock_adaptor_cls: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+        integration_version: str,
+    ):
+        # GIVEN
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "is-compatible",
+                "--openjd-adaptor-cli-version",
+                str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
+                "--integration-data-interface-version",
+                integration_version,
+            ],
+        ), patch.object(
+            argparse._sys, "exit"  # type: ignore
+        ) as sys_exit:
+            entrypoint = EntryPoint(mock_adaptor_cls)
+
+            # WHEN
+            entrypoint.start()
+
+        # THEN
+        captured = capsys.readouterr()
+        assert "Installed interface versions are incompatible with expected:" in captured.err
         sys_exit.assert_called_once_with(2)
 
     def test_creates_adaptor_with_init_data(self, mock_adaptor_cls: MagicMock):
