@@ -58,6 +58,7 @@ def mock_getLogger():
 def mock_adaptor_cls():
     mock_adaptor_cls = MagicMock()
     mock_adaptor_cls.return_value.config = AdaptorConfigurationStub()
+    mock_adaptor_cls.__name__ = "MockAdaptor"
     return mock_adaptor_cls
 
 
@@ -66,59 +67,77 @@ class TestStart:
     Tests for the EntryPoint.start method
     """
 
-    @patch.object(EntryPoint, "_parse_args")
-    def test_creates_adaptor_with_init_data(
-        self, _parse_args_mock: MagicMock, mock_adaptor_cls: MagicMock
+    def test_errors_with_no_command(
+        self, mock_adaptor_cls: MagicMock, capsys: pytest.CaptureFixture[str]
     ):
         # GIVEN
-        init_data = {"init": "data"}
-        _parse_args_mock.return_value = argparse.Namespace(init_data=init_data)
-        entrypoint = EntryPoint(mock_adaptor_cls)
+        with patch.object(runtime_entrypoint.sys, "argv", ["Adaptor"]), patch.object(
+            argparse._sys, "exit"  # type: ignore
+        ) as sys_exit:
+            entrypoint = EntryPoint(mock_adaptor_cls)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
-        _parse_args_mock.assert_called_once()
-        mock_adaptor_cls.assert_called_once_with(init_data, path_mapping_data={})
+        captured = capsys.readouterr()
+        assert "No command was provided." in captured.err
+        sys_exit.assert_called_once_with(2)
 
-    @patch.object(EntryPoint, "_parse_args")
-    def test_creates_adaptor_with_path_mapping(
-        self, _parse_args_mock: MagicMock, mock_adaptor_cls: MagicMock
-    ):
+    def test_creates_adaptor_with_init_data(self, mock_adaptor_cls: MagicMock):
+        # GIVEN
+        init_data = {"init": "data"}
+        with patch.object(
+            runtime_entrypoint.sys, "argv", ["Adaptor", "run", "--init-data", json.dumps(init_data)]
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
+
+            # WHEN
+            entrypoint.start()
+
+        # THEN
+        mock_adaptor_cls.assert_called_with(init_data, path_mapping_data={})
+
+    def test_creates_adaptor_with_path_mapping(self, mock_adaptor_cls: MagicMock):
         # GIVEN
         init_data = {"init": "data"}
         path_mapping_rules = {"path_mapping_rules": "data"}
-        _parse_args_mock.return_value = argparse.Namespace(
-            init_data=init_data, path_mapping_rules=path_mapping_rules
-        )
-        entrypoint = EntryPoint(mock_adaptor_cls)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "run",
+                "--init-data",
+                json.dumps(init_data),
+                "--path-mapping-rules",
+                json.dumps(path_mapping_rules),
+            ],
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
-        _parse_args_mock.assert_called_once()
-        mock_adaptor_cls.assert_called_once_with(init_data, path_mapping_data=path_mapping_rules)
+        mock_adaptor_cls.assert_called_with(init_data, path_mapping_data=path_mapping_rules)
 
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(FakeAdaptor, "_cleanup")
     @patch.object(FakeAdaptor, "_start")
     def test_raises_adaptor_exception(
         self,
         mock_start: MagicMock,
         mock_cleanup: MagicMock,
-        mock_parse_args: MagicMock,
         caplog: pytest.LogCaptureFixture,
     ):
         # GIVEN
         mock_start.side_effect = Exception()
-        mock_parse_args.return_value = argparse.Namespace(command="run")
-        entrypoint = EntryPoint(FakeAdaptor)
+        with patch.object(runtime_entrypoint.sys, "argv", ["Adaptor", "run"]):
+            entrypoint = EntryPoint(FakeAdaptor)
 
-        # WHEN
-        with pytest.raises(Exception) as raised_exc:
-            entrypoint.start()
+            # WHEN
+            with pytest.raises(Exception) as raised_exc:
+                entrypoint.start()
 
         # THEN
         assert raised_exc.value is mock_start.side_effect
@@ -126,25 +145,23 @@ class TestStart:
         mock_start.assert_called_once()
         mock_cleanup.assert_called_once()
 
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(FakeAdaptor, "_cleanup")
     @patch.object(FakeAdaptor, "_start")
     def test_raises_adaptor_cleanup_exception(
         self,
         mock_start: MagicMock,
         mock_cleanup: MagicMock,
-        mock_parse_args: MagicMock,
         caplog: pytest.LogCaptureFixture,
     ):
         # GIVEN
         mock_start.side_effect = Exception()
         mock_cleanup.side_effect = Exception()
-        mock_parse_args.return_value = argparse.Namespace(command="run")
-        entrypoint = EntryPoint(FakeAdaptor)
+        with patch.object(runtime_entrypoint.sys, "argv", ["Adaptor", "run"]):
+            entrypoint = EntryPoint(FakeAdaptor)
 
-        # WHEN
-        with pytest.raises(Exception) as raised_exc:
-            entrypoint.start()
+            # WHEN
+            with pytest.raises(Exception) as raised_exc:
+                entrypoint.start()
 
         # THEN
         assert raised_exc.value is mock_cleanup.side_effect
@@ -202,7 +219,7 @@ class TestStart:
         entrypoint = EntryPoint(FakeAdaptor)
 
         # WHEN
-        entrypoint.start()
+        entrypoint._init_config()
 
         # THEN
         mock_build_config.assert_called_once()
@@ -211,7 +228,6 @@ class TestStart:
         assert f"The current system ({OSName()}) is not supported for runtime "
         "configuration. Only the default configuration will be loaded. Full error: " in caplog.text
 
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(ConfigurationManager, "build_config")
     @patch.object(RuntimeConfiguration, "config", new_callable=PropertyMock)
     @patch.object(runtime_entrypoint, "print")
@@ -220,42 +236,45 @@ class TestStart:
         print_spy: MagicMock,
         mock_config: MagicMock,
         mock_build_config: MagicMock,
-        mock_parse_args: MagicMock,
     ):
         # GIVEN
         config = {"key": "value"}
-        mock_parse_args.return_value = argparse.Namespace(show_config=True)
         mock_config.return_value = config
         mock_build_config.return_value = RuntimeConfiguration({})
-        entrypoint = EntryPoint(FakeAdaptor)
+        with patch.object(runtime_entrypoint.sys, "argv", ["Adaptor", "show-config"]):
+            entrypoint = EntryPoint(FakeAdaptor)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
-        mock_parse_args.assert_called_once()
         mock_build_config.assert_called_once()
         mock_config.assert_called_once()
         print_spy.assert_called_once_with(yaml.dump(config, indent=2))
 
-    @patch.object(EntryPoint, "_parse_args")
-    def test_runs_in_run_mode(self, _parse_args_mock: MagicMock, mock_adaptor_cls: MagicMock):
+    def test_runs_in_run_mode(self, mock_adaptor_cls: MagicMock):
         # GIVEN
         init_data = {"init": "data"}
         run_data = {"run": "data"}
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="run",
-            init_data=init_data,
-            run_data=run_data,
-        )
-        entrypoint = EntryPoint(mock_adaptor_cls)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "run",
+                "--init-data",
+                json.dumps(init_data),
+                "--run-data",
+                json.dumps(run_data),
+            ],
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
-        _parse_args_mock.assert_called_once()
-        mock_adaptor_cls.assert_called_once_with(init_data, path_mapping_data=ANY)
+        mock_adaptor_cls.assert_called_with(init_data, path_mapping_data=ANY)
 
         mock_adaptor_cls.return_value._start.assert_called_once()
         mock_adaptor_cls.return_value._run.assert_called_once_with(run_data)
@@ -263,28 +282,33 @@ class TestStart:
         mock_adaptor_cls.return_value._cleanup.assert_called_once()
 
     @patch.object(runtime_entrypoint, "AdaptorRunner")
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(runtime_entrypoint.signal, "signal")
     def test_runmode_signal_hook(
         self,
         signal_mock: MagicMock,
-        _parse_args_mock: MagicMock,
         mock_adaptor_runner: MagicMock,
         mock_adaptor_cls: MagicMock,
     ):
         # GIVEN
         init_data = {"init": "data"}
         run_data = {"run": "data"}
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="run",
-            init_data=init_data,
-            run_data=run_data,
-        )
-        entrypoint = EntryPoint(mock_adaptor_cls)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "run",
+                "--init-data",
+                json.dumps(init_data),
+                "--run-data",
+                json.dumps(run_data),
+            ],
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
 
-        # WHEN
-        entrypoint.start()
-        entrypoint._sigint_handler(MagicMock(), MagicMock())
+            # WHEN
+            entrypoint.start()
+            entrypoint._sigint_handler(MagicMock(), MagicMock())
 
         # THEN
         signal_mock.assert_any_call(signal.SIGINT, entrypoint._sigint_handler)
@@ -296,14 +320,12 @@ class TestStart:
 
     @patch.object(runtime_entrypoint, "InMemoryLogBuffer")
     @patch.object(runtime_entrypoint, "AdaptorRunner")
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(BackendRunner, "run")
     @patch.object(BackendRunner, "__init__", return_value=None)
     def test_runs_background_serve(
         self,
         mock_init: MagicMock,
         mock_run: MagicMock,
-        _parse_args_mock: MagicMock,
         mock_adaptor_runner: MagicMock,
         mock_log_buffer: MagicMock,
         mock_adaptor_cls: MagicMock,
@@ -311,20 +333,26 @@ class TestStart:
         # GIVEN
         init_data = {"init": "data"}
         conn_file = "/path/to/conn_file"
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="_serve",
-            init_data=init_data,
-            connection_file=conn_file,
-        )
-        entrypoint = EntryPoint(mock_adaptor_cls)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "_serve",
+                "--init-data",
+                json.dumps(init_data),
+                "--connection-file",
+                conn_file,
+            ],
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
-        _parse_args_mock.assert_called_once()
-        mock_adaptor_cls.assert_called_once_with(init_data, path_mapping_data=ANY)
+        mock_adaptor_cls.assert_called_with(init_data, path_mapping_data=ANY)
         mock_adaptor_runner.assert_called_once_with(
             adaptor=mock_adaptor_cls.return_value,
         )
@@ -336,7 +364,6 @@ class TestStart:
         mock_run.assert_called_once()
 
     @patch.object(runtime_entrypoint, "AdaptorRunner")
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(BackendRunner, "run")
     @patch.object(BackendRunner, "__init__", return_value=None)
     @patch.object(runtime_entrypoint.signal, "signal")
@@ -345,50 +372,60 @@ class TestStart:
         signal_mock: MagicMock,
         mock_init: MagicMock,
         mock_run: MagicMock,
-        _parse_args_mock: MagicMock,
+        mock_runtime_entrypoint: MagicMock,
         mock_adaptor_cls: MagicMock,
     ):
         # GIVEN
         init_data = {"init": "data"}
         conn_file = "/path/to/conn_file"
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="_serve",
-            init_data=init_data,
-            connection_file=conn_file,
-        )
-        entrypoint = EntryPoint(mock_adaptor_cls)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "_serve",
+                "--init-data",
+                json.dumps(init_data),
+                "--connection-file",
+                conn_file,
+            ],
+        ):
+            entrypoint = EntryPoint(mock_adaptor_cls)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
         signal_mock.assert_not_called()
 
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     def test_background_start_raises_when_adaptor_module_not_loaded(
         self,
         mock_magic_init: MagicMock,
-        _parse_args_mock: MagicMock,
     ):
         # GIVEN
         conn_file = "/path/to/conn_file"
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="start",
-            connection_file=conn_file,
-        )
-        entrypoint = EntryPoint(FakeAdaptor)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "start",
+                "--connection-file",
+                conn_file,
+            ],
+        ):
+            entrypoint = EntryPoint(FakeAdaptor)
 
-        # WHEN
-        with patch.dict(runtime_entrypoint.sys.modules, {FakeAdaptor.__module__: None}):
-            with pytest.raises(ModuleNotFoundError) as raised_err:
-                entrypoint.start()
+            # WHEN
+            with patch.dict(runtime_entrypoint.sys.modules, {FakeAdaptor.__module__: None}):
+                with pytest.raises(ModuleNotFoundError) as raised_err:
+                    entrypoint.start()
 
         # THEN
         assert raised_err.match(f"Adaptor module is not loaded: {FakeAdaptor.__module__}")
-        _parse_args_mock.assert_called_once()
         mock_magic_init.assert_called_once_with(conn_file)
 
     @pytest.mark.parametrize(
@@ -398,7 +435,6 @@ class TestStart:
             (Path("reeentry_exe_value"),),
         ],
     )
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "init")
     @patch.object(FrontendRunner, "start")
@@ -407,32 +443,35 @@ class TestStart:
         mock_start: MagicMock,
         mock_magic_init: MagicMock,
         mock_magic_start: MagicMock,
-        _parse_args_mock: MagicMock,
         reentry_exe: Optional[Path],
     ):
         # GIVEN
         conn_file = "/path/to/conn_file"
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="start",
-            connection_file=conn_file,
-        )
-        mock_adaptor_module = Mock()
-        entrypoint = EntryPoint(FakeAdaptor)
-
-        # WHEN
-        with patch.dict(
-            runtime_entrypoint.sys.modules, {FakeAdaptor.__module__: mock_adaptor_module}
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "start",
+                "--connection-file",
+                conn_file,
+            ],
         ):
-            entrypoint.start(reentry_exe=reentry_exe)
+            mock_adaptor_module = Mock()
+            entrypoint = EntryPoint(FakeAdaptor)
+
+            # WHEN
+            with patch.dict(
+                runtime_entrypoint.sys.modules, {FakeAdaptor.__module__: mock_adaptor_module}
+            ):
+                entrypoint.start(reentry_exe=reentry_exe)
 
         # THEN
-        _parse_args_mock.assert_called_once()
         mock_magic_init.assert_called_once_with(mock_adaptor_module, {}, {}, reentry_exe)
         mock_magic_start.assert_called_once_with(conn_file)
         mock_start.assert_called_once_with()
 
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "shutdown")
     @patch.object(FrontendRunner, "stop")
@@ -441,55 +480,62 @@ class TestStart:
         mock_end: MagicMock,
         mock_shutdown: MagicMock,
         mock_magic_init: MagicMock,
-        _parse_args_mock: MagicMock,
     ):
         # GIVEN
         conn_file = "/path/to/conn_file"
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="stop",
-            connection_file=conn_file,
-        )
-        entrypoint = EntryPoint(FakeAdaptor)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "stop",
+                "--connection-file",
+                conn_file,
+            ],
+        ):
+            entrypoint = EntryPoint(FakeAdaptor)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
-        _parse_args_mock.assert_called_once()
         mock_magic_init.assert_called_once_with(conn_file)
         mock_end.assert_called_once()
         mock_shutdown.assert_called_once_with()
 
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "run")
     def test_runs_background_run(
         self,
         mock_run: MagicMock,
         mock_magic_init: MagicMock,
-        _parse_args_mock: MagicMock,
     ):
         # GIVEN
         conn_file = "/path/to/conn_file"
         run_data = {"run": "data"}
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="run",
-            connection_file=conn_file,
-            run_data=run_data,
-        )
-        entrypoint = EntryPoint(FakeAdaptor)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "run",
+                "--run-data",
+                json.dumps(run_data),
+                "--connection-file",
+                conn_file,
+            ],
+        ):
+            entrypoint = EntryPoint(FakeAdaptor)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
-        _parse_args_mock.assert_called_once()
         mock_magic_init.assert_called_once_with(conn_file)
         mock_run.assert_called_once_with(run_data)
 
-    @patch.object(EntryPoint, "_parse_args")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "run")
     @patch.object(runtime_entrypoint.signal, "signal")
@@ -498,55 +544,63 @@ class TestStart:
         signal_mock: MagicMock,
         mock_run: MagicMock,
         mock_magic_init: MagicMock,
-        _parse_args_mock: MagicMock,
     ):
         # GIVEN
         conn_file = "/path/to/conn_file"
         run_data = {"run": "data"}
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="run",
-            connection_file=conn_file,
-            run_data=run_data,
-        )
-        entrypoint = EntryPoint(FakeAdaptor)
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "run",
+                "--run-data",
+                json.dumps(run_data),
+                "--connection-file",
+                conn_file,
+            ],
+        ):
+            entrypoint = EntryPoint(FakeAdaptor)
 
-        # WHEN
-        entrypoint.start()
+            # WHEN
+            entrypoint.start()
 
         # THEN
         signal_mock.assert_not_called()
 
-    @patch.object(EntryPoint, "_parse_args")
-    @patch.object(FrontendRunner, "__init__", return_value=None)
+    @patch.object(runtime_entrypoint, "FrontendRunner")
     def test_makes_connection_file_path_absolute(
         self,
-        mock_init: MagicMock,
-        _parse_args_mock: MagicMock,
+        mock_runner: MagicMock,
     ):
         # GIVEN
         conn_file = "relpath"
-        _parse_args_mock.return_value = argparse.Namespace(
-            command="daemon",
-            subcommand="",
-            connection_file=conn_file,
-        )
-
-        entrypoint = EntryPoint(FakeAdaptor)
-
-        # WHEN
-        mock_isabs: MagicMock
-        with (
-            patch.object(runtime_entrypoint.os.path, "isabs", return_value=False) as mock_isabs,
-            patch.object(runtime_entrypoint.os.path, "abspath") as mock_abspath,
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "run",
+                "--connection-file",
+                conn_file,
+            ],
         ):
-            entrypoint.start()
+            entrypoint = EntryPoint(FakeAdaptor)
+
+            # WHEN
+            mock_isabs: MagicMock
+            with (
+                patch.object(runtime_entrypoint.os.path, "isabs", return_value=False) as mock_isabs,
+                patch.object(runtime_entrypoint.os.path, "abspath") as mock_abspath,
+            ):
+                entrypoint.start()
 
         # THEN
-        _parse_args_mock.assert_called_once()
-        mock_isabs.assert_called_once_with(conn_file)
-        mock_abspath.assert_called_once_with(conn_file)
-        mock_init.assert_called_once_with(mock_abspath.return_value)
+        mock_isabs.assert_any_call(conn_file)
+        mock_abspath.assert_any_call(conn_file)
+        mock_runner.assert_called_once_with(mock_abspath.return_value)
 
 
 class TestLoadData:

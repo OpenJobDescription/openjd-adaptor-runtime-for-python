@@ -50,9 +50,6 @@ class TestManagedProcess(object):
         startup_dir: str,
     ):
         class FakeManagedProcess(ManagedProcess):
-            def __init__(self, run_data: dict):
-                super(FakeManagedProcess, self).__init__(run_data)
-
             def get_executable(self) -> str:
                 return executable
 

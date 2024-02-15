@@ -24,9 +24,6 @@ class TestManagedProcess(object):
         """Testing a success case for the managed process."""
 
         class FakeManagedProcess(ManagedProcess):
-            def __init__(self, run_data: dict):
-                super(FakeManagedProcess, self).__init__(run_data)
-
             def get_executable(self) -> str:
                 if OSName.is_windows():
                     return "powershell.exe"
