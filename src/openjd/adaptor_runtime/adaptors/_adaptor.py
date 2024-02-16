@@ -58,7 +58,7 @@ class Adaptor(BaseAdaptor[_T]):
 
     def _run(self, run_data: dict):
         """
-        :param run_data: This is the data that changes between the different SubTasks. Eg. frame
+        :param run_data: This is the data that changes between the different Tasks. Eg. frame
         number.
         """
         self.on_run(run_data)

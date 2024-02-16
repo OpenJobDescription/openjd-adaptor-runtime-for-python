@@ -28,9 +28,6 @@ class TestRun:
             Test implementation of an Adaptor.
             """
 
-            def __init__(self, init_data: dict):
-                super().__init__(init_data)
-
             def on_run(self, run_data: dict):
                 # This run funciton will simply print the run_data.
                 self.update_status(progress=first_progress, status_message=first_status_message)
@@ -61,9 +58,6 @@ class TestRun:
         """
 
         class FileAdaptor(Adaptor):
-            def __init__(self, init_data: dict):
-                super().__init__(init_data)
-
             def on_start(self):
                 # Open a temp file
                 self.f = tmpdir.mkdir("test").join("hello.txt")
