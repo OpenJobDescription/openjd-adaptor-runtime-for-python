@@ -5,7 +5,6 @@ from __future__ import annotations
 from .base_client_interface import Response as _Response
 import http.client
 import signal as _signal
-import threading as _threading
 
 
 from .base_client_interface import BaseClientInterface
@@ -26,8 +25,10 @@ class WinClientInterface(BaseClientInterface):
             server_path (str): Used as pipe name in Named Pipe Server.
         """
         super().__init__(server_path)
-        if _threading.current_thread() is _threading.main_thread():
+        try:
             _signal.signal(_signal.SIGBREAK, self.graceful_shutdown)  # type: ignore[attr-defined]
+        except ValueError:
+            pass
 
     def _send_request(
         self,
