@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from openjd.adaptor_runtime.adaptors import CommandAdaptor
+from openjd.adaptor_runtime.adaptors import CommandAdaptor, SemanticVersion
 from openjd.adaptor_runtime.process import ManagedProcess
 
 
@@ -18,6 +18,10 @@ class FakeCommandAdaptor(CommandAdaptor):
 
     def get_managed_process(self, run_data: dict) -> ManagedProcess:
         return MagicMock()
+
+    @property
+    def integration_data_interface_version(self) -> SemanticVersion:
+        return SemanticVersion(major=0, minor=1)
 
 
 class TestRun:

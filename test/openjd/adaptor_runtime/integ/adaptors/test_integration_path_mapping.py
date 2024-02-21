@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock
 from openjd.adaptor_runtime.adaptors import CommandAdaptor, PathMappingRule
 from openjd.adaptor_runtime.process import ManagedProcess
+from openjd.adaptor_runtime.adaptors import SemanticVersion
 
 
 class FakeCommandAdaptor(CommandAdaptor):
@@ -16,6 +17,10 @@ class FakeCommandAdaptor(CommandAdaptor):
 
     def get_managed_process(self, run_data: dict) -> ManagedProcess:
         return MagicMock()
+
+    @property
+    def integration_data_interface_version(self) -> SemanticVersion:
+        return SemanticVersion(major=0, minor=1)
 
 
 class TestGetPathMappingRules:

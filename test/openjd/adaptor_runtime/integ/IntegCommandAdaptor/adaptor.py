@@ -5,13 +5,17 @@ from typing import List
 from logging import getLogger
 
 from openjd.adaptor_runtime._osname import OSName
-from openjd.adaptor_runtime.adaptors import CommandAdaptor
+from openjd.adaptor_runtime.adaptors import CommandAdaptor, SemanticVersion
 from openjd.adaptor_runtime.process import ManagedProcess
 
 logger = getLogger(__name__)
 
 
 class IntegManagedProcess(ManagedProcess):
+    @property
+    def integration_data_interface_version(self) -> SemanticVersion:
+        return SemanticVersion(major=0, minor=1)
+
     def get_executable(self) -> str:
         if OSName.is_windows():
             # In Windows, we cannot directly execute the powershell script.
@@ -25,6 +29,10 @@ class IntegManagedProcess(ManagedProcess):
 
 
 class IntegCommandAdaptor(CommandAdaptor):
+    @property
+    def integration_data_interface_version(self) -> SemanticVersion:
+        return SemanticVersion(major=0, minor=1)
+
     def get_managed_process(self, run_data: dict) -> ManagedProcess:
         return IntegManagedProcess(run_data)
 

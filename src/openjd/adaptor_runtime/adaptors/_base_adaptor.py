@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import sys
+from abc import abstractproperty
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Generic
@@ -18,6 +19,7 @@ from .configuration._configuration_manager import (
 )
 from ._adaptor_states import AdaptorStates
 from ._path_mapping import PathMappingRule
+from ._versioning import SemanticVersion
 
 __all__ = [
     "AdaptorConfigurationOptions",
@@ -87,6 +89,16 @@ class BaseAdaptor(AdaptorStates, Generic[_T]):
         Cancels the run of this adaptor.
         """
         self.on_cancel()
+
+    @abstractproperty
+    def integration_data_interface_version(self) -> SemanticVersion:
+        """
+        Returns a SemanticVersion of the data-interface.
+        Should be incremented when changes are made to any of the integration's:
+            - init-data schema
+            - run-data schema
+        """
+        pass
 
     @property
     def config_manager(self) -> ConfigurationManager[_T]:

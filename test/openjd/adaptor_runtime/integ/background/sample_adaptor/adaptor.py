@@ -2,7 +2,7 @@
 
 import logging
 
-from openjd.adaptor_runtime.adaptors import Adaptor
+from openjd.adaptor_runtime.adaptors import Adaptor, SemanticVersion
 
 _logger = logging.getLogger(__name__)
 
@@ -14,6 +14,10 @@ class SampleAdaptor(Adaptor):
 
     def __init__(self, init_data: dict, **_):
         super().__init__(init_data)
+
+    @property
+    def integration_data_interface_version(self) -> SemanticVersion:
+        return SemanticVersion(major=0, minor=1)
 
     def on_start(self):
         _logger.info("on_start")

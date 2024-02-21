@@ -7,6 +7,7 @@ from ._base_adaptor import AdaptorConfigurationOptions, BaseAdaptor
 from ._command_adaptor import CommandAdaptor
 from ._path_mapping import PathMappingRule
 from ._validator import AdaptorDataValidator, AdaptorDataValidators
+from ._versioning import SemanticVersion
 
 __all__ = [
     "Adaptor",
@@ -18,4 +19,5 @@ __all__ = [
     "BaseAdaptor",
     "CommandAdaptor",
     "PathMappingRule",
+    "SemanticVersion",
 ]

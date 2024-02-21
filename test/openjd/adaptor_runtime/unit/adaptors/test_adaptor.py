@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import Mock, patch
 
-from openjd.adaptor_runtime.adaptors import Adaptor
+from openjd.adaptor_runtime.adaptors import Adaptor, SemanticVersion
 
 
 class FakeAdaptor(Adaptor):
@@ -17,6 +17,10 @@ class FakeAdaptor(Adaptor):
 
     def on_run(self, run_data: dict):
         pass
+
+    @property
+    def integration_data_interface_version(self) -> SemanticVersion:
+        return SemanticVersion(major=0, minor=1)
 
 
 class TestRun:
