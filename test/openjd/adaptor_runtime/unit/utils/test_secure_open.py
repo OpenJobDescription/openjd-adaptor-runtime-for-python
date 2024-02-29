@@ -44,8 +44,8 @@ FLAG_DICT = {
     ],
 )
 @patch.object(os, "open")
-@pytest.mark.skipif(not OSName.is_linux(), reason="Linux-specific tests")
-def test_secure_open_in_linux(mock_os_open, path, open_mode, mask, expected_os_open_kwargs):
+@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+def test_secure_open_in_posix(mock_os_open, path, open_mode, mask, expected_os_open_kwargs):
     # WHEN
     with patch("builtins.open", mock_open()) as mocked_open:
         secure_open_kwargs = {"mask": mask} if mask else {}

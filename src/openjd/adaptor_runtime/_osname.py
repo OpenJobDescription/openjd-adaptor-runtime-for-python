@@ -37,7 +37,8 @@ class OSName(str):
         return str.__new__(cls, *args, **kw)
 
     @staticmethod
-    def is_macos(name: str) -> bool:
+    def is_macos(name: Optional[str] = None) -> bool:
+        name = OSName._get_os_name() if name is None else name
         return OSName.resolve_os_name(name) == OSName.MACOS
 
     @staticmethod

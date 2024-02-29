@@ -11,8 +11,9 @@ import socketserver
 import urllib.parse as urllib_parse
 from dataclasses import dataclass
 from http import HTTPStatus, server
-from typing import Callable, Type
+from typing import Any, Callable, Type
 
+from .._osname import OSName
 from .exceptions import UnsupportedPlatformException
 
 _logger = logging.getLogger(__name__)
@@ -120,13 +121,27 @@ class RequestHandler(server.BaseHTTPRequestHandler):
                 "Failed to handle request because it was not made through a UNIX socket"
             )
 
+        peercred_opt_level: Any
+        peercred_opt: Any
+        cred_cls: Any
+        if OSName.is_macos():  # pragma: no cover
+            # SOL_LOCAL is not defined in Python's socket module, need to hardcode it
+            # source: https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/un.h#L85
+            peercred_opt_level = 0  # type: ignore[attr-defined]
+            peercred_opt = socket.LOCAL_PEERCRED  # type: ignore[attr-defined]
+            cred_cls = XUCred
+        else:  # pragma: no cover
+            peercred_opt_level = socket.SOL_SOCKET  # type: ignore[attr-defined]
+            peercred_opt = socket.SO_PEERCRED  # type: ignore[attr-defined]
+            cred_cls = UCred
+
         # Get the credentials of the peer process
         cred_buffer = self.connection.getsockopt(
-            socket.SOL_SOCKET,  # type: ignore[attr-defined]
-            socket.SO_PEERCRED,  # type: ignore[attr-defined]
-            socket.CMSG_SPACE(ctypes.sizeof(UCred)),  # type: ignore[attr-defined]
+            peercred_opt_level,
+            peercred_opt,
+            socket.CMSG_SPACE(ctypes.sizeof(cred_cls)),  # type: ignore[attr-defined]
         )
-        peer_cred = UCred.from_buffer_copy(cred_buffer)
+        peer_cred = cred_cls.from_buffer_copy(cred_buffer)
 
         # Only allow connections from a process running as the same user
         return peer_cred.uid == os.getuid()  # type: ignore[attr-defined]
@@ -147,6 +162,26 @@ class UCred(ctypes.Structure):
 
     def __str__(self):  # pragma: no cover
         return f"pid:{self.pid} uid:{self.uid} gid:{self.gid}"
+
+
+class XUCred(ctypes.Structure):
+    """
+    Represents the xucred struct returned from the LOCAL_PEERCRED socket option.
+
+    For more info, see LOCAL_PEERCRED in the unix(4) man page
+    """
+
+    _fields_ = [
+        ("version", ctypes.c_uint),
+        ("uid", ctypes.c_uint),
+        ("ngroups", ctypes.c_short),
+        # cr_groups is a uint array of NGROUPS elements, which is defined as 16
+        # source:
+        # - https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/ucred.h#L207
+        # - https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/param.h#L100
+        # - https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/syslimits.h#L100
+        ("groups", ctypes.c_uint * 16),
+    ]
 
 
 @dataclass
