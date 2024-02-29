@@ -5,9 +5,9 @@ from __future__ import annotations
 import socket as _socket
 import ctypes as _ctypes
 import os as _os
+from sys import platform
 from typing import Any
 from http.client import HTTPConnection as _HTTPConnection
-from ..adaptor_runtime._osname import OSName
 
 
 class UnrecognizedBackgroundConnectionError(Exception):
@@ -86,7 +86,7 @@ class UnixHTTPConnection(_HTTPConnection):  # pragma: no cover
         peercred_opt_level: Any
         peercred_opt: Any
         cred_cls: Any
-        if OSName.is_macos():
+        if platform == "darwin":
             # SOL_LOCAL is not defined in Python's socket module, need to hardcode it
             # source: https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/un.h#L85
             peercred_opt_level = 0  # type: ignore[attr-defined]

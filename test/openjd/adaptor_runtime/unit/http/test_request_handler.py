@@ -137,7 +137,7 @@ class TestRequestHandler:
         mock_wfile.write.assert_called_once_with(body.encode("utf-8"))
 
 
-@pytest.mark.skipif(not OSName.is_linux() or not OSName.is_macos(), reason="Unix-specific tests")
+@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
 class TestAuthentication:
     """
     Tests for the RequestHandler authentication

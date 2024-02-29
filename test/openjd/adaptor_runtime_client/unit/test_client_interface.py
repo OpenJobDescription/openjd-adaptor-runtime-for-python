@@ -51,7 +51,7 @@ class FakeClient(_ClientInterface):
 
 
 @pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
-class TestLinuxClientInterface:
+class TestPosixClientInterface:
     @pytest.mark.parametrize(
         argnames=("original_path", "new_path"),
         argvalues=[
