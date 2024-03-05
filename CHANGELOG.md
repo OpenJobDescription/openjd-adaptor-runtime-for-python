@@ -1,3 +1,10 @@
+## 0.5.1 (2024-03-05)
+
+
+### Features
+* add macOS socket support and enable macOS CI (#65) ([`4da070d`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/4da070daef1c23be8c3be6e2fb5921b17a23c79a))
+
+
 ## 0.5.0 (2024-02-21)
 
 ### BREAKING CHANGES
