@@ -61,8 +61,7 @@ class TestDaemonMode:
         caplog: pytest.LogCaptureFixture,
     ) -> Generator[tuple[FrontendRunner, psutil.Process], None, None]:
         caplog.set_level(0)
-        # TODO: Investigate why we need more time in Windows.
-        frontend = FrontendRunner(connection_file_path, timeout_s=5.0 if OSName.is_posix() else 15)
+        frontend = FrontendRunner(connection_file_path, timeout_s=5.0)
         frontend.init(sys.modules[SampleAdaptor.__module__])
         conn_settings = _load_connection_settings(connection_file_path)
 
@@ -101,8 +100,24 @@ class TestDaemonMode:
         connection_settings = _load_connection_settings(connection_file_path)
 
         if OSName.is_windows():
-            # TODO: Need to figure out what we need to validate here
-            pass
+            try:
+                import pywintypes
+                import win32file
+
+                handle = win32file.CreateFile(
+                    connection_settings.socket,
+                    win32file.GENERIC_READ,
+                    0,  # No sharing
+                    None,  # Default security
+                    win32file.OPEN_EXISTING,
+                    0,  # Default attributes
+                    None,  # No template file
+                )
+                win32file.CloseHandle(handle)
+            except pywintypes.error as e:
+                # If an error occurred, it means the pipe does not exist
+                assert False, f"Named pipe is not created successfully. Fail to connect to it: {e}"
+
         else:
             assert any(
                 [
@@ -126,8 +141,7 @@ class TestDaemonMode:
         # THEN
         assert all(
             [
-                # TODO: Investigate why we need more time in Windows
-                _wait_for_file_deletion(p, timeout_s=(1 if OSName.is_posix() else 5))
+                _wait_for_file_deletion(p, timeout_s=1)
                 for p in [connection_file_path, conn_settings.socket]
             ]
         )
