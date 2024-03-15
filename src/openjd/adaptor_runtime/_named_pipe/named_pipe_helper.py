@@ -19,7 +19,10 @@ from enum import Enum
 import os
 
 
-from openjd.adaptor_runtime._background.server_config import NAMED_PIPE_BUFFER_SIZE
+from openjd.adaptor_runtime._background.server_config import (
+    NAMED_PIPE_BUFFER_SIZE,
+    DEFAULT_MAX_NAMED_PIPE_INSTANCES,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -181,7 +184,7 @@ class NamedPipeHelper:
             # A bi-directional pipe; both server and client processes can read from and write to the pipe.
             win32pipe.PIPE_ACCESS_DUPLEX,
             win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
-            win32pipe.PIPE_UNLIMITED_INSTANCES,
+            DEFAULT_MAX_NAMED_PIPE_INSTANCES,
             NAMED_PIPE_BUFFER_SIZE,  # nOutBufferSize
             NAMED_PIPE_BUFFER_SIZE,  # nInBufferSize
             time_out_in_seconds,
