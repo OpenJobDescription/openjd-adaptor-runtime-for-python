@@ -16,7 +16,7 @@ from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.application_ipc import AdaptorServer as _AdaptorServer
 
 if OSName.is_windows():
-    from openjd.adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
+    from openjd.adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
 
 
 @pytest.fixture

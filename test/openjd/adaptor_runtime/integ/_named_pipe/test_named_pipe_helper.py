@@ -13,7 +13,7 @@ if OSName.is_windows():
     import win32pipe
     import win32security
     import win32api
-    from openjd.adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
+    from openjd.adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
 else:
     # Cannot put this on the top of this file or mypy will complain
     pytest.mark.skip(reason="NamedPipe is only implemented in Windows.")

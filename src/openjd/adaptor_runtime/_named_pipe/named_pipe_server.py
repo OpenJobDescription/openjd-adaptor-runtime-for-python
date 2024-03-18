@@ -8,10 +8,12 @@ from threading import Event
 
 from typing import List
 
-from openjd.adaptor_runtime._background.server_config import DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS
+from openjd.adaptor_runtime_client.named_pipe.named_pipe_config import (
+    DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS,
+)
 from typing import TYPE_CHECKING
 
-from openjd.adaptor_runtime._named_pipe.named_pipe_helper import (
+from openjd.adaptor_runtime_client.named_pipe.named_pipe_helper import (
     NamedPipeHelper,
     NamedPipeTimeoutError,
 )

@@ -31,7 +31,7 @@ from .model import (
 )
 
 if OSName.is_windows():
-    from openjd.adaptor_runtime._named_pipe.named_pipe_helper import NamedPipeHelper
+    from openjd.adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
     import pywintypes
 
 _logger = logging.getLogger(__name__)
