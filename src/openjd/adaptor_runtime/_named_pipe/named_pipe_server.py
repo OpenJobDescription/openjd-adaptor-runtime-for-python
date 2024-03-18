@@ -5,7 +5,6 @@ import logging
 
 import threading
 from threading import Event
-import time
 
 from typing import List
 
@@ -135,14 +134,9 @@ class NamedPipeServer(ABC):
         """
         Shuts down the Named Pipe server and closes all named pipe handlers.
 
-        Signals the `serve_forever` method to stop listening to the NamedPipe Server by
-        pushing a `True` value into the `_cancel_queue`.
+        Signals the `serve_forever` method to stop listening to the NamedPipe Server.
         """
         self._shutdown_event.set()
-        # TODO: Need to find out a better way to wait for the communication finish
-        #  After sending the shutdown command, we need to wait for the response
-        #  from it before shutting down server or the client won't get the response.
-        time.sleep(1)
         error_list: List[Exception] = []
         try:
             # It is possible that the Server already start waiting for a connection from client.

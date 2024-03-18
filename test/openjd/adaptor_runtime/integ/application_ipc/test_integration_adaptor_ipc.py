@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import threading as _threading
+import time
 from time import sleep as _sleep
 from typing import Dict
 from unittest import mock as _mock
@@ -126,11 +127,7 @@ class TestAdaptorIPC:
         client_thread.start()
 
         # Giving time to avoid a race condition in which we close the thread before setup.
-        if OSName.is_linux():
-            _sleep(1)
-        else:
-            # TODO: Need to investigate why Windows is slower
-            _sleep(5)
+        _sleep(1)
 
         # Cleanup
         test_server.shutdown()
@@ -167,11 +164,7 @@ class TestAdaptorIPC:
         client_thread.start()
 
         # Giving time to avoid a race condition in which we close the thread before setup.
-        if OSName.is_linux():
-            _sleep(1)
-        else:
-            # TODO: Need to investigate why Windows is slower
-            _sleep(5)
+        _sleep(1)
 
         # Confirming the test ran successfully.
         mocked_hw.assert_called_once_with(hw_args)
@@ -191,16 +184,14 @@ class TestAdaptorIPC:
         close_thread = _threading.Thread(target=enqueue_close_action)
         close_thread.start()
 
-        if OSName.is_windows():
-            # Need to wait for the action finish
-            # TODO: Need to investigate why Windows is slower
-            _sleep(3)
-
         # Cleanup
+        # Ensure the close action is enqueued before shutting down the server.
+        close_thread.join()
+        # Sleep a while to let `close` to be called
+        time.sleep(0.5)
         test_server.shutdown()
         server_thread.join()
         client_thread.join()
-        close_thread.join()
 
         # Verifying the test was successful.
         mocked_close.assert_called_once()
