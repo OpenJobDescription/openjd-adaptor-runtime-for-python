@@ -1,3 +1,10 @@
+## 0.5.2 (2024-03-19)
+
+
+
+### Bug Fixes
+* specify max named pipe instances (#86) ([`d959381`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/d95938179b4f605d9315cecec8b80b52f23fb11d))
+
 ## 0.5.1 (2024-03-05)
 
 
