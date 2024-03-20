@@ -19,7 +19,7 @@ from enum import Enum
 import os
 
 
-from openjd.adaptor_runtime._background.server_config import (
+from .named_pipe_config import (
     NAMED_PIPE_BUFFER_SIZE,
     DEFAULT_MAX_NAMED_PIPE_INSTANCES,
 )

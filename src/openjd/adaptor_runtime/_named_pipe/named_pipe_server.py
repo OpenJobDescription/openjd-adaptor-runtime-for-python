@@ -8,17 +8,19 @@ from threading import Event
 
 from typing import List
 
-from openjd.adaptor_runtime._background.server_config import DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS
+from ...adaptor_runtime_client.named_pipe.named_pipe_config import (
+    DEFAULT_NAMED_PIPE_TIMEOUT_MILLISECONDS,
+)
 from typing import TYPE_CHECKING
 
-from openjd.adaptor_runtime._named_pipe.named_pipe_helper import (
+from ...adaptor_runtime_client.named_pipe.named_pipe_helper import (
     NamedPipeHelper,
     NamedPipeTimeoutError,
 )
 
 if TYPE_CHECKING:
-    from openjd.adaptor_runtime._named_pipe import ResourceRequestHandler
-from openjd.adaptor_runtime._osname import OSName
+    from .._named_pipe import ResourceRequestHandler
+from .._osname import OSName
 
 import win32pipe
 import win32file

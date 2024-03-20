@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Dict, List
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
     from openjd.adaptor_runtime._named_pipe import NamedPipeServer
 
-from openjd.adaptor_runtime._named_pipe.named_pipe_helper import (
+from ...adaptor_runtime_client.named_pipe.named_pipe_helper import (
     NamedPipeHelper,
     PipeDisconnectedException,
 )

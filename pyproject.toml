@@ -139,7 +139,8 @@ source = [
   "src/openjd/adaptor_runtime/_named_pipe/*.py",
   "src/openjd/adaptor_runtime/application_ipc/_win_adaptor_server.py",
   "src/openjd/adaptor_runtime/application_ipc/_named_pipe_request_handler.py",
-  "src/openjd/adaptor_runtime_client/win_client_interface.py"
+  "src/openjd/adaptor_runtime_client/win_client_interface.py",
+  "src/openjd/adaptor_runtime_client/named_pipe/*.py"
 ]
 # Source files to exclude from coverage on Windows
 "sys_platform == 'win32'" = [

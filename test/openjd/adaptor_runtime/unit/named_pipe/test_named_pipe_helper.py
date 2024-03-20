@@ -10,7 +10,9 @@ pywintypes = pytest.importorskip("pywintypes")
 win32pipe = pytest.importorskip("win32pipe")
 win32file = pytest.importorskip("win32file")
 winerror = pytest.importorskip("winerror")
-named_pipe_helper = pytest.importorskip("openjd.adaptor_runtime._named_pipe.named_pipe_helper")
+named_pipe_helper = pytest.importorskip(
+    "openjd.adaptor_runtime_client.named_pipe.named_pipe_helper"
+)
 
 
 class MockReadFile:
@@ -70,7 +72,7 @@ class TestNamedPipeHelper:
 
     @patch("os.getpid", return_value=1)
     @patch(
-        "openjd.adaptor_runtime._named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
+        "openjd.adaptor_runtime_client.named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
         return_value=False,
     )
     def test_generate_pipe_name(self, mock_check_named_pipe_exists, mock_getpid):
@@ -79,7 +81,7 @@ class TestNamedPipeHelper:
 
     @patch("os.getpid", return_value=1)
     @patch(
-        "openjd.adaptor_runtime._named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
+        "openjd.adaptor_runtime_client.named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
         side_effect=[True, False],
     )
     def test_generate_pipe_name2(self, mock_check_named_pipe_exists, mock_getpid):
@@ -89,7 +91,7 @@ class TestNamedPipeHelper:
 
     @patch("os.getpid", return_value=1)
     @patch(
-        "openjd.adaptor_runtime._named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
+        "openjd.adaptor_runtime_client.named_pipe.named_pipe_helper.NamedPipeHelper.check_named_pipe_exists",
         return_value=True,
     )
     def test_failed_to_generate_pipe_name(self, mock_check_named_pipe_exists, mock_getpid):

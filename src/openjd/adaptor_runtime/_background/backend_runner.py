@@ -19,7 +19,7 @@ from .._utils import secure_open
 if OSName.is_posix():
     from .http_server import BackgroundHTTPServer
 if OSName.is_windows():
-    from .._named_pipe.named_pipe_helper import NamedPipeHelper
+    from ...adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
     from .backend_named_pipe_server import WinBackgroundNamedPipeServer
 from .log_buffers import LogBuffer
 from .model import ConnectionSettings

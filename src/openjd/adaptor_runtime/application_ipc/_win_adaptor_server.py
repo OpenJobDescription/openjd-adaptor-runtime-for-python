@@ -7,7 +7,7 @@ from pywintypes import HANDLE
 
 from ._named_pipe_request_handler import WinAdaptorServerResourceRequestHandler
 from .._named_pipe import ResourceRequestHandler
-from .._named_pipe.named_pipe_helper import NamedPipeHelper
+from ...adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
 from .._named_pipe.named_pipe_server import NamedPipeServer
 
 
