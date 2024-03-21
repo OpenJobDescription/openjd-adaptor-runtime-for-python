@@ -30,6 +30,55 @@ You can download this package from:
 
 See [VERIFYING_PGP_SIGNATURE](VERIFYING_PGP_SIGNATURE.md) for more information.
 
+## Usage
+This package offers two primary adaptor types: `CommandAdaptor` and `Adaptor`, designed for customization for various use cases. 
+All adaptors can operate in two modes Foreground and Background to meet different requirements, 
+Below is an overview of how these adaptors work.
+
+### Adaptor Types
+
+- **CommandAdaptor**: Ideal for executing straightforward commands. Extend this class if your requirements involve 
+simple command execution. An implementation example is available at `test/openjd/adaptor_runtime/integ/CommandAdaptorExample`.
+
+- **Adaptor**: Suited for applications that demand granular control, such as digital content creation (DCC) applications. 
+By inheriting from `Adaptor`, you can predefine actions for reuse across different contexts. 
+An example adaptor could be found at `test/openjd/adaptor_runtime/integ/AdaptorExample`.
+
+### Adaptor Running Mode:
+Adaptors can operate in two modes: Foreground and Background. In the below section, we will use the `AdaptorExample` 
+to show how they work. Following commands need to be run in the `test\openjd\adaptor_runtime\`. Please navigate to 
+this directory by using the `cd`. 
+
+#### Foreground Mode
+In Foreground Mode, the adaptor undergoes a complete lifecycle including `start`, `run`, `stop` and `cleanup` of the adaptor in a single command.
+This mode is straightforward and is recommended for linear task execution.
+```
+python -m integ.AdaptorExample run
+```
+
+#### Background Mode
+Background Mode is optimized for scenarios required maintaining an application's state across multiple operations. 
+This mode enhances efficiency by reusing the application's loaded state.
+
+1. Start the Adaptor: Initializes the adaptor and prepares it for background operation.
+    ```
+    python -m integ.AdaptorExample daemon start --connection-file ./AdaptorExampleConnection.json
+    ```
+1. Run the Adaptor: Executes the adaptor's main functionality. This step can be repeated multiple times, 
+optionally passing custom data via the `--run-data` argument to modify the operation context.
+    ```
+    python -m integ.AdaptorExample daemon run --connection-file ./AdaptorExampleConnection.json
+    ```
+    To pass custom data:
+    ```
+    python -m integ.AdaptorExample daemon run --connection-file ./AdaptorExampleConnection.json --run-data '{"hello": "world"}'
+    ```
+1. Stop the Adaptor: Terminates the adaptor's operation and performs necessary cleanup actions. 
+This step ensures that the background processes are properly closed, and the IPC channel is cleaned up.
+    ```
+    python -m integ.AdaptorExample daemon stop --connection-file ./AdaptorExampleConnection.json
+    ```
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.

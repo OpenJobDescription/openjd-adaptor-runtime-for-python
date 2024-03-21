@@ -28,7 +28,7 @@ class IntegManagedProcess(ManagedProcess):
         return self.run_data.get("args", [""])
 
 
-class IntegCommandAdaptor(CommandAdaptor):
+class CommandAdaptorExample(CommandAdaptor):
     @property
     def integration_data_interface_version(self) -> SemanticVersion:
         return SemanticVersion(major=0, minor=1)
