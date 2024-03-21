@@ -11,7 +11,7 @@ from .base_client_interface import BaseClientInterface
 
 from .named_pipe.named_pipe_helper import NamedPipeHelper
 
-_DEFAULT_TIMEOUT_IN_SECONDS = 15
+_DEFAULT_TIMEOUT_IN_SECONDS = 120
 
 
 class WinClientInterface(BaseClientInterface):
