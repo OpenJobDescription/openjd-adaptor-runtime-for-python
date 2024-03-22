@@ -22,6 +22,7 @@ import os
 from .named_pipe_config import (
     NAMED_PIPE_BUFFER_SIZE,
     DEFAULT_MAX_NAMED_PIPE_INSTANCES,
+    DEFAULT_NAMED_PIPE_SERVER_TIMEOUT_IN_SECONDS,
 )
 
 _logger = logging.getLogger(__name__)
@@ -242,14 +243,14 @@ class NamedPipeHelper:
                 NamedPipeHelper._handle_pipe_exception(e)
 
     @staticmethod
-    def read_from_pipe(handle: HANDLE, timeout_in_seconds: float = 5.0) -> str:  # type: ignore
+    def read_from_pipe(handle: HANDLE, timeout_in_seconds: Optional[float] = 5.0) -> str:  # type: ignore
         """
         Reads data from a Named Pipe. Times out after timeout_in_seconds.
 
         Args:
             handle (HANDLE): The handle to the Named Pipe.
-            timeout_in_seconds (float): The maximum time in seconds to wait for data before
-                raising a TimeoutError. Defaults to 5 seconds.
+            timeout_in_seconds (Optional[float]): The maximum time in seconds to wait for data before
+                raising a TimeoutError. Defaults to 5 seconds. None means waiting indefinitely.
 
         Returns:
             str: The data read from the Named Pipe.
@@ -299,7 +300,7 @@ class NamedPipeHelper:
         Args:
             pipe_name (str): The name of the pipe to connect to.
             timeout_in_seconds (float): The maximum time in seconds to wait for the server pipe
-                to become available before raising an error.
+                to become available before raising an error. If None, the function will wait indefinitely.
 
         Returns:
             HANDLE: A handle to the connected pipe.
@@ -360,7 +361,7 @@ class NamedPipeHelper:
     @staticmethod
     def send_named_pipe_request(
         pipe_name: str,
-        timeout_in_seconds: float,
+        timeout_in_seconds: Optional[float],
         method: str,
         path: str,
         *,
@@ -375,8 +376,8 @@ class NamedPipeHelper:
 
         Args:
             pipe_name (str): The name of the pipe to connect to.
-            timeout_in_seconds (float): The maximum time in seconds to wait for the server pipe to become available
-                before raising an error.
+            timeout_in_seconds (Optional[float]): The maximum time in seconds to wait for the server to response.
+                None means no timeout.
             method (str): The HTTP method type (e.g., 'GET', 'POST').
             path (str): The request path.
             params (dict, optional): Dictionary of URL parameters to append to the path.
@@ -390,7 +391,9 @@ class NamedPipeHelper:
             json.JSONDecodeError: If there is an error in parsing the server's response.
         """
 
-        handle = NamedPipeHelper.establish_named_pipe_connection(pipe_name, timeout_in_seconds)
+        handle = NamedPipeHelper.establish_named_pipe_connection(
+            pipe_name, DEFAULT_NAMED_PIPE_SERVER_TIMEOUT_IN_SECONDS
+        )
         try:
             message_dict = {
                 "method": method,
