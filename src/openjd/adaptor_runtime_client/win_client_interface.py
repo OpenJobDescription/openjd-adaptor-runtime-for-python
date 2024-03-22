@@ -11,7 +11,8 @@ from .base_client_interface import BaseClientInterface
 
 from .named_pipe.named_pipe_helper import NamedPipeHelper
 
-_DEFAULT_TIMEOUT_IN_SECONDS = 15
+# Set timeout to None so our requests are blocking calls with no timeout.
+_REQUEST_TIMEOUT = None
 
 
 class WinClientInterface(BaseClientInterface):
@@ -40,7 +41,7 @@ class WinClientInterface(BaseClientInterface):
             query_string_params = {key: [value] for key, value in query_string_params.items()}
         json_result = NamedPipeHelper.send_named_pipe_request(
             self.server_path,
-            _DEFAULT_TIMEOUT_IN_SECONDS,
+            _REQUEST_TIMEOUT,
             method,
             path,
             params=query_string_params,
