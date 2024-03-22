@@ -11,6 +11,7 @@ from .._osname import OSName
 if OSName.is_windows():
     import ntsecuritycon as con
     import win32security
+    import win32con
 
 from openjd.adaptor_runtime._osname import OSName
 
@@ -88,7 +89,7 @@ def get_file_owner_in_windows(filepath: "StrOrBytesPath") -> str:  # pragma: is-
 
 def set_file_permissions_in_windows(filepath: "StrOrBytesPath") -> None:  # pragma: is-posix
     """
-    Sets read and write permissions for the owner of the specified file.
+    Sets read, write and delete permissions for the owner of the specified file.
 
     Note: This function sets permissions only for the owner of the file and
     does not consider existing DACLs.
@@ -101,9 +102,10 @@ def set_file_permissions_in_windows(filepath: "StrOrBytesPath") -> None:  # prag
 
     dacl = win32security.ACL()
 
-    # Add read & write permissions
+    # Add read, write and delete permissions
     dacl.AddAccessAllowedAce(win32security.ACL_REVISION, con.FILE_GENERIC_READ, user_sid)
     dacl.AddAccessAllowedAce(win32security.ACL_REVISION, con.FILE_GENERIC_WRITE, user_sid)
+    dacl.AddAccessAllowedAce(win32security.ACL_REVISION, win32con.DELETE, user_sid)
 
     # Apply the DACL to the file
     sd = win32security.GetFileSecurity(filepath, win32security.DACL_SECURITY_INFORMATION)
