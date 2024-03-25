@@ -1,3 +1,10 @@
+## 0.6.1 (2024-03-25)
+
+
+
+### Bug Fixes
+* Add `delete` permission to the`secure_open` (#92) ([`6d066ad`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/6d066ad98f33e1b54a6934c1d244f5938a65ec90))
+
 ## 0.6.0 (2024-03-22)
 
 
