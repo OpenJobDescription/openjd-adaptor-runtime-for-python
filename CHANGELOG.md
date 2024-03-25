@@ -1,9 +1,15 @@
-## 0.5.2 (2024-03-19)
+## 0.6.0 (2024-03-22)
 
+
+### BREAKING CHANGES
+* Move the `named_pipe_helper.py` under the folder `adaptor_runtime_client` (#87) ([`1398c56`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/1398c562fead13564705329838a377468e11c2c1))
 
 
 ### Bug Fixes
+* Update request method in windows Client interface to blocking call. (#90) ([`e66d592`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/e66d5927f6f0ede574ae39bcd2616042265baa7c))
+* increase max named pipe instances to 4 (#91) ([`7440c53`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/7440c531f3eadabd9496217ad37f7247e17f5358))
 * specify max named pipe instances (#86) ([`d959381`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/d95938179b4f605d9315cecec8b80b52f23fb11d))
+
 
 ## 0.5.1 (2024-03-05)
 
