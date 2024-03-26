@@ -219,8 +219,8 @@ class NamedPipeHelper:
     def read_from_pipe_target(handle: HANDLE):
         """
         Reads data from a Named Pipe. Times out after timeout_in_seconds.
-        Note: This method should be executed in a thread with a timeout.
-              win32.ReadFile can hang up, causing this to execute indefinitely.
+        Note: This method should be run in a thread with a timeout.
+              win32.ReadFile can hang up, causing this to run indefinitely.
 
         Args:
             handle (HANDLE): The handle to the Named Pipe.

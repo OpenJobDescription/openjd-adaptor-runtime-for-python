@@ -31,15 +31,21 @@ class AdaptorClient(ClientInterface):
             }
         )
 
-    def print(self, data: dict) -> None:
-        print(f"App: {data.get('message')}", flush=True)
+    def print(self, args: dict[str, Any] | None) -> None:
+        """
+        This function prints a message fetched from an action queue when `print` action is fetched from the action queue.
+        """
+        if args is None:
+            print("App: 'args' in print action is None", flush=True)
+        else:
+            print(f"App: {args.get('message')}", flush=True)
 
     def close(self, args: dict[str, Any] | None) -> None:
         print("'close' function is called", flush=True)
 
     def graceful_shutdown(self, signum: int, frame: FrameType | None) -> None:
         """
-        This function will be called when the application got the SIGTERM in the Linux and SIGBREAK in Windows.
+        This function will be called when the application got the SIGTERM in the Linux or SIGBREAK in Windows.
         """
         print(f"received signal: {signum}\ngracefully shutting down", flush=True)
 

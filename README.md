@@ -44,28 +44,54 @@ simple command execution. An implementation example is available at `test/openjd
 By inheriting from `Adaptor`, you can predefine actions for reuse across different contexts. 
 An example adaptor could be found at `test/openjd/adaptor_runtime/integ/AdaptorExample`.
 
-### Adaptor Running Mode:
+### Running an Adaptor
 Adaptors can operate in two modes: Foreground and Background. In the below section, we will use the `AdaptorExample` 
 to show how they work. Following commands need to be run in the `test\openjd\adaptor_runtime\`. Please navigate to 
 this directory by using the `cd`. 
 
 #### Foreground Mode
-In Foreground Mode, the adaptor undergoes a complete lifecycle including `start`, `run`, `stop` and `cleanup` of the adaptor in a single command.
-This mode is straightforward and is recommended for linear task execution.
+In Foreground Mode, the adaptor undergoes a complete lifecycle including `start`, `run`, `stop` and `cleanup` of the 
+adaptor in a single command.
+This mode is straightforward and is recommended for linear task execution.  Additionally, the Foreground Mode supports 
+the injection of initialization and runtime data through the `--init-data` and `--run-data` flags. 
+These flags allow for the passing of a JSON-encoded dictionary, either directly in the command line or through a file. 
+- **`--init-data`**: This data is decoded and stored within the `self.init_data` attribute.
+- **`--run-data`**: This data becomes accessible as the first argument of the `on_run` method.
+
 ```
-python -m integ.AdaptorExample run
+python -m integ.AdaptorExample run --init-data '{"name": "MyAdaptor"}'  --run-data '{"hello": "world"}'
 ```
 
 #### Background Mode
-Background Mode is optimized for scenarios required maintaining an application's state across multiple operations. 
-This mode enhances efficiency by reusing the application's loaded state.
+Background Mode is provided to enable scenarios where it is beneficial to maintain state between multiple runs.
+Such as between task runs within an 
+[Open Job Description Session](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#sessions).
+You can use it with any type of Adaptor, but it derives its greatest benefit with Adaptors derived from
+the `Adaptor` class rather than the `CommandAdaptor` class.
+An example of how you might design an Adaptor to leverage this mode is to have it:
+1. Load an application in the Adaptor's `start` phase; then
+2. Communicate with that loaded application in each `run` of the Adaptor to tell the application what to do; then
+3. Close the application in the Adaptor's `stop` phase.
+In this mode, your Adaptor is started up as a background process and left running. Then you can invoke
+your Adaptor again to connect to that background process and instruct it to perform actions. When
+connecting to the background process your command will relay all log output from the background process
+to your stdout and stderr, and will only exit once the command is complete.
 
-1. Start the Adaptor: Initializes the adaptor and prepares it for background operation.
+When using background mode, you have to manage the state transitions of the Adaptor yourself by repeatedly running the 
+adaptor with different arguments.
+1. Start the Adaptor: Initializes the adaptor and prepares it for background operation. This starts up your
+   Adaptor in a subprocess that is left running after the command exits. You must provide a path to a
+   connection file for the Adaptor to create. This file contains information on how to connect to the
+   subprocess that is left running, and you must provide it to all subsequent runs of the Adaptor until you
+   have stopped it. You may also provide `--init-data` to the start command that is a JSON-encoded
+   dictionary either inline or in a given file; this data is decoded and automatically stored in the
+   `self.init_data` member of your running Adaptor.
     ```
-    python -m integ.AdaptorExample daemon start --connection-file ./AdaptorExampleConnection.json
+    python -m integ.AdaptorExample daemon start --connection-file ./AdaptorExampleConnection.json --init-data '{"name": "MyAdaptor"}'
     ```
-1. Run the Adaptor: Executes the adaptor's main functionality. This step can be repeated multiple times, 
+2. Run the Adaptor: Executes the adaptor's main functionality. This step can be repeated multiple times, 
 optionally passing custom data via the `--run-data` argument to modify the operation context.
+This data becomes accessible as the first argument of the `on_run` method of your running Adaptor.
     ```
     python -m integ.AdaptorExample daemon run --connection-file ./AdaptorExampleConnection.json
     ```
@@ -73,7 +99,7 @@ optionally passing custom data via the `--run-data` argument to modify the opera
     ```
     python -m integ.AdaptorExample daemon run --connection-file ./AdaptorExampleConnection.json --run-data '{"hello": "world"}'
     ```
-1. Stop the Adaptor: Terminates the adaptor's operation and performs necessary cleanup actions. 
+3. Stop the Adaptor: Terminates the adaptor's operation and performs necessary cleanup actions. 
 This step ensures that the background processes are properly closed, and the IPC channel is cleaned up.
     ```
     python -m integ.AdaptorExample daemon stop --connection-file ./AdaptorExampleConnection.json
