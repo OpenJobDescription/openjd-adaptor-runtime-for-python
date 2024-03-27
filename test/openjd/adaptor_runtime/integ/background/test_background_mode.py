@@ -162,7 +162,6 @@ class TestDaemonMode:
         frontend.start()
 
         # THEN
-        print(caplog.text)
         assert "on_start" in caplog.text
 
     @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")

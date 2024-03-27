@@ -32,8 +32,8 @@ See [VERIFYING_PGP_SIGNATURE](VERIFYING_PGP_SIGNATURE.md) for more information.
 
 ## Usage
 This package offers two primary adaptor types: `CommandAdaptor` and `Adaptor`, designed for customization for various use cases. 
-All adaptors can operate in two modes Foreground and Background to meet different requirements, 
-Below is an overview of how these adaptors work.
+All adaptors can operate in two modes Foreground and Background to meet different requirements. Below is an overview of 
+how these adaptors work.
 
 ### Adaptor Types
 
@@ -68,10 +68,13 @@ Such as between task runs within an
 [Open Job Description Session](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#sessions).
 You can use it with any type of Adaptor, but it derives its greatest benefit with Adaptors derived from
 the `Adaptor` class rather than the `CommandAdaptor` class.
+
 An example of how you might design an Adaptor to leverage this mode is to have it:
+
 1. Load an application in the Adaptor's `start` phase; then
 2. Communicate with that loaded application in each `run` of the Adaptor to tell the application what to do; then
 3. Close the application in the Adaptor's `stop` phase.
+
 In this mode, your Adaptor is started up as a background process and left running. Then you can invoke
 your Adaptor again to connect to that background process and instruct it to perform actions. When
 connecting to the background process your command will relay all log output from the background process
@@ -79,6 +82,7 @@ to your stdout and stderr, and will only exit once the command is complete.
 
 When using background mode, you have to manage the state transitions of the Adaptor yourself by repeatedly running the 
 adaptor with different arguments.
+
 1. Start the Adaptor: Initializes the adaptor and prepares it for background operation. This starts up your
    Adaptor in a subprocess that is left running after the command exits. You must provide a path to a
    connection file for the Adaptor to create. This file contains information on how to connect to the

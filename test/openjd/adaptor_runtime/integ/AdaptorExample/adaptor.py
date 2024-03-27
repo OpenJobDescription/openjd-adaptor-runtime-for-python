@@ -24,9 +24,11 @@ class AdaptorExample(Adaptor):
     Implementing the on_run method is mandatory for all adaptors. Optionally, on_start, on_end, on_cleanup, and
     on_cancel methods can also be overridden for more granular control over the adaptor's lifecycle.
 
-    Adaptors support two modes: Foreground, where they run a full lifecycle in a single command, and Background,
-    for maintaining state across operations. Proper method implementation is crucial in Background mode for stateful
-    operations.
+    Adaptors support two modes:
+    - Foreground: It undergoes a complete lifecycle including `start`, `run`, `stop` and `cleanup` of the adaptor in a
+        single command.
+    - Background: It will maintain states between multiple runs. Proper method implementation is crucial in Background
+        mode for stateful operations.
     """
 
     def __init__(self, init_data: dict, **_):
@@ -39,10 +41,18 @@ class AdaptorExample(Adaptor):
 
     def on_start(self) -> None:
         """
-        In Background mode, `on_start` initializes the environment or dependencies, running at the 'daemon start'
-        command execution. This example initializes a server thread to interact with a client application,
-        showing command exchange and execution.
+        `on_start` is used for setting up the environment or dependencies,
+
+        In Foreground mode, `on_start` is the first method which will be called when the adaptor is started.
+        +----------+
+        | on_start |  -> on_run -> on_stop -> on_cleanup
+        +----------+
+
+        In Background mode, it will be run at the 'daemon start' command execution.
         """
+
+        # This example initializes a server thread to interact with a client application, showing command exchange and
+        # execution.
         _logger.info("on_start")
         # Initialize the server thread to manage actions
         self.server = AdaptorServer(
@@ -92,8 +102,15 @@ class AdaptorExample(Adaptor):
 
     def on_run(self, run_data: dict) -> None:
         """
-        Executed during 'daemon run' command in Background mode. `run_data` is adjustable via `--run-data`.
-        `on_run` is an abstract method and must be overridden and defined in each every adaptor.
+        `on_run` is an abstract method and must be overridden and defined in each adaptor. `run_data` is adjustable via
+        `--run-data`.
+
+        In Foreground mode, `on_run` is the second method which will be called when the adaptor starts.
+                    +--------+
+        on_start -> | on_run | -> on_stop -> on_cleanup
+                    +--------+
+
+        In Background mode, `on_run` will be run during 'daemon run' command.
         """
         _logger.info(f"on_run: {run_data}")
         self.enqueue_print(f"`on_run` is called with run_data: {run_data}")
@@ -103,9 +120,16 @@ class AdaptorExample(Adaptor):
 
     def on_cleanup(self) -> None:
         """
-        In Background mode `on_cleanup` wil be used for cleaning up resources regardless of the operation mode or any
-        failures during on_stop.
-        In Foreground mode, it runs after all steps, ensuring releasing resource and terminating process.
+        `on_cleanup` is method used for final cleanup tasks.
+
+        In Foreground mode, `on_cleanup` runs after all steps have completed. It will also run immediately if any errors
+        occurred in previous steps.
+                                         +------------+
+        on_start -> on_run -> on_stop -> | on_cleanup |
+                                         +------------+
+
+        In Background mode, `on_cleanup` is called as part of the `daemon stop` command, regardless of whether `on_stop`
+        failed or not.
         """
         self.enqueue_print("`on_cleanup` is called.")
         # do something then call the close action
@@ -134,8 +158,15 @@ class AdaptorExample(Adaptor):
 
     def on_stop(self):
         """
-        `on_stop` will be invoked with 'daemon stop', This method should be used for ensuring that
-        the adaptor and associated tasks are properly terminated.
+        `on_stop` method should be used for ensuring that the adaptor and associated tasks are properly terminated.
+
+        In Foreground mode, `on_stop` is the third method which will be called when the adaptor starts.
+
+                              +---------+
+        on_start -> on_run -> | on_stop | -> on_cleanup
+                              +---------+
+
+        In Background mode, `on_stop` will be invoked with 'daemon stop'.
         """
         _logger.info("on_stop")
         self.enqueue_print("`on_stop` is called.")

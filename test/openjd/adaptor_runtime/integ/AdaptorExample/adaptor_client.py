@@ -24,7 +24,7 @@ class AdaptorClient(ClientInterface):
     def __init__(self, server_path: str) -> None:
         super().__init__(server_path)
         # All customized actions needed to be put in this dict
-        # There is key value pair is pre-defined in this dict {"close": self.close}
+        # There is a key value pair that is pre-defined in this dict: {"close": self.close}
         self.actions.update(
             {
                 "print": self.print,
