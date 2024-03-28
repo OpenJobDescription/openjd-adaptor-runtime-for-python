@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-from .adaptor import SampleAdaptor
+from .adaptor import AdaptorExample
 
 __all__ = [
-    "SampleAdaptor",
+    "AdaptorExample",
 ]

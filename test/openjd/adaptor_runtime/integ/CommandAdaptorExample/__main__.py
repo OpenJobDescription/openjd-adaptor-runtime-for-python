@@ -5,7 +5,7 @@ import sys as _sys
 
 from openjd.adaptor_runtime import EntryPoint as _EntryPoint
 
-from .adaptor import IntegCommandAdaptor
+from .adaptor import CommandAdaptorExample
 
 __all__ = ["main"]
 _logger = _logging.getLogger(__name__)
@@ -19,7 +19,7 @@ def main():
         raise RuntimeError(f"Must be run as a module. Do not run {__file__} directly")
 
     try:
-        _EntryPoint(IntegCommandAdaptor).start()
+        _EntryPoint(CommandAdaptorExample).start()
     except Exception as e:
         _logger.error(f"Entrypoint failed: {e}")
         _sys.exit(1)

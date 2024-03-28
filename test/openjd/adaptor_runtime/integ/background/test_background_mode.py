@@ -24,13 +24,13 @@ from openjd.adaptor_runtime._background.frontend_runner import (
 )
 from openjd.adaptor_runtime._osname import OSName
 
-mod_path = (Path(__file__).parent).resolve()
+mod_path = (Path(__file__).parent.parent).resolve()
 sys.path.append(str(mod_path))
 if (_pypath := os.environ.get("PYTHONPATH")) is not None:
     os.environ["PYTHONPATH"] = os.pathsep.join((_pypath, str(mod_path)))
 else:
     os.environ["PYTHONPATH"] = str(mod_path)
-from sample_adaptor import SampleAdaptor  # noqa: E402
+from AdaptorExample import AdaptorExample  # noqa: E402
 
 
 class TestDaemonMode:
@@ -40,7 +40,7 @@ class TestDaemonMode:
 
     @pytest.fixture(autouse=True)
     def mock_runtime_logger_level(self, tmpdir: pathlib.Path):
-        # Setup a config file for the backend process
+        # Set up a config file for the backend process
         config = {"log_level": "DEBUG"}
         config_path = os.path.join(tmpdir, "configuration.json")
         with open(config_path, mode="w") as f:
@@ -62,7 +62,7 @@ class TestDaemonMode:
     ) -> Generator[tuple[FrontendRunner, psutil.Process], None, None]:
         caplog.set_level(0)
         frontend = FrontendRunner(connection_file_path, timeout_s=5.0)
-        frontend.init(sys.modules[SampleAdaptor.__module__])
+        frontend.init(sys.modules[AdaptorExample.__module__])
         conn_settings = _load_connection_settings(connection_file_path)
 
         match = re.search("Started backend process. PID: ([0-9]+)", caplog.text)

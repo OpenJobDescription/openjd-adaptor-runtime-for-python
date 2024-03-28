@@ -23,7 +23,7 @@ if (_pypath := os.environ.get("PYTHONPATH")) is not None:
     os.environ["PYTHONPATH"] = ":".join((_pypath, str(mod_path)))
 else:
     os.environ["PYTHONPATH"] = str(mod_path)
-from IntegCommandAdaptor import IntegCommandAdaptor  # noqa: E402
+from CommandAdaptorExample import CommandAdaptorExample  # noqa: E402
 
 
 class TestCommandAdaptorRun:
@@ -51,7 +51,7 @@ class TestCommandAdaptorRun:
                 {"args": ["echo", "hello world"] if OSName.is_windows() else ["hello world"]}
             ),
         ]
-        entrypoint = EntryPoint(IntegCommandAdaptor)
+        entrypoint = EntryPoint(CommandAdaptorExample)
 
         # WHEN
         with (
@@ -100,7 +100,7 @@ class TestCommandAdaptorDaemon:
             "--connection-file",
             str(connection_file),
         ]
-        entrypoint = EntryPoint(IntegCommandAdaptor)
+        entrypoint = EntryPoint(CommandAdaptorExample)
 
         # WHEN
         with (
@@ -158,7 +158,7 @@ class TestCommandAdaptorDaemon:
             "--connection-file",
             str(connection_file),
         ]
-        entrypoint = EntryPoint(IntegCommandAdaptor)
+        entrypoint = EntryPoint(CommandAdaptorExample)
 
         # WHEN
         with (

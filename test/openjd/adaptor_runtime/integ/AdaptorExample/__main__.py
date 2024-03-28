@@ -4,7 +4,7 @@ import sys
 
 from openjd.adaptor_runtime import EntryPoint
 
-from .adaptor import SampleAdaptor
+from .adaptor import AdaptorExample
 
 
 def main():
@@ -12,7 +12,7 @@ def main():
     if not package_name:
         raise RuntimeError(f"Must be run as a module. Do not run {__file__} directly")
 
-    EntryPoint(SampleAdaptor).start()
+    EntryPoint(AdaptorExample).start()
 
 
 if __name__ == "__main__":
