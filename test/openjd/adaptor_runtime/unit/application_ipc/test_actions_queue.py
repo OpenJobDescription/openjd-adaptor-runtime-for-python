@@ -41,7 +41,7 @@ class TestActionsQueue:
         assert aq.dequeue_action() is None
 
     def test_len(self) -> None:
-        """Testing that our overriden __len__ works as expected."""
+        """Testing that our overridden __len__ works as expected."""
         aq = _ActionsQueue()
 
         # Starting off with an empty queue.
@@ -64,7 +64,7 @@ class TestActionsQueue:
         assert len(aq) == 0
 
     def test_bool(self) -> None:
-        """Testing that our overriden __bool__ works as expected."""
+        """Testing that our overridden __bool__ works as expected."""
         aq = _ActionsQueue()
 
         # Starting off with an empty queue.

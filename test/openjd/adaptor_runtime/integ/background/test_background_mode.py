@@ -100,10 +100,10 @@ class TestDaemonMode:
         connection_settings = _load_connection_settings(connection_file_path)
 
         if OSName.is_windows():
-            try:
-                import pywintypes
-                import win32file
+            import pywintypes
+            import win32file
 
+            try:
                 handle = win32file.CreateFile(
                     connection_settings.socket,
                     win32file.GENERIC_READ,

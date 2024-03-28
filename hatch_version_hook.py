@@ -104,7 +104,7 @@ class CustomBuildHook(BuildHookInterface):
         if missing_required_opts:
             _logger.warn(
                 f"Required options {missing_required_opts} are missing or empty. "
-                "Contining without copying sources to destinations...",
+                "Continuing without copying sources to destinations...",
                 file=sys.stderr,
             )
             return False

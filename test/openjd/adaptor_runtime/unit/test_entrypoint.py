@@ -349,7 +349,10 @@ class TestStart:
         mock_get_default_config.assert_called_once()
         assert entrypoint.config is mock_get_default_config.return_value
         assert f"The current system ({OSName()}) is not supported for runtime "
-        "configuration. Only the default configuration will be loaded. Full error: " in caplog.text
+        assert (
+            "configuration. Only the default configuration will be loaded. Full error: "
+            in caplog.text
+        )
 
     @patch.object(ConfigurationManager, "build_config")
     @patch.object(RuntimeConfiguration, "config", new_callable=PropertyMock)
@@ -552,7 +555,7 @@ class TestStart:
         mock_magic_init.assert_called_once_with(conn_file)
 
     @pytest.mark.parametrize(
-        argnames=("reentry_exe"),
+        argnames="reentry_exe",
         argvalues=[
             (None,),
             (Path("reeentry_exe_value"),),

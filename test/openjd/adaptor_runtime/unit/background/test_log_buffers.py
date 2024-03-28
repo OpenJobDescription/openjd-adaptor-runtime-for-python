@@ -21,7 +21,7 @@ def mocked_chunk_id():
     with patch.object(LogBuffer, "_create_id") as mock_create_id:
         chunk_id = "id"
         mock_create_id.return_value = chunk_id
-        yield (chunk_id, mock_create_id)
+        yield chunk_id, mock_create_id
 
 
 class TestInMemoryLogBuffer:

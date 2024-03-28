@@ -126,7 +126,7 @@ class Configuration:
 
     def override(self: _T, other: _T) -> _T:
         """
-        Creates a new Configuration with the configuration values in this object overriden by
+        Creates a new Configuration with the configuration values in this object overridden by
         another configuration.
 
         Args:

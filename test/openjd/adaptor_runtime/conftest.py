@@ -14,13 +14,7 @@ if OSName.is_windows():
 
 # List of platforms that can be used to mark tests as specific to that platform
 # See [tool.pytest.ini_options] -> markers in pyproject.toml
-_PLATFORMS = set(
-    [
-        "Linux",
-        "Windows",
-        "Darwin",
-    ]
-)
+_PLATFORMS = {"Linux", "Windows", "Darwin"}
 
 
 def pytest_runtest_setup(item: pytest.Item):

@@ -93,16 +93,6 @@ class PathMappingRule:
         if not rule:
             raise ValueError("Empty path mapping rule")
 
-        # TODO - DELETE ONCE MIGRATION COMPLETE
-        # The field "source_os" was renamed to "source_path_format", but interfaces may still
-        # provide the old name until they're updated. Remove once we're sure all interfaces are
-        # updated.
-        if "source_os" in rule:
-            new_rule = dict(**rule)
-            new_rule["source_path_format"] = new_rule["source_os"]
-            del new_rule["source_os"]
-            rule = new_rule
-        # END TODO
         return PathMappingRule(**rule)
 
     def to_dict(self) -> dict[str, str]:

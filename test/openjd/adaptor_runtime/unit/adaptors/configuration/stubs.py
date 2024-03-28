@@ -60,8 +60,10 @@ class ConfigurationManagerMock(ConfigurationManager):
         default_config_path="",
         system_config_path="",
         user_config_rel_path="",
-        additional_config_paths=[],
+        additional_config_paths=None,
     ) -> None:
+        if additional_config_paths is None:
+            additional_config_paths = []
         super().__init__(
             config_cls=Configuration,
             schema_path=schema_path,
