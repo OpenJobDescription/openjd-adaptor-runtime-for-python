@@ -26,7 +26,7 @@ __all__ = [
     "BaseAdaptor",
 ]
 
-# "{ADAPTORNAME}_" is put in front of this variables to make the full env variable
+# "{ADAPTORNAME}_" is put in front of these variables to make the full env variable
 # ie. MAYAADAPTOR_CONFIG_PATH
 _ENV_CONFIG_PATH_TEMPLATE = "CONFIG_PATH"
 # Directory containing adaptor schemas

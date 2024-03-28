@@ -304,7 +304,7 @@ class FrontendRunner:
         finally:
             conn.close()
 
-        if response.status >= 400 and response.status < 600:
+        if 400 <= response.status < 600:
             errmsg = f"Received unexpected HTTP status code {response.status}: {response.reason}"
             _logger.error(errmsg)
             raise HTTPError(response, errmsg)
@@ -321,10 +321,20 @@ class FrontendRunner:
         return self._connection_settings
 
     def _sigint_handler(self, signum: int, frame: Optional[FrameType]) -> None:
-        """Signal handler that is invoked when the process receives a SIGINT/SIGTERM"""
-        _logger.info("Interruption signal recieved.")
-        # OpenJD dictates that a SIGTERM/SIGINT results in a cancel workflow being
-        # kicked off.
+        """
+        Signal handler for interrupt signals.
+
+        This handler is invoked when the process receives a SIGTERM signal on Linux and SIGBREAK signal on Windows.
+        It calls the cancel method on the adaptor runner to initiate cancellation workflow.
+
+        Args:
+            signum: The number of the received signal.
+            frame: The current stack frame.
+        """
+
+        _logger.info("Interrupt signal received.")
+
+        # Open Job Description dictates that an interrupt signal should trigger cancellation
         self.cancel()
 
 

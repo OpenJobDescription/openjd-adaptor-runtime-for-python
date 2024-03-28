@@ -30,7 +30,7 @@ def create_adaptor_configuration_manager(
     adaptor_name: str,
     default_config_path: str,
     schema_path: str | List[str] | None = None,
-    additional_config_paths: list[str] = [],
+    additional_config_paths: List[str] | None = None,
 ) -> ConfigurationManager[_AdaptorConfigType]:
     """
     Creates a ConfigurationManager for an adaptor.
@@ -43,7 +43,11 @@ def create_adaptor_configuration_manager(
         schema_path (str, List[str], optional): The path(s) to a JSON Schema file(s) to validate
         the configuration with. If left as None, only the base adaptor configuration values will be
         validated.
+        additional_config_paths (list[str], Optional): Paths to additional configuration files. These
+        will have the highest priority and will be applied in the order they are provided.
     """
+    if additional_config_paths is None:
+        additional_config_paths = []
     schema_paths = [os.path.abspath(os.path.join(_DIR, "_adaptor_configuration.schema.json"))]
     if isinstance(schema_path, str):
         schema_paths.append(schema_path)
@@ -118,7 +122,7 @@ class ConfigurationManager(Generic[_ConfigType]):
         system_config_path: str,
         user_config_rel_path: str,
         schema_path: str | List[str] | None = None,
-        additional_config_paths: list[str] = [],
+        additional_config_paths: list[str] | None = None,
     ) -> None:
         """
         Initializes a ConfigurationManager object.
@@ -132,9 +136,11 @@ class ConfigurationManager(Generic[_ConfigType]):
             schema_path (str, List[str], Optional): The path(s) to the JSON Schema file to use.
             If multiple are given then they will be used in the order they are provided.
             If none are given then validation will be skipped for configuration files.
-            additional_config_paths (list[str]): Paths to additional configuration files. These
+            additional_config_paths (list[str], Optional): Paths to additional configuration files. These
             will have the highest priority and will be applied in the order they are provided.
         """
+        if additional_config_paths is None:
+            additional_config_paths = []
         self._config_cls = config_cls
         self._schema_path = schema_path
         self._default_config_path = default_config_path

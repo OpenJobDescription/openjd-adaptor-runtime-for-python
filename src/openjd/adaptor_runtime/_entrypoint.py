@@ -52,7 +52,7 @@ _CLI_HELP_TEXT = {
         "This can be a JSON string or the path to a file containing a JSON string in the format "
         "file://path/to/file.json"
     ),
-    "show_config": ("Prints the adaptor runtime configuration, then the program exits."),
+    "show_config": "Prints the adaptor runtime configuration, then the program exits.",
     "connection_file": "The file path to the connection file for use in background mode.",
 }
 
@@ -109,7 +109,7 @@ class _VersionInfo(NamedTuple):
         expected by something like a job template.
 
         Args:
-            other (_VersionInfo): The VersionInfo to compare with.
+            expected (_VersionInfo): The VersionInfo to compare with.
         """
         return self.adaptor_cli_version.has_compatibility_with(
             expected.adaptor_cli_version
@@ -436,10 +436,10 @@ class EntryPoint:
         return parser
 
     def _sigint_handler(self, signum: int, frame: Optional[FrameType]) -> None:
-        """Signal handler that is invoked when the process receives a SIGINT/SIGTERM"""
+        """Signal handler that is invoked when the process receives a SIGINT/SIGTERM in Linux and SIGBREAK in Windows"""
         if self._adaptor_runner is not None:
-            _logger.info("Interruption signal recieved.")
-            # OpenJD dictates that a SIGTERM/SIGINT results in a cancel workflow being
+            _logger.info("Interruption signal received.")
+            # OpenJD dictates that an Interruption signal results in a cancel workflow being
             # kicked off.
             self._adaptor_runner._cancel()
 

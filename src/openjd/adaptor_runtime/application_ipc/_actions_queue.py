@@ -12,7 +12,7 @@ if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test f
 
 
 class ActionsQueue:
-    """This class will manage the Queue of Actions. This class will be reponsible for
+    """This class will manage the Queue of Actions. This class will be responsible for
     enqueueing, or dequeueing Actions, and converting actions to and from json strings."""
 
     _actions_queue: Deque[Action]

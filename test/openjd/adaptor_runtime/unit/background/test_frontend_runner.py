@@ -55,7 +55,7 @@ class TestFrontendRunner:
         """
 
         @pytest.mark.parametrize(
-            argnames=("reentry_exe"),
+            argnames="reentry_exe",
             argvalues=[
                 (None,),
                 (Path("reeentry_exe_value"),),

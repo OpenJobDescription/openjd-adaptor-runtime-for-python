@@ -100,7 +100,7 @@ class TestPosixClientInterface:
         )
 
     @pytest.mark.parametrize(
-        argnames=("rules"),
+        argnames="rules",
         argvalues=[
             (
                 [
@@ -402,7 +402,7 @@ class TestWindowsClientInterface:
         mock_establish_named_pipe_connection().close.assert_called_once()
 
     @pytest.mark.parametrize(
-        argnames=("rules"),
+        argnames="rules",
         argvalues=[
             (
                 [

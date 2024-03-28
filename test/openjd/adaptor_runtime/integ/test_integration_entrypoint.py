@@ -17,7 +17,7 @@ import openjd.adaptor_runtime._entrypoint as runtime_entrypoint
 from openjd.adaptor_runtime import EntryPoint
 from openjd.adaptor_runtime._osname import OSName
 
-mod_path = (Path(__file__).parent).resolve()
+mod_path = Path(__file__).parent.resolve()
 sys.path.append(str(mod_path))
 if (_pypath := os.environ.get("PYTHONPATH")) is not None:
     os.environ["PYTHONPATH"] = ":".join((_pypath, str(mod_path)))

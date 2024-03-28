@@ -34,8 +34,8 @@ def secure_open(
             OWNER read/write bit-wise OR'd with the mask argument provided
         If the open_mode only involves reading the file, the permissions are not changed.
     Args:
-        file (StrOrBytesPath): The path to the file to open
-        mode (str): The string mode for opening the file. A combination of r, w, a, x, +
+        path (StrOrBytesPath): The path to the file to open
+        open_mode (str): The string mode for opening the file. A combination of r, w, a, x, +
         encoding (str, optional): The encoding of the file to open. Defaults to None.
         newline (str, optional): The newline character to use. Defaults to None.
         mask (int, optional): Additional masks to apply to the opened file. Defaults to 0.
