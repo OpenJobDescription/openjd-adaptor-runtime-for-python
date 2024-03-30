@@ -28,9 +28,10 @@ class TestFromFile:
 
         try:
             # GIVEN
-            with tempfile.NamedTemporaryFile(
-                mode="w+", delete=False
-            ) as schema_file, tempfile.NamedTemporaryFile(mode="w+", delete=False) as config_file:
+            with (
+                tempfile.NamedTemporaryFile(mode="w+", delete=False) as schema_file,
+                tempfile.NamedTemporaryFile(mode="w+", delete=False) as config_file,
+            ):
                 json.dump(json_schema, schema_file.file)
                 json.dump(config, config_file.file)
                 schema_file.seek(0)

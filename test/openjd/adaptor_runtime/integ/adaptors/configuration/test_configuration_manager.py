@@ -74,13 +74,13 @@ class TestConfigurationManager:
         homedir = os.path.expanduser("~")
 
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w+", delete=False
-            ) as default_config_file, tempfile.NamedTemporaryFile(
-                mode="w+", delete=False
-            ) as system_config_file, tempfile.NamedTemporaryFile(
-                mode="w+", dir=homedir, delete=False
-            ) as user_config_file:
+            with (
+                tempfile.NamedTemporaryFile(mode="w+", delete=False) as default_config_file,
+                tempfile.NamedTemporaryFile(mode="w+", delete=False) as system_config_file,
+                tempfile.NamedTemporaryFile(
+                    mode="w+", dir=homedir, delete=False
+                ) as user_config_file,
+            ):
                 json.dump(default_config, default_config_file)
                 json.dump(system_config, system_config_file)
                 json.dump(user_config, user_config_file)
