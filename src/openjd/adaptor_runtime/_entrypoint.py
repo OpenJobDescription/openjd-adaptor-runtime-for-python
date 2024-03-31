@@ -181,9 +181,9 @@ class EntryPoint:
         return _IntegrationData(
             init_data=parsed_args.init_data if hasattr(parsed_args, "init_data") else {},
             run_data=parsed_args.run_data if hasattr(parsed_args, "run_data") else {},
-            path_mapping_data=parsed_args.path_mapping_rules
-            if hasattr(parsed_args, "path_mapping_rules")
-            else {},
+            path_mapping_data=(
+                parsed_args.path_mapping_rules if hasattr(parsed_args, "path_mapping_rules") else {}
+            ),
         )
 
     def start(self, reentry_exe: Optional[Path] = None) -> None:

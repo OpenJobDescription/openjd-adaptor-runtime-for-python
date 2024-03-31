@@ -74,9 +74,10 @@ class TestStart:
         self, mock_adaptor_cls: MagicMock, capsys: pytest.CaptureFixture[str]
     ):
         # GIVEN
-        with patch.object(runtime_entrypoint.sys, "argv", ["Adaptor"]), patch.object(
-            argparse._sys, "exit"  # type: ignore
-        ) as sys_exit:
+        with (
+            patch.object(runtime_entrypoint.sys, "argv", ["Adaptor"]),
+            patch.object(argparse._sys, "exit") as sys_exit,  # type: ignore
+        ):
             entrypoint = EntryPoint(mock_adaptor_cls)
 
             # WHEN
@@ -151,20 +152,21 @@ class TestStart:
         def exit():
             raise Exception
 
-        with patch.object(
-            runtime_entrypoint.sys,
-            "argv",
-            [
-                "Adaptor",
-                "is-compatible",
-                "--openjd-adaptor-cli-version",
-                str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
-                "--integration-data-interface-version",
-                "1.0.0",
-            ],
-        ), patch.object(
-            argparse._sys, "exit"  # type: ignore
-        ) as sys_exit:
+        with (
+            patch.object(
+                runtime_entrypoint.sys,
+                "argv",
+                [
+                    "Adaptor",
+                    "is-compatible",
+                    "--openjd-adaptor-cli-version",
+                    str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
+                    "--integration-data-interface-version",
+                    "1.0.0",
+                ],
+            ),
+            patch.object(argparse._sys, "exit") as sys_exit,  # type: ignore
+        ):
             entrypoint = EntryPoint(mock_adaptor_cls)
 
             # WHEN
@@ -183,20 +185,21 @@ class TestStart:
         integration_version: str,
     ):
         # GIVEN
-        with patch.object(
-            runtime_entrypoint.sys,
-            "argv",
-            [
-                "Adaptor",
-                "is-compatible",
-                "--openjd-adaptor-cli-version",
-                str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
-                "--integration-data-interface-version",
-                integration_version,
-            ],
-        ), patch.object(
-            argparse._sys, "exit"  # type: ignore
-        ) as sys_exit:
+        with (
+            patch.object(
+                runtime_entrypoint.sys,
+                "argv",
+                [
+                    "Adaptor",
+                    "is-compatible",
+                    "--openjd-adaptor-cli-version",
+                    str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
+                    "--integration-data-interface-version",
+                    integration_version,
+                ],
+            ),
+            patch.object(argparse._sys, "exit") as sys_exit,  # type: ignore
+        ):
             entrypoint = EntryPoint(mock_adaptor_cls)
 
             # WHEN

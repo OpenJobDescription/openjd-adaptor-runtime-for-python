@@ -349,13 +349,17 @@ class TestWindowsClientInterface:
     def patched_named_pipe_helper(
         self,
     ) -> Generator[Tuple[MagicMock, MagicMock, MagicMock], None, None]:
-        with patch.object(
-            win_client_interface.NamedPipeHelper, "write_to_pipe"
-        ) as mock_write_to_pipe, patch.object(
-            win_client_interface.NamedPipeHelper, "establish_named_pipe_connection"
-        ) as mock_establish_named_pipe_connection, patch.object(
-            win_client_interface.NamedPipeHelper, "read_from_pipe"
-        ) as mock_read_from_pipe:
+        with (
+            patch.object(
+                win_client_interface.NamedPipeHelper, "write_to_pipe"
+            ) as mock_write_to_pipe,
+            patch.object(
+                win_client_interface.NamedPipeHelper, "establish_named_pipe_connection"
+            ) as mock_establish_named_pipe_connection,
+            patch.object(
+                win_client_interface.NamedPipeHelper, "read_from_pipe"
+            ) as mock_read_from_pipe,
+        ):
             yield mock_write_to_pipe, mock_establish_named_pipe_connection, mock_read_from_pipe
 
     @pytest.mark.parametrize(
