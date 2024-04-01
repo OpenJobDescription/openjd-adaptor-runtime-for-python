@@ -4,11 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openjd-adaptor-runtime"
+description = "A python library for building adaptors that integrate applications with Open Job Description jobs."
+authors = [
+  {name = "Amazon Web Services"},
+]
 dynamic = ["version"]
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.9"
-description = "A python library for building adaptors that integrate applications with Open Job Description jobs"
 # https://pypi.org/classifiers/
 classifiers = [
   "Development Status :: 5 - Production/Stable",

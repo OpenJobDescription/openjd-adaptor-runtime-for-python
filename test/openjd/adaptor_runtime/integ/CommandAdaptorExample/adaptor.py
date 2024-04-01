@@ -53,14 +53,15 @@ class CommandAdaptorExample(CommandAdaptor):
 
     def get_managed_process(self, run_data: dict) -> ManagedProcess:
         """
-        Must be implemented to specify how commands are run, making use of the ManagedProcess.
-        This is crucial for the CommandAdaptor's functionality.
+        This method provides the primary functionality of the *run* phase of the Adaptor's lifecycle.
+        It must be implemented to specify how commands are run through use of a ManagedProcess.
         """
         return IntegManagedProcess(run_data)
 
     def on_prerun(self):
         """
-        `on_prerun` will be run before the ManagedProcess runs. Useful for setup operations or logging.
+        This method is run first during the *run* phase of the Adaptor's lifecycle; before the ManagedProcess runs.
+        Useful for setup operations or logging.
         """
         # Print only goes to stdout and is not captured in daemon mode.
         print("prerun-print")
@@ -69,7 +70,9 @@ class CommandAdaptorExample(CommandAdaptor):
 
     def on_postrun(self):
         """
-        `on_postrun` will be run after the ManagedProcess completes. Can be used for cleanup or further processing.
+        This method is run last during the *run* phase of the Adaptor's lifecycle; after the ManagedProcess has
+        exited.
+        Can be used for cleanup or further processing.
         """
         # Print only goes to stdout and is not captured in daemon mode.
         print("postrun-print")
