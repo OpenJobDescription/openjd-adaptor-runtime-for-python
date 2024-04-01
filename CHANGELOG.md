@@ -1,3 +1,10 @@
+## 0.7.0 (2024-04-01)
+
+### BREAKING CHANGES
+* public release (#101) ([`c9be773`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/c9be773e212f6d0b505a2eb52d9a4fde63a476c1))
+
+
+
 ## 0.6.1 (2024-03-25)
 
 
