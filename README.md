@@ -1,7 +1,32 @@
 # Open Job Description - Adaptor Runtime
 
-This package provides a runtime library that can be used to implement a CLI adaptor interface around
-a desired application.
+[![pypi](https://img.shields.io/pypi/v/openjd-adaptor-runtime.svg?style=flat)](https://pypi.python.org/pypi/openjd-adaptor-runtime)
+[![python](https://img.shields.io/pypi/pyversions/openjd-adaptor-runtime.svg?style=flat)](https://pypi.python.org/pypi/openjd-adaptor-runtime)
+[![license](https://img.shields.io/pypi/l/openjd-adaptor-runtime.svg?style=flat)](https://github.com/OpenJobDescription/openjd-adaptor-runtime/blob/mainline/LICENSE)
+
+This package provides a runtime library for creating a command-line Adaptor to assist with
+integrating an existing application, such as a rendering application, into batch computing systems
+that run Jobs in a way that is compatible with [Open Job Description Sessions]. That is, when running
+a Job on a host consists of a phase to initialize a local compute environment, then running one
+or more Tasks that each run the same application for the Job on the host, and finally tearing down
+the initialized compute environment when complete.
+
+Some of the reasons that you should consider creating an Adaptor are if you want to:
+
+1. Optimize the runtime of your Job on a compute host by loading the application once and dynamically running
+   many units of work with that single application instance before shutting down the application;
+2. Programmatically respond to signals that the application provides, such as stopping the application early
+   if it prints a message to stdout that indicates that the run may produce undesirable results like watermarks
+   due to missing a floating license, or a bad image render due to missing textures;
+3. Dynamically select which version of an application to run based on what is available and modify the
+   command-line options provided to the application based on which version will be run;
+4. Emit [Open Job Description Stdout Messages], or equivalent, to update the batch computing system on the
+   status or progress of the running unit of work; and/or
+5. Integrate [Open Job Description Path Mapping] information into the application in the format that it is expecting.
+
+[Open Job Description Sessions]: https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#sessions
+[Open Job Description Stdout Messages]: https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#stdoutstderr-messages
+[Open Job Description Path Mapping]: https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#path-mapping
 
 ## Compatibility
 
@@ -31,80 +56,103 @@ You can download this package from:
 See [VERIFYING_PGP_SIGNATURE](VERIFYING_PGP_SIGNATURE.md) for more information.
 
 ## Usage
-This package offers two primary adaptor types: `CommandAdaptor` and `Adaptor`, designed for customization for various use cases. 
-All adaptors can operate in two modes Foreground and Background to meet different requirements. Below is an overview of 
-how these adaptors work.
 
-### Adaptor Types
+To create your own Adaptor you create a Python application that uses this package and consists of:
 
-- **CommandAdaptor**: Ideal for executing straightforward commands. Extend this class if your requirements involve 
-simple command execution. An implementation example is available at `test/openjd/adaptor_runtime/integ/CommandAdaptorExample`.
+1. A console script entrypoint that passes control flow to an instance of this runtime's **EntryPoint** class;
+2. A JSON file for configuration options of your Adaptor; and
+3. An Adaptor class derived from either the **CommandAdaptor** or **Adaptor** class.
+    - **CommandAdaptor** is ideal for applications where you do not need to initialize the local compute environment by, say,
+       preloading your application, and simply need to run a single commandline for each Task that is run on the compute host.
+       Please see [CommandAdaptorExample] in this GitHub repository for a simple example.
+    - **Adaptor** exposes callbacks for every stage of an Adaptor's lifecycle, and is is suited for Adaptors where you want full control.
+       Please see [AdaptorExample] in this GitHub repository for a simple example.
 
-- **Adaptor**: Suited for applications that demand granular control, such as digital content creation (DCC) applications. 
-By inheriting from `Adaptor`, you can predefine actions for reuse across different contexts. 
-An example adaptor could be found at `test/openjd/adaptor_runtime/integ/AdaptorExample`.
+You can also find many more examples within the [AWS Deadline Cloud Organization] on GitHub.
+
+[CommandAdaptorExample]: https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/tree/release/test/openjd/adaptor_runtime/integ/CommandAdaptorExample
+[AdaptorExample]: https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/tree/mainline/test/openjd/adaptor_runtime/integ/AdaptorExample
+[AWS Deadline Cloud Organization]: https://github.com/aws-deadline
+
+### Adaptor Lifecycle
+
+All Adaptors undergo a lifecycle consisting of the following stages:
+
+1. **start**: Occurs once during construction and initialization of the Adaptor. This is the stage where
+   your Adaptor should perform any expensive initialization actions for the local compute environment; such
+   as starting and loading an application in the background for use in later stages of the Adaptor's lifecycle.
+    - Runs the `on_start()` method of Adaptors derived from the **Adaptor** base class.
+2. **run**: May occur one or more times for a single running Adaptor. This is the stage where your Adaptor is
+   performing the work required of a Task that is being run.
+    - Run the `on_run()` method of Adaptors derived from the **Adaptor** base class.
+    - Run the `on_prerun()` then `get_managed_process()` then `on_postrun()` methods of Adaptors derived from the
+     **CommandAdaptor** base class.
+3. **stop**: Occurs once as part of shutting down the Adaptor. This stage is the inverse of the **start**
+   stage and should undo the actions done in that phase; such as stopping any background processes that are
+   still running.
+    - Runs the `on_stop()` method of Adaptors derived from the **Adaptor** base class.
+4. **cleanup**: A final opportunity to cleanup any remaining processes and data left behind by the Adaptor.
+    - Runs the `on_cleanup()` method of Adaptors derived from the **Adaptor** base class.
+
+A running Adaptor can also be canceled by sending the Adaptor process a signal (SIGINT/SIGTERM on posix, or
+CTRL-C/CTRL-BREAK on Windows). This will call the `on_cancel()` method of your Adaptor, if one is defined. 
+You should ensure that the design of your Adaptor allows this cancelation to interrupt any actions that may
+be running, and gracefully exit any running background processes.
 
 ### Running an Adaptor
-Adaptors can operate in two modes: Foreground and Background. In the below section, we will use the `AdaptorExample` 
-to show how they work. Following commands need to be run in the `test\openjd\adaptor_runtime\`. Please navigate to 
-this directory by using the `cd`. 
 
-#### Foreground Mode
-In Foreground Mode, the adaptor undergoes a complete lifecycle including `start`, `run`, `stop` and `cleanup` of the 
-adaptor in a single command.
-This mode is straightforward and is recommended for linear task execution.  Additionally, the Foreground Mode supports 
-the injection of initialization and runtime data through the `--init-data` and `--run-data` flags. 
-These flags allow for the passing of a JSON-encoded dictionary, either directly in the command line or through a file. 
-- **`--init-data`**: This data is decoded and stored within the `self.init_data` attribute.
-- **`--run-data`**: This data becomes accessible as the first argument of the `on_run` method.
+The **EntryPoint** provided by this runtime allows for an Adaptor to be run directly through its
+entire lifecycle in a single command, or to be run as a background daemon that lets you drive the lifecycle
+of the Adaptor yourself.
 
+#### The `run` Subcommand
+
+The `run` subcommand of an Adaptor will run it through its entire lifecycle (**start**, then **run**, then
+**stop**, and finally **cleanup**), and then exit. This is useful for initial development and testing, and
+for running Adaptors created from the **CommandAdaptor** base class.
+
+To see this in action install the openjd-adaptor-runtime package into your Python environment, and then
+within your local clone of this repository:
+
+```bash
+cd test/openjd
+python3 -m integ.AdaptorExample run --init-data '{"name": "MyAdaptor"}'  --run-data '{"hello": "world"}'
 ```
-python -m integ.AdaptorExample run --init-data '{"name": "MyAdaptor"}'  --run-data '{"hello": "world"}'
-```
 
-#### Background Mode
-Background Mode is provided to enable scenarios where it is beneficial to maintain state between multiple runs.
-Such as between task runs within an 
-[Open Job Description Session](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#sessions).
-You can use it with any type of Adaptor, but it derives its greatest benefit with Adaptors derived from
-the `Adaptor` class rather than the `CommandAdaptor` class.
+The arguments to the `run` subcommand are:
 
-An example of how you might design an Adaptor to leverage this mode is to have it:
+- **`--init-data`** is a JSON-encoded dictionary either inline or in a given file (`file://<path-to-file>`). This data is
+  decoded and automatically stored in the `self.init_data` member of the running Adaptor.
+- **`--run-data`** is, similarly, a JSON-encoded dictionary either inline or in a given file (`file://<path-to-file>`).
+  This data is passed as the argument to the `on_run()` method of an **Adaptor** or the `get_managed_process()`
+  method of a **CommandAdaptor**.
 
-1. Load an application in the Adaptor's `start` phase; then
-2. Communicate with that loaded application in each `run` of the Adaptor to tell the application what to do; then
-3. Close the application in the Adaptor's `stop` phase.
+#### The `daemon` Subcommand
 
-In this mode, your Adaptor is started up as a background process and left running. Then you can invoke
-your Adaptor again to connect to that background process and instruct it to perform actions. When
-connecting to the background process your command will relay all log output from the background process
-to your stdout and stderr, and will only exit once the command is complete.
+With the `daemon` subcommand, you must transition the Adaptor through its lifecycle yourself by running the
+subcommands of the `daemon` subcommand in order.
 
-When using background mode, you have to manage the state transitions of the Adaptor yourself by repeatedly running the 
-adaptor with different arguments.
-
-1. Start the Adaptor: Initializes the adaptor and prepares it for background operation. This starts up your
-   Adaptor in a subprocess that is left running after the command exits. You must provide a path to a
-   connection file for the Adaptor to create. This file contains information on how to connect to the
-   subprocess that is left running, and you must provide it to all subsequent runs of the Adaptor until you
-   have stopped it. You may also provide `--init-data` to the start command that is a JSON-encoded
-   dictionary either inline or in a given file; this data is decoded and automatically stored in the
-   `self.init_data` member of your running Adaptor.
+1. Start the Adaptor: Initializes the Adaptor as a background daemon subprocess and leaves it running.
+   This runs the `on_start()` method of your **Adaptor**-derived Adaptor if the method is available.
     ```
     python -m integ.AdaptorExample daemon start --connection-file ./AdaptorExampleConnection.json --init-data '{"name": "MyAdaptor"}'
     ```
-2. Run the Adaptor: Executes the adaptor's main functionality. This step can be repeated multiple times, 
-optionally passing custom data via the `--run-data` argument to modify the operation context.
-This data becomes accessible as the first argument of the `on_run` method of your running Adaptor.
-    ```
-    python -m integ.AdaptorExample daemon run --connection-file ./AdaptorExampleConnection.json
-    ```
-    To pass custom data:
+   - **`--init-data`** is as described in the `run` subcommand, above.
+   - **`--connection-file`** provide a path to a JSON file for the Adaptor to create. This file contains information
+     on how to connect to the daemon subprocess remains running, and you must provide it to all subsequent runs of the
+     Adaptor until you have stopped it.
+2. Run the Adaptor: Connects to the daemon subprocess that is running the Adaptor and instructs it to perform its **run**
+   lifecycle phase. The command remains connected to the daemon subprocess for the entire duration of this **run** phase,
+   and forwards all data logged by the Adaptor to stdout or stderr. This step can be repeated multiple times.
     ```
     python -m integ.AdaptorExample daemon run --connection-file ./AdaptorExampleConnection.json --run-data '{"hello": "world"}'
     ```
-3. Stop the Adaptor: Terminates the adaptor's operation and performs necessary cleanup actions. 
-This step ensures that the background processes are properly closed, and the IPC channel is cleaned up.
+   - **`--run-data`** is as described in the `run` subcommand, above.
+   - **`--connection-file`** is as described in above.
+3. Stop the Adaptor: Connects to the daemon subprocess that is running the Adaptor and instructs it to transition to the
+   **stop** then **cleanup** lifecycle phases, and then instructs the daemon subprocess to exit when complete. The command
+   remains connected to the daemon subprocess for the entire duration, and forwards all data logged by the Adaptor to stdout
+   or stderr.
     ```
     python -m integ.AdaptorExample daemon stop --connection-file ./AdaptorExampleConnection.json
     ```
