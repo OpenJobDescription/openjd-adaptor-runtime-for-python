@@ -27,12 +27,16 @@ classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Intended Audience :: Developers",
 ]
-
 dependencies = [
   "pyyaml ~= 6.0",
   "jsonschema >= 4.17.0, == 4.*",
   "pywin32 == 306; platform_system == 'Windows'",
 ]
+
+[project.urls]
+Homepage = "https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python"
+Source = "https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python"
+
 
 [tool.hatch.build]
 artifacts = [
