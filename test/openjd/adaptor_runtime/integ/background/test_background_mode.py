@@ -52,7 +52,18 @@ class TestDaemonMode:
 
     @pytest.fixture
     def connection_file_path(self, tmp_path: pathlib.Path) -> str:
-        return os.path.join(tmp_path.absolute(), "connection.json")
+        connection_dir = os.path.join(tmp_path.absolute(), "connection_dir")
+        os.mkdir(connection_dir)
+        if OSName.is_windows():
+            # In Windows, to prevent false positives in tests, it's crucial to remove the "Delete subfolders and files"
+            # permission from the parent folder. This step ensures that files cannot be deleted without explicit delete
+            # permissions, addressing an edge case where the same user owns both the parent folder and the file,
+            # bypassing delete permissions. `set_file_permissions_in_windows` will restrict the permission to read,
+            # write, delete current folder, which meets the requirement.
+            from openjd.adaptor_runtime._utils._secure_open import set_file_permissions_in_windows
+
+            set_file_permissions_in_windows(connection_dir)
+        return os.path.join(connection_dir, "connection.json")
 
     @pytest.fixture
     def initialized_setup(
