@@ -153,7 +153,7 @@ class TestAsyncFutureRunner:
         runner.wait_for_start()
 
         # THEN
-        assert mock_sleep.called_once_with(AsyncFutureRunner._WAIT_FOR_START_INTERVAL)
+        mock_sleep.assert_called_once_with(AsyncFutureRunner._WAIT_FOR_START_INTERVAL)
 
 
 class TestBackgroundRequestHandler:
