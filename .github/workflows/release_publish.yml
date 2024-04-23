@@ -16,6 +16,6 @@ jobs:
     name: Publish Release
     permissions:
       id-token: write
-      contents: read
+      contents: write
     uses: OpenJobDescription/.github/.github/workflows/reusable_publish.yml@mainline
     secrets: inherit
