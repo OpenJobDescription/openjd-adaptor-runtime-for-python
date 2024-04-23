@@ -1,3 +1,10 @@
+## 0.7.1 (2024-04-23)
+
+
+
+### Bug Fixes
+* set correct permission for the test directory. (#107) ([`169f346`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/169f346df8efc5bbcc33eda9859c4bb20fe471f4))
+
 ## 0.7.0 (2024-04-01)
 
 ### BREAKING CHANGES
