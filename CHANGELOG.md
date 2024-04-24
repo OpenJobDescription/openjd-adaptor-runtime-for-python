@@ -1,3 +1,9 @@
+## 0.7.2 (2024-04-24)
+
+### CI
+* add PyPI publish job to publish workflow (#118) ([`1c7cfb7`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/1c7cfb77555e958cd6343bff445aacf657d32bbb))
+
+
 ## 0.7.1 (2024-04-23)
 
 
