@@ -29,40 +29,21 @@ class TestSocketDirectories:
         Tests for SocketDirectories.get_process_socket_path()
         """
 
-        @pytest.fixture
-        def socket_dir(self) -> str:
-            return "/path/to/socket/dir"
-
-        @pytest.fixture(autouse=True)
-        def mock_socket_dir(self, socket_dir: str) -> Generator[MagicMock, None, None]:
-            with patch.object(SocketDirectories, "get_socket_dir") as mock:
-                mock.return_value = socket_dir
-                yield mock
-
-        @pytest.mark.parametrize(
-            argnames=["create_dir"],
-            argvalues=[[True], [False]],
-            ids=["creates dir", "does not create dir"],
-        )
         @patch.object(sockets.os, "getpid", return_value=1234)
         def test_gets_path(
             self,
             mock_getpid: MagicMock,
-            socket_dir: str,
-            mock_socket_dir: MagicMock,
-            create_dir: bool,
         ) -> None:
             # GIVEN
             namespace = "my-namespace"
             subject = SocketDirectoriesStub()
 
             # WHEN
-            result = subject.get_process_socket_path(namespace, create_dir=create_dir)
+            result = subject.get_process_socket_path(namespace)
 
             # THEN
-            assert result == os.path.join(socket_dir, str(mock_getpid.return_value))
+            assert result.endswith(os.path.join(namespace, str(mock_getpid.return_value)))
             mock_getpid.assert_called_once()
-            mock_socket_dir.assert_called_once_with(namespace, create=create_dir)
 
         @patch.object(sockets.os, "getpid", return_value="a" * (sockets._PID_MAX_LENGTH + 1))
         def test_asserts_max_pid_length(self, mock_getpid: MagicMock):
@@ -79,10 +60,16 @@ class TestSocketDirectories:
             )
             mock_getpid.assert_called_once()
 
-    class TestGetSocketDir:
+    class TestGetSocketPath:
         """
-        Tests for SocketDirectories.get_socket_dir()
+        Tests for SocketDirectories.get_socket_path()
         """
+
+        @pytest.fixture(autouse=True)
+        def mock_exists(self) -> Generator[MagicMock, None, None]:
+            with patch.object(sockets.os.path, "exists") as mock:
+                mock.return_value = False
+                yield mock
 
         @pytest.fixture(autouse=True)
         def mock_makedirs(self) -> Generator[MagicMock, None, None]:
@@ -116,7 +103,7 @@ class TestSocketDirectories:
             subject = SocketDirectoriesStub()
 
             # WHEN
-            result = subject.get_socket_dir()
+            result = subject.get_socket_path("sock")
 
             # THEN
             mock_expanduser.assert_called_once_with("~")
@@ -138,7 +125,7 @@ class TestSocketDirectories:
             subject = SocketDirectoriesStub()
 
             # WHEN
-            result = subject.get_socket_dir()
+            result = subject.get_socket_path("sock")
 
             # THEN
             mock_gettempdir.assert_called_once()
@@ -160,11 +147,13 @@ class TestSocketDirectories:
             subject = SocketDirectoriesStub()
 
             # WHEN
-            result = subject.get_socket_dir(create=create)
+            result = subject.get_socket_path("sock", create_dir=create)
 
             # THEN
             if create:
-                mock_makedirs.assert_called_once_with(result, mode=0o700, exist_ok=True)
+                mock_makedirs.assert_called_once_with(
+                    os.path.dirname(result), mode=0o700, exist_ok=True
+                )
             else:
                 mock_makedirs.assert_not_called()
 
@@ -174,20 +163,20 @@ class TestSocketDirectories:
             subject = SocketDirectoriesStub()
 
             # WHEN
-            result = subject.get_socket_dir(namespace)
+            result = subject.get_socket_path("sock", namespace)
 
             # THEN
-            assert result.endswith(namespace)
+            assert os.path.dirname(result).endswith(namespace)
 
         @patch.object(SocketDirectoriesStub, "verify_socket_path")
-        def test_raises_when_no_valid_dir_found(self, mock_verify_socket_path: MagicMock) -> None:
+        def test_raises_when_no_valid_path_found(self, mock_verify_socket_path: MagicMock) -> None:
             # GIVEN
             mock_verify_socket_path.side_effect = NonvalidSocketPathException()
             subject = SocketDirectoriesStub()
 
             # WHEN
             with pytest.raises(NoSocketPathFoundException) as raised_exc:
-                subject.get_socket_dir()
+                subject.get_socket_path("sock")
 
             # THEN
             assert raised_exc.match(
@@ -211,7 +200,7 @@ class TestSocketDirectories:
 
             # WHEN
             with pytest.raises(NoSocketPathFoundException) as raised_exc:
-                subject.get_socket_dir()
+                subject.get_socket_path("sock")
 
             # THEN
             assert raised_exc.match(
@@ -220,6 +209,24 @@ class TestSocketDirectories:
                     "sticky bit (restricted deletion flag) set"
                 )
             )
+
+        @patch.object(sockets.os.path, "exists")
+        def test_handles_socket_name_collisions(
+            self,
+            mock_exists: MagicMock,
+        ) -> None:
+            # GIVEN
+            sock_name = "sock"
+            existing_sock_names = [sock_name, f"{sock_name}_1", f"{sock_name}_2"]
+            mock_exists.side_effect = ([True] * len(existing_sock_names)) + [False]
+            subject = SocketDirectoriesStub()
+
+            # WHEN
+            result = subject.get_socket_path(sock_name)
+
+            # THEN
+            assert result.endswith(f"{sock_name}_3")
+            mock_exists.call_count == len(existing_sock_names) + 1
 
 
 class TestLinuxSocketDirectories:

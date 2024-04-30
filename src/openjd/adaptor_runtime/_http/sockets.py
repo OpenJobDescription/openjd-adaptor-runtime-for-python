@@ -60,15 +60,22 @@ class SocketDirectories(abc.ABC):
             len(socket_name) <= _PID_MAX_LENGTH
         ), f"PID too long. Only PIDs up to {_PID_MAX_LENGTH} digits are supported."
 
-        return os.path.join(self.get_socket_dir(namespace, create=create_dir), socket_name)
+        return self.get_socket_path(socket_name, namespace, create_dir=create_dir)
 
-    def get_socket_dir(self, namespace: str | None = None, *, create: bool = False) -> str:
+    def get_socket_path(
+        self,
+        base_socket_name: str,
+        namespace: str | None = None,
+        *,
+        create_dir: bool = False,
+    ) -> str:
         """
         Gets the base directory for sockets used in Adaptor IPC
 
         Args:
+            base_socket_name (str): The name of the socket
             namespace (Optional[str]): The optional namespace (subdirectory) where the sockets go
-            create (bool): Whether to create the directory or not. Default is false.
+            create_dir (bool): Whether to create the directory or not. Default is false.
 
         Raises:
             NonvalidSocketPathException: Raised if the user has configured a socket base directory
@@ -77,10 +84,18 @@ class SocketDirectories(abc.ABC):
                 not be raised if the user has configured a socket base directory.
         """
 
-        def create_dir(path: str) -> str:
-            if create:
+        def mkdir(path: str) -> str:
+            if create_dir:
                 os.makedirs(path, mode=0o700, exist_ok=True)
             return path
+
+        def gen_socket_path(dir: str, base_name: str):
+            i = 0
+            name = base_name
+            while os.path.exists(os.path.join(dir, name)):
+                i = i + 1
+                name = f"{base_name}_{i}"
+            return os.path.join(dir, name)
 
         rel_path = os.path.join(".openjd", "adaptors", "sockets")
         if namespace:
@@ -91,18 +106,21 @@ class SocketDirectories(abc.ABC):
         # First try home directory
         home_dir = os.path.expanduser("~")
         socket_dir = os.path.join(home_dir, rel_path)
+        socket_path = gen_socket_path(socket_dir, base_socket_name)
         try:
-            self.verify_socket_path(socket_dir)
+            self.verify_socket_path(socket_path)
         except NonvalidSocketPathException as e:
             reasons.append(f"Cannot create sockets directory in the home directory because: {e}")
         else:
-            return create_dir(socket_dir)
+            mkdir(socket_dir)
+            return socket_path
 
         # Last resort is the temp directory
         temp_dir = tempfile.gettempdir()
         socket_dir = os.path.join(temp_dir, rel_path)
+        socket_path = gen_socket_path(socket_dir, base_socket_name)
         try:
-            self.verify_socket_path(socket_dir)
+            self.verify_socket_path(socket_path)
         except NonvalidSocketPathException as e:
             reasons.append(f"Cannot create sockets directory in the temp directory because: {e}")
         else:
@@ -113,7 +131,8 @@ class SocketDirectories(abc.ABC):
                     "sticky bit (restricted deletion flag) set"
                 )
             else:
-                return create_dir(socket_dir)
+                mkdir(socket_dir)
+                return socket_path
 
         raise NoSocketPathFoundException(
             "Failed to find a suitable base directory to create sockets in for the following "
