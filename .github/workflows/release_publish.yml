@@ -24,6 +24,7 @@ jobs:
   PublishToPyPI:
     needs: Publish
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       id-token: write
     steps:
