@@ -6,6 +6,6 @@ pytest-timeout == 2.3.*
 pytest-xdist == 3.6.*
 black == 24.*
 ruff == 0.4.*
-mypy == 1.9.*
+mypy == 1.10.*
 psutil == 5.9.*
 types-PyYAML ~= 6.0
