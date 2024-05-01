@@ -8,7 +8,7 @@ import warnings
 from socketserver import UnixStreamServer  # type: ignore[attr-defined]
 from typing import TYPE_CHECKING
 
-from .._http import SocketDirectories
+from .._http import SocketPaths
 from ._http_request_handler import AdaptorHTTPRequestHandler
 
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
@@ -32,8 +32,14 @@ class AdaptorServer(UnixStreamServer):
         self,
         actions_queue: ActionsQueue,
         adaptor: BaseAdaptor,
+        *,
+        working_dir: str | None = None,
     ) -> None:  # pragma: no cover
-        socket_path = SocketDirectories.for_os().get_process_socket_path("dcc", create_dir=True)
+        socket_path = SocketPaths.for_os().get_process_socket_path(
+            "dcc",
+            base_dir=working_dir,
+            create_dir=True,
+        )
         super().__init__(socket_path, AdaptorHTTPRequestHandler)
 
         self.actions_queue = actions_queue

@@ -53,7 +53,8 @@ _CLI_HELP_TEXT = {
         "file://path/to/file.json"
     ),
     "show_config": "Prints the adaptor runtime configuration, then the program exits.",
-    "connection_file": "The file path to the connection file for use in background mode.",
+    "connection_file": "DEPRECATED. Please use 'working_dir' instead.\n\nThe file path to the connection file for use in background mode.",
+    "working_dir": "The path to the directory to use for runtime files. This directory must not already exist.",
 }
 
 _DIR = os.path.dirname(os.path.realpath(__file__))
@@ -300,9 +301,25 @@ class EntryPoint:
         integration_data: _IntegrationData,
         reentry_exe: Optional[Path] = None,
     ):
-        connection_file = parsed_args.connection_file
-        if not os.path.isabs(connection_file):
+        # Validate args
+        connection_file = None
+        if hasattr(parsed_args, "connection_file"):
+            connection_file = parsed_args.connection_file
+
+        working_dir = None
+        if hasattr(parsed_args, "working_dir"):
+            working_dir = parsed_args.working_dir
+
+        if (connection_file and working_dir) or not (connection_file or working_dir):
+            raise RuntimeError(
+                "Expected exactly one of 'connection_file' or 'working_dir' to be provided, "
+                f"but got args: {parsed_args}"
+            )
+
+        if connection_file and not os.path.isabs(connection_file):
             connection_file = os.path.abspath(connection_file)
+        if working_dir and not os.path.isabs(working_dir):
+            working_dir = os.path.abspath(working_dir)
         subcommand = parsed_args.subcommand if hasattr(parsed_args, "subcommand") else None
 
         if subcommand == "_serve":
@@ -318,14 +335,18 @@ class EntryPoint:
             # forever until a shutdown is requested
             backend = BackendRunner(
                 AdaptorRunner(adaptor=adaptor),
-                connection_file,
+                connection_file_path=connection_file,
+                working_dir=working_dir,
                 log_buffer=log_buffer,
             )
             backend.run()
         else:
             # This process is running in frontend mode. Create the frontend runner and send
             # the appropriate request to the backend.
-            frontend = FrontendRunner(connection_file)
+            frontend = FrontendRunner(
+                connection_file_path=connection_file,
+                working_dir=working_dir,
+            )
             if subcommand == "start":
                 adaptor_module = sys.modules.get(self.adaptor_class.__module__)
                 if adaptor_module is None:
@@ -349,10 +370,12 @@ class EntryPoint:
     def _parse_args(self) -> Tuple[ArgumentParser, Namespace]:
         parser = self._build_argparser()
         try:
-            return parser, parser.parse_args(sys.argv[1:])
+            parsed_args = parser.parse_args(sys.argv[1:])
         except Exception as e:
             _logger.error(f"Error parsing command line arguments: {e}")
             raise
+        else:
+            return parser, parsed_args
 
     def _build_argparser(self) -> ArgumentParser:
         parser = ArgumentParser(
@@ -412,9 +435,15 @@ class EntryPoint:
         connection_file = ArgumentParser(add_help=False)
         connection_file.add_argument(
             "--connection-file",
-            default="",
             help=_CLI_HELP_TEXT["connection_file"],
-            required=True,
+            required=False,
+        )
+
+        working_dir = ArgumentParser(add_help=False)
+        working_dir.add_argument(
+            "--working-dir",
+            help=_CLI_HELP_TEXT["working_dir"],
+            required=False,
         )
 
         bg_parser = subparser.add_parser("daemon", help="Runs the adaptor in a daemon mode.")
@@ -427,11 +456,15 @@ class EntryPoint:
         )
 
         # "Hidden" command that actually runs the adaptor runtime in background mode
-        bg_subparser.add_parser("_serve", parents=[init_data, path_mapping_rules, connection_file])
+        bg_subparser.add_parser(
+            "_serve", parents=[init_data, path_mapping_rules, connection_file, working_dir]
+        )
 
-        bg_subparser.add_parser("start", parents=[init_data, path_mapping_rules, connection_file])
-        bg_subparser.add_parser("run", parents=[run_data, connection_file])
-        bg_subparser.add_parser("stop", parents=[connection_file])
+        bg_subparser.add_parser(
+            "start", parents=[init_data, path_mapping_rules, connection_file, working_dir]
+        )
+        bg_subparser.add_parser("run", parents=[run_data, connection_file, working_dir])
+        bg_subparser.add_parser("stop", parents=[connection_file, working_dir])
 
         return parser
 

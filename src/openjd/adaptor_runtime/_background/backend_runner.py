@@ -13,7 +13,7 @@ from typing import Optional, Union
 from .server_response import ServerResponseGenerator
 from .._osname import OSName
 from ..adaptors import AdaptorRunner
-from .._http import SocketDirectories
+from .._http import SocketPaths
 from .._utils import secure_open
 
 if OSName.is_posix():
@@ -33,15 +33,34 @@ class BackendRunner:
     Class that runs the backend logic in background mode.
     """
 
+    _connection_file_path: str
+    _working_dir: str | None
+
     def __init__(
         self,
         adaptor_runner: AdaptorRunner,
-        connection_file_path: str,
         *,
+        # TODO: Deprecate connection_file_path
+        connection_file_path: str | None = None,
+        working_dir: str | None = None,
         log_buffer: LogBuffer | None = None,
     ) -> None:
         self._adaptor_runner = adaptor_runner
-        self._connection_file_path = connection_file_path
+
+        if (connection_file_path and working_dir) or not (connection_file_path or working_dir):
+            raise RuntimeError(
+                "Exactly one of 'connection_file_path' or 'working_dir' must be provided, but got:"
+                f" connection_file_path={connection_file_path} working_dir={working_dir}"
+            )
+
+        if working_dir:
+            self._working_dir = working_dir
+            self._connection_file_path = os.path.join(working_dir, "connection.json")
+        else:
+            assert connection_file_path  # for mypy
+            self._working_dir = None
+            self._connection_file_path = connection_file_path
+
         self._log_buffer = log_buffer
         self._server: Optional[Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer]] = None
         signal.signal(signal.SIGINT, self._sigint_handler)
@@ -79,8 +98,10 @@ class BackendRunner:
         shutdown_event: Event = Event()
 
         if OSName.is_posix():  # pragma: is-windows
-            server_path = SocketDirectories.for_os().get_process_socket_path(
-                "runtime", create_dir=True
+            server_path = SocketPaths.for_os().get_process_socket_path(
+                "runtime",
+                base_dir=self._working_dir,
+                create_dir=True,
             )
         else:  # pragma: is-posix
             server_path = NamedPipeHelper.generate_pipe_name("AdaptorNamedPipe")

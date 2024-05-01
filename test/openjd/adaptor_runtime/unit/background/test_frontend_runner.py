@@ -93,7 +93,7 @@ class TestFrontendRunner:
             conn_file_path = "/path"
             init_data = {"init": "data"}
             path_mapping_data: dict = {}
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             runner.init(adaptor_module, init_data, path_mapping_data, reentry_exe)
@@ -113,24 +113,24 @@ class TestFrontendRunner:
                     adaptor_module.__package__,
                     "daemon",
                     "_serve",
-                    "--connection-file",
-                    conn_file_path,
                     "--init-data",
                     json.dumps(init_data),
                     "--path-mapping-rules",
                     json.dumps(path_mapping_data),
+                    "--connection-file",
+                    conn_file_path,
                 ]
             else:
                 expected_args = [
                     str(reentry_exe),
                     "daemon",
                     "_serve",
-                    "--connection-file",
-                    conn_file_path,
                     "--init-data",
                     json.dumps(init_data),
                     "--path-mapping-rules",
                     json.dumps(path_mapping_data),
+                    "--connection-file",
+                    conn_file_path,
                 ]
             mock_Popen.assert_called_once_with(
                 expected_args,
@@ -148,7 +148,7 @@ class TestFrontendRunner:
             # GIVEN
             adaptor_module = ModuleType("")
             adaptor_module.__package__ = None
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             with pytest.raises(Exception) as raised_exc:
@@ -167,7 +167,7 @@ class TestFrontendRunner:
             adaptor_module = ModuleType("")
             adaptor_module.__package__ = "package"
             conn_file_path = "/path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with pytest.raises(FileExistsError) as raised_err:
@@ -196,7 +196,7 @@ class TestFrontendRunner:
             adaptor_module = ModuleType("")
             adaptor_module.__package__ = "package"
             conn_file_path = "/path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with pytest.raises(Exception) as raised_exc:
@@ -231,7 +231,7 @@ class TestFrontendRunner:
             adaptor_module = ModuleType("")
             adaptor_module.__package__ = "package"
             conn_file_path = "/path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with pytest.raises(TimeoutError) as raised_err:
@@ -267,7 +267,7 @@ class TestFrontendRunner:
             if OSName.is_windows():
                 mock_send_request.return_value = {"body": '{"key1": "value1"}'}
             mock_response = mock_send_request.return_value
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             response = runner._heartbeat()
@@ -295,7 +295,7 @@ class TestFrontendRunner:
             if OSName.is_windows():
                 mock_send_request.return_value = {"body": '{"key1": "value1"}'}
             mock_response = mock_send_request.return_value
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             response = runner._heartbeat(ack_id)
@@ -338,7 +338,9 @@ class TestFrontendRunner:
             mock_event.wait = MagicMock()
             mock_event.is_set = MagicMock(return_value=False)
             heartbeat_interval = 1
-            runner = FrontendRunner("", heartbeat_interval=heartbeat_interval)
+            runner = FrontendRunner(
+                connection_file_path="/tmp/connection.json", heartbeat_interval=heartbeat_interval
+            )
 
             # WHEN
             runner._heartbeat_until_state_complete(state)
@@ -367,7 +369,7 @@ class TestFrontendRunner:
                     failed=False,
                 ),
             ]
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             with pytest.raises(AdaptorFailedException) as raised_exc:
@@ -385,7 +387,7 @@ class TestFrontendRunner:
         @patch.object(FrontendRunner, "_send_request")
         def test_sends_shutdown(self, mock_send_request: MagicMock):
             # GIVEN
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             runner.shutdown()
@@ -407,7 +409,7 @@ class TestFrontendRunner:
         ):
             # GIVEN
             run_data = {"run": "data"}
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             runner.run(run_data)
@@ -429,7 +431,7 @@ class TestFrontendRunner:
             mock_heartbeat_until_state_complete: MagicMock,
         ):
             # GIVEN
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             runner.start()
@@ -451,7 +453,7 @@ class TestFrontendRunner:
             mock_heartbeat_until_state_complete: MagicMock,
         ):
             # GIVEN
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             runner.stop()
@@ -471,7 +473,7 @@ class TestFrontendRunner:
             mock_send_request: MagicMock,
         ):
             # GIVEN
-            runner = FrontendRunner("")
+            runner = FrontendRunner(connection_file_path="/tmp/connection.json")
 
             # WHEN
             runner.cancel()
@@ -502,7 +504,7 @@ class TestFrontendRunner:
             method = "GET"
             path = "/path"
             conn_file_path = "/conn/file/path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             response = runner._send_request(method, path)
@@ -529,7 +531,7 @@ class TestFrontendRunner:
             method = "GET"
             path = "/path"
             conn_file_path = "/conn/file/path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with pytest.raises(http_client.HTTPException) as raised_exc:
@@ -559,7 +561,7 @@ class TestFrontendRunner:
             method = "GET"
             path = "/path"
             conn_file_path = "/conn/file/path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with pytest.raises(HTTPError) as raised_err:
@@ -585,7 +587,7 @@ class TestFrontendRunner:
             path = "/path"
             conn_file_path = "/conn/file/path"
             params = {"first param": 1, "second_param": ["one", "two three"]}
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             response = runner._send_request(method, path, params=params)
@@ -606,7 +608,7 @@ class TestFrontendRunner:
             path = "/path"
             conn_file_path = "/conn/file/path"
             json = {"the": "body"}
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             response = runner._send_request(method, path, json_body=json)
@@ -648,7 +650,7 @@ class TestFrontendRunner:
             path = "/path"
             conn_file_path = r"C:\conn\file\path"
 
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with patch.object(
@@ -680,7 +682,7 @@ class TestFrontendRunner:
             method = "GET"
             path = "/path"
             conn_file_path = r"C:\conn\file\path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with patch.object(
@@ -709,7 +711,7 @@ class TestFrontendRunner:
             method = "GET"
             path = "/path"
             conn_file_path = r"C:\conn\file\path"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with patch.object(
@@ -747,7 +749,7 @@ class TestFrontendRunner:
             path = "/path"
             conn_file_path = r"C:\conn\file\path"
             params = {"first param": 1, "second_param": ["one", "two three"]}
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with patch.object(
@@ -777,7 +779,7 @@ class TestFrontendRunner:
             path = "/path"
             conn_file_path = r"C:\conn\file\path"
             json_body = {"the": "body"}
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             with patch.object(
@@ -805,7 +807,7 @@ class TestFrontendRunner:
 
             # GIVEN
             conn_file_path = "/path/to/conn_file"
-            runner = FrontendRunner(conn_file_path)
+            runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
             runner._sigint_handler(MagicMock(), MagicMock())
@@ -949,7 +951,7 @@ def test_connection_settings_lazy_loads(mock_load_connection_settings: MagicMock
     filepath = "/path"
     expected = ConnectionSettings("/socket")
     mock_load_connection_settings.return_value = expected
-    runner = FrontendRunner(filepath)
+    runner = FrontendRunner(connection_file_path=filepath)
 
     # Assert the internal connection settings var is not set yet
     assert not hasattr(runner, "_connection_settings")

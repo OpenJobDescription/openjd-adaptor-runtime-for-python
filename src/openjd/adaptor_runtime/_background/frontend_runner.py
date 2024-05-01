@@ -42,23 +42,43 @@ class FrontendRunner:
     Class that runs the frontend logic in background mode.
     """
 
+    _connection_file_path: str
+    _working_dir: str | None
+
     def __init__(
         self,
-        connection_file_path: str,
         *,
+        # TODO: Deprecate this option, replace with working_dir
+        connection_file_path: str | None = None,
+        working_dir: str | None = None,
         timeout_s: float = 5.0,
         heartbeat_interval: float = 1.0,
     ) -> None:
         """
         Args:
-            connection_file_path (str): Absolute path to the connection file.
+            connection_file_path (Optional[str]): DEPRECATED. Please use 'working_dir' instead. Absolute path to the connection file.
+            working_dir (Optional[str]): Working directory for the runtime. A connection.json file must exist in this directory.
             timeout_s (float, optional): Timeout for HTTP requests, in seconds. Defaults to 5.
             heartbeat_interval (float, optional): Interval between heartbeats, in seconds.
                 Defaults to 1.
         """
         self._timeout_s = timeout_s
         self._heartbeat_interval = heartbeat_interval
-        self._connection_file_path = connection_file_path
+
+        if (connection_file_path and working_dir) or not (connection_file_path or working_dir):
+            raise RuntimeError(
+                "Expected exactly one of 'connection_file_path' or 'working_dir', but got: "
+                f"connection_file_path={connection_file_path} working_dir={working_dir}"
+            )
+
+        if working_dir:
+            self._working_dir = working_dir
+            self._connection_file_path = os.path.join(working_dir, "connection.json")
+        else:
+            assert connection_file_path  # for mypy
+            self._working_dir = None
+            self._connection_file_path = connection_file_path
+
         self._canceled = Event()
         signal.signal(signal.SIGINT, self._sigint_handler)
         if OSName.is_posix():  # pragma: is-windows
@@ -111,14 +131,26 @@ class FrontendRunner:
             [
                 "daemon",
                 "_serve",
-                "--connection-file",
-                self._connection_file_path,
                 "--init-data",
                 json.dumps(init_data),
                 "--path-mapping-rules",
                 json.dumps(path_mapping_data),
             ]
         )
+        if self._working_dir:
+            args.extend(
+                [
+                    "--working-dir",
+                    self._working_dir,
+                ]
+            )
+        else:
+            args.extend(
+                [
+                    "--connection-file",
+                    self._connection_file_path,
+                ]
+            )
         try:
             process = subprocess.Popen(
                 args,

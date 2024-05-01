@@ -72,7 +72,7 @@ class TestDaemonMode:
         caplog: pytest.LogCaptureFixture,
     ) -> Generator[tuple[FrontendRunner, psutil.Process], None, None]:
         caplog.set_level(0)
-        frontend = FrontendRunner(connection_file_path, timeout_s=5.0)
+        frontend = FrontendRunner(connection_file_path=connection_file_path, timeout_s=5.0)
         frontend.init(sys.modules[AdaptorExample.__module__])
         conn_settings = _load_connection_settings(connection_file_path)
 

@@ -16,17 +16,17 @@ from .exceptions import (
 
 # Max PID on 64-bit systems is 4194304 (2^22)
 _PID_MAX_LENGTH = 7
-_PID_MAX_LENGTH_PADDED = _PID_MAX_LENGTH + 1  # 1 char for path seperator
 
 
-class SocketDirectories(abc.ABC):
+class SocketPaths(abc.ABC):
     """
-    Base class for determining the base directory for sockets used in the Adaptor Runtime.
+    Base class for determining the paths for sockets used in the Adaptor Runtime.
     """
 
     @staticmethod
     def for_os(osname: OSName = OSName()):  # pragma: no cover
-        """_summary_
+        """
+        Gets the SocketPaths class for a specific OS.
 
         Args:
             osname (OSName, optional): The OS to get socket directories for.
@@ -41,12 +41,20 @@ class SocketDirectories(abc.ABC):
             raise UnsupportedPlatformException(osname)
         return klass()
 
-    def get_process_socket_path(self, namespace: str | None = None, *, create_dir: bool = False):
+    def get_process_socket_path(
+        self,
+        namespace: str | None = None,
+        *,
+        base_dir: str | None = None,
+        create_dir: bool = False,
+    ):
         """
         Gets the path for this process' socket in the given namespace.
 
         Args:
             namespace (Optional[str]): The optional namespace (subdirectory) where the sockets go.
+            base_dir (Optional[str]): The base directory to create sockets in. Defaults to user's home
+                directory, then the temp directory.
             create_dir (bool): Whether to create the socket directory. Default is false.
 
         Raises:
@@ -60,21 +68,29 @@ class SocketDirectories(abc.ABC):
             len(socket_name) <= _PID_MAX_LENGTH
         ), f"PID too long. Only PIDs up to {_PID_MAX_LENGTH} digits are supported."
 
-        return self.get_socket_path(socket_name, namespace, create_dir=create_dir)
+        return self.get_socket_path(
+            socket_name,
+            namespace,
+            base_dir=base_dir,
+            create_dir=create_dir,
+        )
 
     def get_socket_path(
         self,
         base_socket_name: str,
         namespace: str | None = None,
         *,
+        base_dir: str | None = None,
         create_dir: bool = False,
     ) -> str:
         """
-        Gets the base directory for sockets used in Adaptor IPC
+        Gets the path for a socket used in Adaptor IPC
 
         Args:
             base_socket_name (str): The name of the socket
             namespace (Optional[str]): The optional namespace (subdirectory) where the sockets go
+            base_dir (Optional[str]): The base directory to create sockets in. Defaults to user's home
+                directory, then the temp directory.
             create_dir (bool): Whether to create the directory or not. Default is false.
 
         Raises:
@@ -103,39 +119,57 @@ class SocketDirectories(abc.ABC):
 
         reasons: list[str] = []
 
-        # First try home directory
-        home_dir = os.path.expanduser("~")
-        socket_dir = os.path.join(home_dir, rel_path)
-        socket_path = gen_socket_path(socket_dir, base_socket_name)
-        try:
-            self.verify_socket_path(socket_path)
-        except NonvalidSocketPathException as e:
-            reasons.append(f"Cannot create sockets directory in the home directory because: {e}")
-        else:
-            mkdir(socket_dir)
-            return socket_path
-
-        # Last resort is the temp directory
-        temp_dir = tempfile.gettempdir()
-        socket_dir = os.path.join(temp_dir, rel_path)
-        socket_path = gen_socket_path(socket_dir, base_socket_name)
-        try:
-            self.verify_socket_path(socket_path)
-        except NonvalidSocketPathException as e:
-            reasons.append(f"Cannot create sockets directory in the temp directory because: {e}")
-        else:
-            # Also check that the sticky bit is set on the temp dir
-            if not os.stat(temp_dir).st_mode & stat.S_ISVTX:
+        if base_dir:
+            # Only try to use the provided base directory
+            socket_dir = os.path.join(base_dir, rel_path)
+            socket_path = gen_socket_path(socket_dir, base_socket_name)
+            try:
+                self.verify_socket_path(socket_path)
+            except NonvalidSocketPathException as e:
                 reasons.append(
-                    f"Cannot use temporary directory {temp_dir} because it does not have the "
-                    "sticky bit (restricted deletion flag) set"
+                    f"Cannot create socket in the base directory at '{socket_dir}' because: {e}"
+                )
+            else:
+                mkdir(socket_dir)
+                return socket_path
+        else:
+            # First try home directory
+            home_dir = os.path.expanduser("~")
+            socket_dir = os.path.join(home_dir, rel_path)
+            socket_path = gen_socket_path(socket_dir, base_socket_name)
+            try:
+                self.verify_socket_path(socket_path)
+            except NonvalidSocketPathException as e:
+                reasons.append(
+                    f"Cannot create socket in the home directory at '{socket_dir}' because: {e}"
                 )
             else:
                 mkdir(socket_dir)
                 return socket_path
 
+            # Last resort is the temp directory
+            temp_dir = tempfile.gettempdir()
+            socket_dir = os.path.join(temp_dir, rel_path)
+            socket_path = gen_socket_path(socket_dir, base_socket_name)
+            try:
+                self.verify_socket_path(socket_path)
+            except NonvalidSocketPathException as e:
+                reasons.append(
+                    f"Cannot create socket in the temp directory at '{socket_dir}' because: {e}"
+                )
+            else:
+                # Also check that the sticky bit is set on the temp dir
+                if not os.stat(temp_dir).st_mode & stat.S_ISVTX:
+                    reasons.append(
+                        f"Cannot use temporary directory {temp_dir} because it does not have the "
+                        "sticky bit (restricted deletion flag) set"
+                    )
+                else:
+                    mkdir(socket_dir)
+                    return socket_path
+
         raise NoSocketPathFoundException(
-            "Failed to find a suitable base directory to create sockets in for the following "
+            "Failed to find a suitable socket path for the following "
             f"reasons: {os.linesep.join(reasons)}"
         )
 
@@ -151,53 +185,55 @@ class SocketDirectories(abc.ABC):
         pass
 
 
-class LinuxSocketDirectories(SocketDirectories):
+class LinuxSocketPaths(SocketPaths):
     """
     Specialization for socket paths in Linux systems.
     """
 
     # This is based on the max length of socket names to 108 bytes
     # See unix(7) under "Address format"
-    _socket_path_max_length = 108
-    _socket_dir_max_length = _socket_path_max_length - _PID_MAX_LENGTH_PADDED
+    # In practice, only 107 bytes are accepted (one byte for null terminator)
+    _socket_name_max_length = 108 - 1
 
     def verify_socket_path(self, path: str) -> None:
-        path_length = len(path.encode("utf-8"))
-        if path_length > self._socket_dir_max_length:
+        socket_name = os.path.basename(path)
+        socket_name_length = len(socket_name.encode("utf-8"))
+        if socket_name_length > self._socket_name_max_length:
             raise NonvalidSocketPathException(
-                "Socket base directory path too big. The maximum allowed size is "
-                f"{self._socket_dir_max_length} bytes, but the directory has a size of "
-                f"{path_length}: {path}"
+                "Socket name too long. The maximum allowed size is "
+                f"{self._socket_name_max_length} bytes, but the name has a size of "
+                f"{socket_name_length}: {socket_name}"
             )
 
 
-class MacOSSocketDirectories(SocketDirectories):
+class MacOSSocketPaths(SocketPaths):
     """
     Specialization for socket paths in macOS systems.
     """
 
     # This is based on the max length of socket names to 104 bytes
     # See https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/un.h#L79
-    _socket_path_max_length = 104
-    _socket_dir_max_length = _socket_path_max_length - _PID_MAX_LENGTH_PADDED
+    # In practice, only 103 bytes are accepted (one byte for null terminator)
+    _socket_name_max_length = 104 - 1
 
     def verify_socket_path(self, path: str) -> None:
-        path_length = len(path.encode("utf-8"))
-        if path_length > self._socket_dir_max_length:
+        socket_name = os.path.basename(path)
+        socket_name_length = len(socket_name.encode("utf-8"))
+        if socket_name_length > self._socket_name_max_length:
             raise NonvalidSocketPathException(
-                "Socket base directory path too big. The maximum allowed size is "
-                f"{self._socket_dir_max_length} bytes, but the directory has a size of "
-                f"{path_length}: {path}"
+                "Socket name too long. The maximum allowed size is "
+                f"{self._socket_name_max_length} bytes, but the name has a size of "
+                f"{socket_name_length}: {socket_name}"
             )
 
 
-_os_map: dict[str, type[SocketDirectories]] = {
-    OSName.LINUX: LinuxSocketDirectories,
-    OSName.MACOS: MacOSSocketDirectories,
+_os_map: dict[str, type[SocketPaths]] = {
+    OSName.LINUX: LinuxSocketPaths,
+    OSName.MACOS: MacOSSocketPaths,
 }
 
 
 def _get_socket_directories_cls(
     osname: OSName,
-) -> type[SocketDirectories] | None:  # pragma: no cover
+) -> type[SocketPaths] | None:  # pragma: no cover
     return _os_map.get(osname, None)

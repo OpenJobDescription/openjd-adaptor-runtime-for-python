@@ -10,23 +10,23 @@ import pytest
 
 import openjd.adaptor_runtime._http.sockets as sockets
 from openjd.adaptor_runtime._http.sockets import (
-    LinuxSocketDirectories,
-    MacOSSocketDirectories,
+    LinuxSocketPaths,
+    MacOSSocketPaths,
     NonvalidSocketPathException,
     NoSocketPathFoundException,
-    SocketDirectories,
+    SocketPaths,
 )
 
 
-class SocketDirectoriesStub(SocketDirectories):
+class SocketPathsStub(SocketPaths):
     def verify_socket_path(self, path: str) -> None:
         pass
 
 
-class TestSocketDirectories:
+class TestSocketPaths:
     class TestGetProcessSocketPath:
         """
-        Tests for SocketDirectories.get_process_socket_path()
+        Tests for SocketPaths.get_process_socket_path()
         """
 
         @patch.object(sockets.os, "getpid", return_value=1234)
@@ -36,7 +36,7 @@ class TestSocketDirectories:
         ) -> None:
             # GIVEN
             namespace = "my-namespace"
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             result = subject.get_process_socket_path(namespace)
@@ -48,7 +48,7 @@ class TestSocketDirectories:
         @patch.object(sockets.os, "getpid", return_value="a" * (sockets._PID_MAX_LENGTH + 1))
         def test_asserts_max_pid_length(self, mock_getpid: MagicMock):
             # GIVEN
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             with pytest.raises(AssertionError) as raised_err:
@@ -62,7 +62,7 @@ class TestSocketDirectories:
 
     class TestGetSocketPath:
         """
-        Tests for SocketDirectories.get_socket_path()
+        Tests for SocketPaths.get_socket_path()
         """
 
         @pytest.fixture(autouse=True)
@@ -100,7 +100,7 @@ class TestSocketDirectories:
             home_dir: str,
         ) -> None:
             # GIVEN
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             result = subject.get_socket_path("sock")
@@ -110,7 +110,7 @@ class TestSocketDirectories:
             assert result.startswith(home_dir)
 
         @patch.object(sockets.os, "stat")
-        @patch.object(SocketDirectoriesStub, "verify_socket_path")
+        @patch.object(SocketPathsStub, "verify_socket_path")
         def test_gets_temp_dir(
             self,
             mock_verify_socket_path: MagicMock,
@@ -122,7 +122,7 @@ class TestSocketDirectories:
             exc = NonvalidSocketPathException()
             mock_verify_socket_path.side_effect = [exc, None]  # Raise exc only once
             mock_stat.return_value.st_mode = stat.S_ISVTX
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             result = subject.get_socket_path("sock")
@@ -144,7 +144,7 @@ class TestSocketDirectories:
         )
         def test_create_dir(self, mock_makedirs: MagicMock, create: bool) -> None:
             # GIVEN
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             result = subject.get_socket_path("sock", create_dir=create)
@@ -160,7 +160,7 @@ class TestSocketDirectories:
         def test_uses_namespace(self) -> None:
             # GIVEN
             namespace = "my-namespace"
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             result = subject.get_socket_path("sock", namespace)
@@ -168,11 +168,11 @@ class TestSocketDirectories:
             # THEN
             assert os.path.dirname(result).endswith(namespace)
 
-        @patch.object(SocketDirectoriesStub, "verify_socket_path")
+        @patch.object(SocketPathsStub, "verify_socket_path")
         def test_raises_when_no_valid_path_found(self, mock_verify_socket_path: MagicMock) -> None:
             # GIVEN
             mock_verify_socket_path.side_effect = NonvalidSocketPathException()
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             with pytest.raises(NoSocketPathFoundException) as raised_exc:
@@ -180,12 +180,11 @@ class TestSocketDirectories:
 
             # THEN
             assert raised_exc.match(
-                "Failed to find a suitable base directory to create sockets in for the following "
-                "reasons: "
+                "Failed to find a suitable socket path for the following reasons: "
             )
             assert mock_verify_socket_path.call_count == 2
 
-        @patch.object(SocketDirectoriesStub, "verify_socket_path")
+        @patch.object(SocketPathsStub, "verify_socket_path")
         @patch.object(sockets.os, "stat")
         def test_raises_when_no_tmpdir_sticky_bit(
             self,
@@ -196,7 +195,7 @@ class TestSocketDirectories:
             # GIVEN
             mock_verify_socket_path.side_effect = [NonvalidSocketPathException(), None]
             mock_stat.return_value.st_mode = 0
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             with pytest.raises(NoSocketPathFoundException) as raised_exc:
@@ -219,7 +218,7 @@ class TestSocketDirectories:
             sock_name = "sock"
             existing_sock_names = [sock_name, f"{sock_name}_1", f"{sock_name}_2"]
             mock_exists.side_effect = ([True] * len(existing_sock_names)) + [False]
-            subject = SocketDirectoriesStub()
+            subject = SocketPathsStub()
 
             # WHEN
             result = subject.get_socket_path(sock_name)
@@ -229,22 +228,21 @@ class TestSocketDirectories:
             mock_exists.call_count == len(existing_sock_names) + 1
 
 
-class TestLinuxSocketDirectories:
+class TestLinuxSocketPaths:
     @pytest.mark.parametrize(
         argnames=["path"],
         argvalues=[
             ["a"],
-            ["a" * 100],
+            ["a" * 107],
         ],
-        ids=["one byte", "100 bytes"],
+        ids=["one byte", "107 bytes"],
     )
-    def test_accepts_paths_within_100_bytes(self, path: str):
+    def test_accepts_paths_within_107_bytes(self, path: str):
         """
-        Verifies the function accepts paths up to 100 bytes (108 byte max - 8 byte padding
-        for socket name portion (path sep + PID))
+        Verifies the function accepts paths up to 100 bytes (108 byte max - 1 byte null terminator)
         """
         # GIVEN
-        subject = LinuxSocketDirectories()
+        subject = LinuxSocketPaths()
 
         try:
             # WHEN
@@ -255,11 +253,11 @@ class TestLinuxSocketDirectories:
             # THEN
             pass  # success
 
-    def test_rejects_paths_over_100_bytes(self):
+    def test_rejects_paths_over_107_bytes(self):
         # GIVEN
-        length = 101
+        length = 108
         path = "a" * length
-        subject = LinuxSocketDirectories()
+        subject = LinuxSocketPaths()
 
         # WHEN
         with pytest.raises(NonvalidSocketPathException) as raised_exc:
@@ -267,28 +265,27 @@ class TestLinuxSocketDirectories:
 
         # THEN
         assert raised_exc.match(
-            "Socket base directory path too big. The maximum allowed size is "
-            f"{subject._socket_dir_max_length} bytes, but the directory has a size of "
+            "Socket name too long. The maximum allowed size is "
+            f"{subject._socket_name_max_length} bytes, but the name has a size of "
             f"{length}: {path}"
         )
 
 
-class TestMacOSSocketDirectories:
+class TestMacOSSocketPaths:
     @pytest.mark.parametrize(
         argnames=["path"],
         argvalues=[
             ["a"],
-            ["a" * 96],
+            ["a" * 103],
         ],
-        ids=["one byte", "96 bytes"],
+        ids=["one byte", "103 bytes"],
     )
-    def test_accepts_paths_within_100_bytes(self, path: str):
+    def test_accepts_paths_within_103_bytes(self, path: str):
         """
-        Verifies the function accepts paths up to 96 bytes (104 byte max - 8 byte padding
-        for socket name portion (path sep + PID))
+        Verifies the function accepts paths up to 103 bytes (104 byte max - 1 byte null terminator)
         """
         # GIVEN
-        subject = MacOSSocketDirectories()
+        subject = MacOSSocketPaths()
 
         try:
             # WHEN
@@ -299,11 +296,11 @@ class TestMacOSSocketDirectories:
             # THEN
             pass  # success
 
-    def test_rejects_paths_over_96_bytes(self):
+    def test_rejects_paths_over_103_bytes(self):
         # GIVEN
-        length = 97
+        length = 104
         path = "a" * length
-        subject = MacOSSocketDirectories()
+        subject = MacOSSocketPaths()
 
         # WHEN
         with pytest.raises(NonvalidSocketPathException) as raised_exc:
@@ -311,7 +308,7 @@ class TestMacOSSocketDirectories:
 
         # THEN
         assert raised_exc.match(
-            "Socket base directory path too big. The maximum allowed size is "
-            f"{subject._socket_dir_max_length} bytes, but the directory has a size of "
+            "Socket name too long. The maximum allowed size is "
+            f"{subject._socket_name_max_length} bytes, but the name has a size of "
             f"{length}: {path}"
         )

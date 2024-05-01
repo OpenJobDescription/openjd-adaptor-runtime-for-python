@@ -214,7 +214,14 @@ class TestStart:
         # GIVEN
         init_data = {"init": "data"}
         with patch.object(
-            runtime_entrypoint.sys, "argv", ["Adaptor", "run", "--init-data", json.dumps(init_data)]
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "run",
+                "--init-data",
+                json.dumps(init_data),
+            ],
         ):
             entrypoint = EntryPoint(mock_adaptor_cls)
 
@@ -487,7 +494,8 @@ class TestStart:
         )
         mock_init.assert_called_once_with(
             mock_adaptor_runner.return_value,
-            conn_file,
+            connection_file_path=conn_file,
+            working_dir=None,
             log_buffer=mock_log_buffer.return_value,
         )
         mock_run.assert_called_once()
@@ -555,7 +563,7 @@ class TestStart:
 
         # THEN
         assert raised_err.match(f"Adaptor module is not loaded: {FakeAdaptor.__module__}")
-        mock_magic_init.assert_called_once_with(conn_file)
+        mock_magic_init.assert_called_once_with(connection_file_path=conn_file, working_dir=None)
 
     @pytest.mark.parametrize(
         argnames="reentry_exe",
@@ -598,7 +606,7 @@ class TestStart:
 
         # THEN
         mock_magic_init.assert_called_once_with(mock_adaptor_module, {}, {}, reentry_exe)
-        mock_magic_start.assert_called_once_with(conn_file)
+        mock_magic_start.assert_called_once_with(connection_file_path=conn_file, working_dir=None)
         mock_start.assert_called_once_with()
 
     @patch.object(FrontendRunner, "__init__", return_value=None)
@@ -629,7 +637,7 @@ class TestStart:
             entrypoint.start()
 
         # THEN
-        mock_magic_init.assert_called_once_with(conn_file)
+        mock_magic_init.assert_called_once_with(connection_file_path=conn_file, working_dir=None)
         mock_end.assert_called_once()
         mock_shutdown.assert_called_once_with()
 
@@ -662,7 +670,7 @@ class TestStart:
             entrypoint.start()
 
         # THEN
-        mock_magic_init.assert_called_once_with(conn_file)
+        mock_magic_init.assert_called_once_with(connection_file_path=conn_file, working_dir=None)
         mock_run.assert_called_once_with(run_data)
 
     @patch.object(FrontendRunner, "__init__", return_value=None)
@@ -729,7 +737,9 @@ class TestStart:
         # THEN
         mock_isabs.assert_any_call(conn_file)
         mock_abspath.assert_any_call(conn_file)
-        mock_runner.assert_called_once_with(mock_abspath.return_value)
+        mock_runner.assert_called_once_with(
+            connection_file_path=mock_abspath.return_value, working_dir=None
+        )
 
 
 class TestLoadData:

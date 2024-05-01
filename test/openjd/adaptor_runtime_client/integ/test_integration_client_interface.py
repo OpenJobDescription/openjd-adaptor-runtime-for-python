@@ -53,7 +53,7 @@ class TestIntegrationClientInterface:
         # Ensure the process actually shutdown
         assert client_subprocess.returncode is not None
 
-    def test_client_in_thread_does_not_do_graceful_shutdown(self):
+    def test_client_in_thread_does_not_do_graceful_shutdown(self) -> None:
         """Ensures that a client running in a thread does not crash by attempting to register a signal,
         since they can only be created in the main thread. This means the graceful shutdown is effectively
         ignored."""

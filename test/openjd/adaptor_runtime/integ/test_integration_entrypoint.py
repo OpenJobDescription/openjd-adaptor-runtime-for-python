@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import pathlib
 import os
 import re
 import sys
@@ -32,7 +33,7 @@ class TestCommandAdaptorRun:
     """
 
     def test_runs_command_adaptor(
-        self, capfd: pytest.CaptureFixture, caplog: pytest.LogCaptureFixture
+        self, capfd: pytest.CaptureFixture, caplog: pytest.LogCaptureFixture, tmp_path: pathlib.Path
     ):
         # GIVEN
         caplog.set_level(INFO)
