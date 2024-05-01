@@ -209,22 +209,28 @@ class TestSocketPaths:
                 )
             )
 
+        @patch.object(sockets.uuid, "uuid4")
         @patch.object(sockets.os.path, "exists")
         def test_handles_socket_name_collisions(
             self,
             mock_exists: MagicMock,
+            mock_uuid4: MagicMock,
         ) -> None:
             # GIVEN
             sock_name = "sock"
-            existing_sock_names = [sock_name, f"{sock_name}_1", f"{sock_name}_2"]
+            existing_sock_names = [sock_name, f"{sock_name}_abc123", f"{sock_name}_123abc"]
             mock_exists.side_effect = ([True] * len(existing_sock_names)) + [False]
+
+            expected_sock_name = f"{sock_name}_123456789abcdefg"
+            mock_uuid4.side_effect = existing_sock_names[1:] + [expected_sock_name]
+
             subject = SocketPathsStub()
 
             # WHEN
             result = subject.get_socket_path(sock_name)
 
             # THEN
-            assert result.endswith(f"{sock_name}_3")
+            assert result.endswith(expected_sock_name)
             mock_exists.call_count == len(existing_sock_names) + 1
 
 
