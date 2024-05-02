@@ -26,7 +26,18 @@ class WinAdaptorServer(NamedPipeServer):
     actions_queue: ActionsQueue
     adaptor: BaseAdaptor
 
-    def __init__(self, actions_queue: ActionsQueue, adaptor: BaseAdaptor) -> None:
+    def __init__(
+        self,
+        actions_queue: ActionsQueue,
+        adaptor: BaseAdaptor,
+        *,
+        # TODO: Remove this
+        # The "working_dir" parameter was added to "AdaptorServer", so need to add it here as well.
+        # This is a temporary workaround due to how this class is used/exposed. In __init__.py,
+        # this class "replaces" the "AdaptorServer" class on Windows so the calling code does not
+        # even know it is instantiating a completely different class on Windows.
+        working_dir: str | None = None,
+    ) -> None:
         """
         Adaptor Server class in Windows.
 

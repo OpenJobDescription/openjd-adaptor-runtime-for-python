@@ -117,7 +117,7 @@ class TestBackendRunner:
         mock_server_cls.side_effect = exc
         runner = BackendRunner(
             Mock(),
-           connection_file_path=os.path.join(os.path.sep, "tmp", "connection.json"),
+            connection_file_path=os.path.join(os.path.sep, "tmp", "connection.json"),
         )
 
         # WHEN
