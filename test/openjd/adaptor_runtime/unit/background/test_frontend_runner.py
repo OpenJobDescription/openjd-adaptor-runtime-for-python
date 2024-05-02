@@ -821,6 +821,118 @@ class TestFrontendRunner:
                 signal_mock.assert_any_call(signal.SIGBREAK, runner._sigint_handler)  # type: ignore[attr-defined]
             cancel_mock.assert_called_once()
 
+    class TestConnectionFileCompat:
+        @pytest.mark.parametrize(
+            argnames=["connection_file", "working_dir"],
+            argvalues=[
+                ["path", "dir"],
+                [None, None],
+            ],
+            ids=["both provided", "neither provided"],
+        )
+        def test_rejects_not_exactly_one_of_connection_file_and_working_dir(
+            self,
+            connection_file: str | None,
+            working_dir: str | None,
+        ) -> None:
+            # GIVEN
+            with pytest.raises(RuntimeError) as raised_err:
+                # WHEN
+                FrontendRunner(
+                    connection_file_path=connection_file,
+                    working_dir=working_dir,
+                )
+
+            # THEN
+            assert (
+                f"Expected exactly one of 'connection_file_path' or 'working_dir', but got: connection_file_path={connection_file} working_dir={working_dir}"
+                == str(raised_err.value)
+            )
+
+        @patch.object(frontend_runner, "_wait_for_file")
+        @patch.object(frontend_runner.os.path, "exists", return_value=False)
+        @patch.object(frontend_runner.subprocess, "Popen")
+        def test_init_provides_connection_file_arg(
+            self,
+            mock_popen: MagicMock,
+            mock_exists: MagicMock,
+            mock_wait_for_file: MagicMock,
+        ) -> None:
+            # GIVEN
+            connection_file = os.path.join(os.sep, "path", "to", "connection.json")
+            runner = FrontendRunner(connection_file_path=connection_file)
+            adaptor_module = ModuleType("")
+            adaptor_module.__package__ = "package"
+
+            with patch.object(runner, "_heartbeat"):
+                # WHEN
+                runner.init(adaptor_module)
+
+            # THEN
+            mock_popen.assert_called_once_with(
+                [
+                    sys.executable,
+                    "-m",
+                    adaptor_module.__package__,
+                    "daemon",
+                    "_serve",
+                    "--init-data",
+                    json.dumps({}),
+                    "--path-mapping-rules",
+                    json.dumps({}),
+                    "--connection-file",
+                    connection_file,
+                ],
+                shell=False,
+                close_fds=True,
+                start_new_session=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+        @patch.object(frontend_runner, "_wait_for_file")
+        @patch.object(frontend_runner.os.path, "exists", return_value=False)
+        @patch.object(frontend_runner.subprocess, "Popen")
+        def test_init_provides_working_dir_arg(
+            self,
+            mock_popen: MagicMock,
+            mock_exists: MagicMock,
+            mock_wait_for_file: MagicMock,
+        ) -> None:
+            # GIVEN
+            working_dir = os.path.join(os.sep, "path", "to", "working")
+            runner = FrontendRunner(working_dir=working_dir)
+            adaptor_module = ModuleType("")
+            adaptor_module.__package__ = "package"
+
+            with patch.object(runner, "_heartbeat"):
+                # WHEN
+                runner.init(adaptor_module)
+
+            # THEN
+            mock_popen.assert_called_once_with(
+                [
+                    sys.executable,
+                    "-m",
+                    adaptor_module.__package__,
+                    "daemon",
+                    "_serve",
+                    "--init-data",
+                    json.dumps({}),
+                    "--path-mapping-rules",
+                    json.dumps({}),
+                    "--working-dir",
+                    working_dir,
+                ],
+                shell=False,
+                close_fds=True,
+                start_new_session=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
 
 class TestLoadConnectionSettings:
     """

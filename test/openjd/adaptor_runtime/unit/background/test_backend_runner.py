@@ -1,4 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+from __future__ import annotations
 
 import json
 import os
@@ -201,3 +202,55 @@ class TestBackendRunner:
         else:
             signal_mock.assert_any_call(signal.SIGBREAK, runner._sigint_handler)  # type: ignore[attr-defined]
         mock_submit.assert_called_with(server_mock, adaptor_runner._cancel, force_immediate=True)
+
+    class ConnectionFileCompat:
+        @pytest.mark.parametrize(
+            argnames=["connection_file", "working_dir"],
+            argvalues=[
+                ["path", "dir"],
+                [None, None],
+            ],
+            ids=["both provided", "neither provided"],
+        )
+        def test_rejects_not_exactly_one_of_connection_file_and_working_dir(
+            self,
+            connection_file: str | None,
+            working_dir: str | None,
+        ) -> None:
+            # GIVEN
+            with pytest.raises(RuntimeError) as raised_err:
+                # WHEN
+                BackendRunner(
+                    Mock(),
+                    connection_file_path=connection_file,
+                    working_dir=working_dir,
+                )
+
+            # THEN
+            assert (
+                f"Exactly one of 'connection_file_path' or 'working_dir' must be provided, but got: connection_file_path={connection_file} working_dir={working_dir}"
+                == str(raised_err.value)
+            )
+
+        @pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific test")
+        @pytest.mark.parametrize(
+            argnames=["working_dir"], argvalues=[["dir"], [None]], ids=["provided", "not provided"]
+        )
+        def test_run_uses_working_dir_for_socket_path(self, working_dir: str | None) -> None:
+            # GIVEN
+            runner = BackendRunner(Mock(), working_dir=working_dir)
+
+            with patch.object(
+                backend_runner.SocketPaths,
+                "get_process_socket_path",
+                wraps=backend_runner.SocketPaths.get_process_socket_path,
+            ) as mock_get_process_socket_path:
+                # WHEN
+                runner.run()
+
+            # THEN
+            mock_get_process_socket_path.assert_called_once_with(
+                "runtime",
+                base_dir=working_dir,
+                create_dir=True,
+            )

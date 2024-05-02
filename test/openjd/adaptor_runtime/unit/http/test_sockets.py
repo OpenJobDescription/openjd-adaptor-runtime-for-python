@@ -157,6 +157,17 @@ class TestSocketPaths:
             else:
                 mock_makedirs.assert_not_called()
 
+        def test_uses_base_dir(self) -> None:
+            # GIVEN
+            subject = SocketPathsStub()
+            base_dir = os.path.join(os.sep, "base", "dir")
+
+            # WHEN
+            result = subject.get_socket_path("sock", base_dir=base_dir)
+
+            # THEN
+            assert result.startswith(base_dir)
+
         def test_uses_namespace(self) -> None:
             # GIVEN
             namespace = "my-namespace"
@@ -240,10 +251,11 @@ class TestLinuxSocketPaths:
         argvalues=[
             ["a"],
             ["a" * 107],
+            ["/this/part/should/not/matter/" + "a" * 107],
         ],
-        ids=["one byte", "107 bytes"],
+        ids=["one byte", "107 bytes", "path with name of 107 bytes"],
     )
-    def test_accepts_paths_within_107_bytes(self, path: str):
+    def test_accepts_names_within_107_bytes(self, path: str):
         """
         Verifies the function accepts paths up to 100 bytes (108 byte max - 1 byte null terminator)
         """
@@ -259,7 +271,7 @@ class TestLinuxSocketPaths:
             # THEN
             pass  # success
 
-    def test_rejects_paths_over_107_bytes(self):
+    def test_rejects_names_over_107_bytes(self):
         # GIVEN
         length = 108
         path = "a" * length
@@ -283,8 +295,9 @@ class TestMacOSSocketPaths:
         argvalues=[
             ["a"],
             ["a" * 103],
+            ["/this/part/should/not/matter/" + "a" * 103],
         ],
-        ids=["one byte", "103 bytes"],
+        ids=["one byte", "103 bytes", "path with name of 103 bytes"],
     )
     def test_accepts_paths_within_103_bytes(self, path: str):
         """

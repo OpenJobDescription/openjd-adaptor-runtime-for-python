@@ -742,6 +742,53 @@ class TestStart:
             connection_file_path=mock_abspath.return_value, working_dir=None
         )
 
+    class TestConnectionFileCompat:
+        @pytest.mark.parametrize(
+            argnames=["connection_file", "working_dir"],
+            argvalues=[
+                ["path", "dir"],
+                [None, None],
+            ],
+            ids=["both provided", "neither provided"],
+        )
+        def test_rejects_not_exactly_one_of_connection_file_and_working_dir(
+            self,
+            connection_file: str | None,
+            working_dir: str | None,
+        ) -> None:
+            # GIVEN
+            entrypoint = EntryPoint(FakeAdaptor)
+            args = [
+                "Adaptor",
+                "daemon",
+                "run",
+            ]
+            if connection_file:
+                args.extend(
+                    [
+                        "--connection-file",
+                        connection_file,
+                    ]
+                )
+            if working_dir:
+                args.extend(
+                    [
+                        "--working-dir",
+                        working_dir,
+                    ]
+                )
+
+            with patch.object(runtime_entrypoint.sys, "argv", args):
+                with pytest.raises(RuntimeError) as raised_err:
+                    # WHEN
+                    entrypoint.start()
+
+            # THEN
+            assert (
+                "Expected exactly one of 'connection_file' or 'working_dir' to be provided, but got args: "
+                in str(raised_err.value)
+            )
+
 
 class TestLoadData:
     """
