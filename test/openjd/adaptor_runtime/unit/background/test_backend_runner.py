@@ -67,7 +67,7 @@ class TestBackendRunner:
     ):
         # GIVEN
         caplog.set_level("DEBUG")
-        conn_dir = "/path/to/conn_dir"
+        conn_dir = os.path.join(os.sep, "path", "to", "conn_dir")
         connection_settings = {"socket": socket_path}
         adaptor_runner = Mock()
         runner = BackendRunner(adaptor_runner, working_dir=conn_dir)
@@ -93,7 +93,7 @@ class TestBackendRunner:
         )
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
-        conn_file_path = f"{conn_dir}/connection.json"
+        conn_file_path = os.path.join(conn_dir, "connection.json")
         open_mock.assert_called_once_with(conn_file_path, open_mode="w")
         mock_json_dump.assert_called_once_with(
             ConnectionSettings(socket_path),
@@ -115,7 +115,10 @@ class TestBackendRunner:
         caplog.set_level("DEBUG")
         exc = Exception()
         mock_server_cls.side_effect = exc
-        runner = BackendRunner(Mock(), connection_file_path="/tmp/connection.json")
+        runner = BackendRunner(
+            Mock(),
+           connection_file_path=os.path.join(os.path.sep, "tmp", "connection.json"),
+        )
 
         # WHEN
         with pytest.raises(Exception) as raised_exc:
@@ -145,7 +148,7 @@ class TestBackendRunner:
         caplog.set_level("DEBUG")
         err = OSError()
         open_mock.side_effect = err
-        conn_dir = "/path/to/conn_dir"
+        conn_dir = os.path.join(os.sep, "path", "to", "conn_dir")
         adaptor_runner = Mock()
         runner = BackendRunner(adaptor_runner, working_dir=conn_dir)
 
@@ -165,7 +168,7 @@ class TestBackendRunner:
         ]
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
-        conn_file_path = f"{conn_dir}/connection.json"
+        conn_file_path = os.path.join(conn_dir, "connection.json")
         open_mock.assert_called_once_with(conn_file_path, open_mode="w")
         mock_thread.return_value.join.assert_called_once()
         if OSName.is_posix():
@@ -180,7 +183,7 @@ class TestBackendRunner:
         # as expected.
 
         # GIVEN
-        conn_file_path = "/path/to/conn_file"
+        conn_file_path = os.path.join(os.sep, "path", "to", "conn_file")
         adaptor_runner = Mock()
         runner = BackendRunner(adaptor_runner, connection_file_path=conn_file_path)
         server_mock = MagicMock()

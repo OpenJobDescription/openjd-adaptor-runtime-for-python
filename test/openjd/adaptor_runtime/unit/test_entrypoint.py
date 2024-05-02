@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 from pathlib import Path
 from typing import Optional
@@ -468,7 +469,7 @@ class TestStart:
     ):
         # GIVEN
         init_data = {"init": "data"}
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -514,7 +515,7 @@ class TestStart:
     ):
         # GIVEN
         init_data = {"init": "data"}
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -542,7 +543,7 @@ class TestStart:
         mock_magic_init: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -583,7 +584,7 @@ class TestStart:
         reentry_exe: Optional[Path],
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -619,7 +620,7 @@ class TestStart:
         mock_magic_init: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -649,7 +650,7 @@ class TestStart:
         mock_magic_init: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         run_data = {"run": "data"}
         with patch.object(
             runtime_entrypoint.sys,
@@ -683,7 +684,7 @@ class TestStart:
         mock_magic_init: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         run_data = {"run": "data"}
         with patch.object(
             runtime_entrypoint.sys,

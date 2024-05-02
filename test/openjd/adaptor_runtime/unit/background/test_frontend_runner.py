@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import http.client as http_client
 import json
+import os
 import re
 import signal
 import subprocess
@@ -806,7 +807,7 @@ class TestFrontendRunner:
             # as expected.
 
             # GIVEN
-            conn_file_path = "/path/to/conn_file"
+            conn_file_path = os.path.join(os.sep, "path", "to", "conn_file")
             runner = FrontendRunner(connection_file_path=conn_file_path)
 
             # WHEN
