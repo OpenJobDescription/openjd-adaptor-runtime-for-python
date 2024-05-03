@@ -55,6 +55,11 @@ class TestFrontendRunner:
         Tests for the FrontendRunner.init method
         """
 
+        @pytest.fixture(autouse=True)
+        def open_mock(self) -> Generator[MagicMock, None, None]:
+            with patch.object(frontend_runner, "open") as m:
+                yield m
+
         @pytest.mark.parametrize(
             argnames="reentry_exe",
             argvalues=[
@@ -62,6 +67,7 @@ class TestFrontendRunner:
                 (Path("reeentry_exe_value"),),
             ],
         )
+        @patch.object(frontend_runner.uuid, "uuid4", return_value="uuid")
         @patch.object(frontend_runner.sys, "argv")
         @patch.object(frontend_runner.sys, "executable")
         @patch.object(frontend_runner.json, "dumps")
@@ -78,6 +84,8 @@ class TestFrontendRunner:
             mock_json_dumps: MagicMock,
             mock_sys_executable: MagicMock,
             mock_sys_argv: MagicMock,
+            mock_uuid: MagicMock,
+            open_mock: MagicMock,
             caplog: pytest.LogCaptureFixture,
             reentry_exe: Optional[Path],
         ):
@@ -100,12 +108,15 @@ class TestFrontendRunner:
             runner.init(adaptor_module, init_data, path_mapping_data, reentry_exe)
 
             # THEN
-            assert caplog.messages == [
-                "Initializing backend process...",
-                f"Started backend process. PID: {pid}",
-                "Verifying connection to backend...",
-                "Connected successfully",
-            ]
+            assert all(
+                m in caplog.messages
+                for m in [
+                    "Initializing backend process...",
+                    f"Started backend process. PID: {pid}",
+                    "Verifying connection to backend...",
+                    "Connected successfully",
+                ]
+            )
             mock_exists.assert_called_once_with(conn_file_path)
             if reentry_exe is None:
                 expected_args = [
@@ -133,14 +144,23 @@ class TestFrontendRunner:
                     "--connection-file",
                     conn_file_path,
                 ]
+            expected_args.extend(
+                [
+                    "--log-file",
+                    os.path.join(
+                        os.path.dirname(conn_file_path),
+                        f"adaptor-runtime-background-bootstrap-{mock_uuid.return_value}.log",
+                    ),
+                ]
+            )
             mock_Popen.assert_called_once_with(
                 expected_args,
                 shell=False,
                 close_fds=True,
                 start_new_session=True,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=open_mock.return_value,
+                stderr=open_mock.return_value,
             )
             mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
             mock_heartbeat.assert_called_once()
@@ -205,10 +225,13 @@ class TestFrontendRunner:
 
             # THEN
             assert raised_exc.value is exc
-            assert caplog.messages == [
-                "Initializing backend process...",
-                "Failed to initialize backend process: ",
-            ]
+            assert all(
+                m in caplog.messages
+                for m in [
+                    "Initializing backend process...",
+                    "Failed to initialize backend process: ",
+                ]
+            )
             mock_exists.assert_called_once_with(conn_file_path)
             mock_Popen.assert_called_once()
 
@@ -240,12 +263,14 @@ class TestFrontendRunner:
 
             # THEN
             assert raised_err.value is err
-            print(caplog.messages)
-            assert caplog.messages == [
-                "Initializing backend process...",
-                f"Started backend process. PID: {pid}",
-                f"Backend process failed to write connection file in time at: {conn_file_path}",
-            ]
+            assert all(
+                m in caplog.messages
+                for m in [
+                    "Initializing backend process...",
+                    f"Started backend process. PID: {pid}",
+                    f"Backend process failed to write connection file in time at: {conn_file_path}",
+                ]
+            )
             mock_exists.assert_called_once_with(conn_file_path)
             mock_Popen.assert_called_once()
             mock_wait_for_file.assert_called_once_with(conn_file_path, timeout_s=5)
@@ -822,6 +847,16 @@ class TestFrontendRunner:
             cancel_mock.assert_called_once()
 
     class TestConnectionFileCompat:
+        @pytest.fixture(autouse=True)
+        def open_mock(self) -> Generator[MagicMock, None, None]:
+            with patch.object(frontend_runner, "open") as m:
+                yield m
+
+        @pytest.fixture(autouse=True)
+        def mock_uuid(self) -> Generator[MagicMock, None, None]:
+            with patch.object(frontend_runner.uuid, "uuid4", return_value="uuid") as m:
+                yield m
+
         @pytest.mark.parametrize(
             argnames=["connection_file", "working_dir"],
             argvalues=[
@@ -857,6 +892,8 @@ class TestFrontendRunner:
             mock_popen: MagicMock,
             mock_exists: MagicMock,
             mock_wait_for_file: MagicMock,
+            mock_uuid: MagicMock,
+            open_mock: MagicMock,
         ) -> None:
             # GIVEN
             connection_file = os.path.join(os.sep, "path", "to", "connection.json")
@@ -882,13 +919,18 @@ class TestFrontendRunner:
                     json.dumps({}),
                     "--connection-file",
                     connection_file,
+                    "--log-file",
+                    os.path.join(
+                        os.path.dirname(connection_file),
+                        f"adaptor-runtime-background-bootstrap-{mock_uuid.return_value}.log",
+                    ),
                 ],
                 shell=False,
                 close_fds=True,
                 start_new_session=True,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=open_mock.return_value,
+                stderr=open_mock.return_value,
             )
 
         @patch.object(frontend_runner, "_wait_for_file")
@@ -899,6 +941,8 @@ class TestFrontendRunner:
             mock_popen: MagicMock,
             mock_exists: MagicMock,
             mock_wait_for_file: MagicMock,
+            mock_uuid: MagicMock,
+            open_mock: MagicMock,
         ) -> None:
             # GIVEN
             working_dir = os.path.join(os.sep, "path", "to", "working")
@@ -924,13 +968,18 @@ class TestFrontendRunner:
                     json.dumps({}),
                     "--working-dir",
                     working_dir,
+                    "--log-file",
+                    os.path.join(
+                        working_dir,
+                        f"adaptor-runtime-background-bootstrap-{mock_uuid.return_value}.log",
+                    ),
                 ],
                 shell=False,
                 close_fds=True,
                 start_new_session=True,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=open_mock.return_value,
+                stderr=open_mock.return_value,
             )
 
 

@@ -251,9 +251,8 @@ class TestLinuxSocketPaths:
         argvalues=[
             ["a"],
             ["a" * 107],
-            ["/this/part/should/not/matter/" + "a" * 107],
         ],
-        ids=["one byte", "107 bytes", "path with name of 107 bytes"],
+        ids=["one byte", "107 bytes"],
     )
     def test_accepts_names_within_107_bytes(self, path: str):
         """
@@ -295,9 +294,8 @@ class TestMacOSSocketPaths:
         argvalues=[
             ["a"],
             ["a" * 103],
-            ["/this/part/should/not/matter/" + "a" * 103],
         ],
-        ids=["one byte", "103 bytes", "path with name of 103 bytes"],
+        ids=["one byte", "103 bytes"],
     )
     def test_accepts_paths_within_103_bytes(self, path: str):
         """

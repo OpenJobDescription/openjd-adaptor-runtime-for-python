@@ -8,7 +8,7 @@ import os
 import signal
 from threading import Thread, Event
 from types import FrameType
-from typing import Optional, Union
+from typing import Callable, List, Optional, Union
 
 from .server_response import ServerResponseGenerator
 from .._osname import OSName
@@ -87,7 +87,7 @@ class BackendRunner:
                 self._server, self._adaptor_runner._cancel, force_immediate=True
             )
 
-    def run(self) -> None:
+    def run(self, *, on_connection_file_written: List[Callable[[], None]] | None = None) -> None:
         """
         Runs the backend logic for background mode.
 
@@ -145,6 +145,11 @@ class BackendRunner:
             shutdown_event.set()
             raise
         finally:
+            if on_connection_file_written:
+                callbacks = list(on_connection_file_written)
+                for cb in callbacks:
+                    cb()
+
             # Block until the shutdown_event is set
             shutdown_event.wait()
 

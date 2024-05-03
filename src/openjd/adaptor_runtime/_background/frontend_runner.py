@@ -11,8 +11,9 @@ import socket
 import subprocess
 import sys
 import time
-from pathlib import Path
 import urllib.parse as urllib_parse
+import uuid
+from pathlib import Path
 from threading import Event
 from types import FrameType
 from types import ModuleType
@@ -151,6 +152,19 @@ class FrontendRunner:
                     self._connection_file_path,
                 ]
             )
+
+        bootstrap_id = uuid.uuid4()
+        bootstrap_log_dir = self._working_dir or os.path.dirname(self._connection_file_path)
+        bootstrap_log_path = os.path.join(
+            bootstrap_log_dir, f"adaptor-runtime-background-bootstrap-{bootstrap_id}.log"
+        )
+        args.extend(["--log-file", bootstrap_log_path])
+
+        _logger.debug(f"Running process with args: {args}")
+        bootstrap_output_path = os.path.join(
+            bootstrap_log_dir, f"adaptor-runtime-background-bootstrap-output-{bootstrap_id}.log"
+        )
+        output_log_file = open(bootstrap_output_path, mode="w+")
         try:
             process = subprocess.Popen(
                 args,
@@ -158,8 +172,8 @@ class FrontendRunner:
                 close_fds=True,
                 start_new_session=True,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=output_log_file,
+                stderr=output_log_file,
             )
         except Exception as e:
             _logger.error(f"Failed to initialize backend process: {e}")
@@ -174,7 +188,41 @@ class FrontendRunner:
                 "Backend process failed to write connection file in time at: "
                 + self._connection_file_path
             )
+
+            exit_code = process.poll()
+            if exit_code is not None:
+                _logger.info(f"Backend process exited with code: {exit_code}")
+            else:
+                _logger.info("Backend process is still running")
+
             raise
+        finally:
+            # Close file handle to prevent further writes
+            # At this point, we have all the logs/output we need from the bootstrap
+            output_log_file.close()
+            if process.stdout:
+                process.stdout.close()
+            if process.stderr:
+                process.stderr.close()
+
+            with open(bootstrap_output_path, mode="r") as f:
+                bootstrap_output = f.readlines()
+            _logger.info("========== BEGIN BOOTSTRAP OUTPUT CONTENTS ==========")
+            for line in bootstrap_output:
+                _logger.info(line.strip())
+            _logger.info("========== END BOOTSTRAP OUTPUT CONTENTS ==========")
+
+            _logger.info(f"Checking for bootstrap logs at '{bootstrap_log_path}'")
+            try:
+                with open(bootstrap_log_path, mode="r") as f:
+                    bootstrap_logs = f.readlines()
+            except Exception as e:
+                _logger.error(f"Failed to get bootstrap logs at '{bootstrap_log_path}': {e}")
+            else:
+                _logger.info("========== BEGIN BOOTSTRAP LOG CONTENTS ==========")
+                for line in bootstrap_logs:
+                    _logger.info(line.strip())
+                _logger.info("========== END BOOTSTRAP LOG CONTENTS ==========")
 
         # Heartbeat to ensure backend process is listening for requests
         _logger.info("Verifying connection to backend...")

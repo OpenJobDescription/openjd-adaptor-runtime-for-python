@@ -10,7 +10,19 @@ import sys
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 from types import FrameType as FrameType
-from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, NamedTuple, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    cast,
+    Callable,
+    List,
+    Optional,
+    MutableSet,
+    Type,
+    TypeVar,
+    NamedTuple,
+    Tuple,
+)
 
 import jsonschema
 import yaml
@@ -55,6 +67,7 @@ _CLI_HELP_TEXT = {
     "show_config": "Prints the adaptor runtime configuration, then the program exits.",
     "connection_file": "DEPRECATED. Please use 'working_dir' instead.\n\nThe file path to the connection file for use in background mode.",
     "working_dir": "The path to the directory to use for runtime files. This directory must not already exist.",
+    "log_file": "The file to log adaptor output to. Default is to not log to a file.",
 }
 
 _DIR = os.path.dirname(os.path.realpath(__file__))
@@ -124,13 +137,21 @@ class EntryPoint:
     The main entry point of the adaptor runtime.
     """
 
+    on_bootstrap_complete: MutableSet[Callable[[], None]]
+    """
+    Set of callbacks that are called when daemon mode bootstrapping is complete.
+    These callbacks are never called when not running in daemon mode.
+    """
+
     def __init__(self, adaptor_class: Type[_U]) -> None:
         self.adaptor_class = adaptor_class
         # This will be the current AdaptorRunner when using the 'run' command, rather than
         # 'background' command
         self._adaptor_runner: Optional[AdaptorRunner] = None
 
-    def _init_loggers(self) -> _LogConfig:
+        self.on_bootstrap_complete = set()
+
+    def _init_loggers(self, *, bootstrap_log_path: str | None = None) -> _LogConfig:
         "Creates runtime/adaptor loggers"
         formatter = ConditionalFormatter(
             "%(levelname)s: %(message)s", ignore_patterns=[_OPENJD_LOG_REGEX]
@@ -144,6 +165,22 @@ class EntryPoint:
 
         adaptor_logger = logging.getLogger(self.adaptor_class.__module__.split(".")[0])
         adaptor_logger.addHandler(stream_handler)
+
+        if bootstrap_log_path:
+            file_formatter = logging.Formatter("[%(asctime)s][%(levelname)-8s] %(message)s")
+            file_handler = logging.FileHandler(bootstrap_log_path)
+            file_handler.setFormatter(file_formatter)
+            file_handler.setLevel(0)
+            runtime_logger.addHandler(file_handler)
+            adaptor_logger.addHandler(file_handler)
+
+            def disconnect_bootstrap_logging() -> None:
+                # Remove file logger after bootstrap is complete
+                runtime_logger.removeHandler(file_handler)
+                adaptor_logger.removeHandler(file_handler)
+                self.on_bootstrap_complete.remove(disconnect_bootstrap_logging)
+
+            self.on_bootstrap_complete.add(disconnect_bootstrap_logging)
 
         return _LogConfig(formatter, stream_handler, runtime_logger, adaptor_logger)
 
@@ -194,19 +231,41 @@ class EntryPoint:
         Args:
             reentry_exe (Path): The path to the binary executable that for adaptor reentry.
         """
-        log_config = self._init_loggers()
         parser, parsed_args = self._parse_args()
-        version_info = self._get_version_info()
+        log_config = self._init_loggers(
+            bootstrap_log_path=parsed_args.log_file if hasattr(parsed_args, "log_file") else None
+        )
+
+        interface_version_info = self._get_version_info()
+        # adaptor_pkg = self.adaptor_class.__package__ if hasattr(self.adaptor_class, )
+        # adaptor_version = adaptor_pkg.version if hasattr(adaptor_pkg, "version") else adaptor_pkg.__version__ if hasattr(adaptor_pkg, "__version__") else "unknown"
+        runtime_version = (
+            __package__.version
+            if hasattr(__package__, "version")
+            else __package__.__version__ if hasattr(__package__, "__version__") else "unknown"
+        )
+
+        _logger.info(f"Adaptor runtime version: {runtime_version}")
+        _logger.info(
+            f"Adaptor runtime CLI version: {str(interface_version_info.adaptor_cli_version)}"
+        )
+        # _logger.info(f"{self.adaptor_class.__name__} version: {adaptor_version}")
+        _logger.info(
+            f"{self.adaptor_class.__name__} integration data interface version: {str(interface_version_info.integration_data_interface_version)}"
+        )
+        _logger.info("")
 
         if parsed_args.command == "is-compatible":
-            return self._handle_is_compatible(version_info, parsed_args, parser)
+            return self._handle_is_compatible(interface_version_info, parsed_args, parser)
         elif parsed_args.command == "version-info":
             return print(
                 yaml.dump(
                     {
-                        "OpenJD Adaptor CLI Version": str(version_info.adaptor_cli_version),
+                        "OpenJD Adaptor CLI Version": str(
+                            interface_version_info.adaptor_cli_version
+                        ),
                         f"{self.adaptor_class.__name__} Data Interface Version": str(
-                            version_info.integration_data_interface_version
+                            interface_version_info.integration_data_interface_version
                         ),
                     },
                     indent=2,
@@ -339,7 +398,11 @@ class EntryPoint:
                 working_dir=working_dir,
                 log_buffer=log_buffer,
             )
-            backend.run()
+            backend.run(
+                on_connection_file_written=cast(
+                    List[Callable[[], None]], self.on_bootstrap_complete
+                )
+            )
         else:
             # This process is running in frontend mode. Create the frontend runner and send
             # the appropriate request to the backend.
@@ -446,6 +509,13 @@ class EntryPoint:
             required=False,
         )
 
+        log_file = ArgumentParser(add_help=False)
+        log_file.add_argument(
+            "--log-file",
+            help=_CLI_HELP_TEXT["log_file"],
+            required=False,
+        )
+
         bg_parser = subparser.add_parser("daemon", help="Runs the adaptor in a daemon mode.")
         bg_subparser = bg_parser.add_subparsers(
             dest="subcommand",
@@ -457,7 +527,8 @@ class EntryPoint:
 
         # "Hidden" command that actually runs the adaptor runtime in background mode
         bg_subparser.add_parser(
-            "_serve", parents=[init_data, path_mapping_rules, connection_file, working_dir]
+            "_serve",
+            parents=[init_data, path_mapping_rules, connection_file, working_dir, log_file],
         )
 
         bg_subparser.add_parser(

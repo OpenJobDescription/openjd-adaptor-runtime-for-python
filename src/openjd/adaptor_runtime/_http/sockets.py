@@ -112,15 +112,11 @@ class SocketPaths(abc.ABC):
                 name = f"{base_name}_{str(uuid.uuid4()).replace('-', '')}"
             return os.path.join(dir, name)
 
-        rel_path = os.path.join(".openjd", "adaptors", "sockets")
-        if namespace:
-            rel_path = os.path.join(rel_path, namespace)
-
         reasons: list[str] = []
 
         if base_dir:
             # Only try to use the provided base directory
-            socket_dir = os.path.join(base_dir, rel_path)
+            socket_dir = base_dir if not namespace else os.path.join(base_dir, namespace)
             socket_path = gen_socket_path(socket_dir, base_socket_name)
             try:
                 self.verify_socket_path(socket_path)
@@ -132,6 +128,10 @@ class SocketPaths(abc.ABC):
                 mkdir(socket_dir)
                 return socket_path
         else:
+            rel_path = os.path.join(".openjd", "adaptors", "sockets")
+            if namespace:
+                rel_path = os.path.join(rel_path, namespace)
+
             # First try home directory
             home_dir = os.path.expanduser("~")
             socket_dir = os.path.join(home_dir, rel_path)
@@ -195,13 +195,12 @@ class LinuxSocketPaths(SocketPaths):
     _socket_name_max_length = 108 - 1
 
     def verify_socket_path(self, path: str) -> None:
-        socket_name = os.path.basename(path)
-        socket_name_length = len(socket_name.encode("utf-8"))
-        if socket_name_length > self._socket_name_max_length:
+        path_length = len(path.encode("utf-8"))
+        if path_length > self._socket_name_max_length:
             raise NonvalidSocketPathException(
                 "Socket name too long. The maximum allowed size is "
                 f"{self._socket_name_max_length} bytes, but the name has a size of "
-                f"{socket_name_length}: {socket_name}"
+                f"{path_length}: {path}"
             )
 
 
@@ -216,13 +215,12 @@ class MacOSSocketPaths(SocketPaths):
     _socket_name_max_length = 104 - 1
 
     def verify_socket_path(self, path: str) -> None:
-        socket_name = os.path.basename(path)
-        socket_name_length = len(socket_name.encode("utf-8"))
-        if socket_name_length > self._socket_name_max_length:
+        path_length = len(path.encode("utf-8"))
+        if path_length > self._socket_name_max_length:
             raise NonvalidSocketPathException(
                 "Socket name too long. The maximum allowed size is "
                 f"{self._socket_name_max_length} bytes, but the name has a size of "
-                f"{socket_name_length}: {socket_name}"
+                f"{path_length}: {path}"
             )
 
 

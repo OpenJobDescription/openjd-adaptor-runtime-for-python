@@ -7,6 +7,7 @@ import os
 import pathlib
 import re
 import sys
+import tempfile
 import time
 from http import HTTPStatus
 from typing import Generator
@@ -265,57 +266,57 @@ class TestDaemonMode:
     @pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific test")
     def test_init_uses_working_dir(
         self,
-        tmp_path: pathlib.Path,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         backend_proc = None
         conn_settings = None
-        try:
-            # GIVEN
-            caplog.set_level(0)
-            working_dir = tmp_path / "working_dir"
-            working_dir.mkdir()
-            frontend = FrontendRunner(working_dir=str(working_dir), timeout_s=5.0)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            try:
+                # GIVEN
+                caplog.set_level(0)
+                working_dir = pathlib.Path(tmpdir) / "working_dir"
+                working_dir.mkdir()
+                frontend = FrontendRunner(working_dir=str(working_dir), timeout_s=5.0)
 
-            # WHEN
-            frontend.init(sys.modules[AdaptorExample.__module__])
+                # WHEN
+                frontend.init(sys.modules[AdaptorExample.__module__])
 
-            # THEN
+                # THEN
 
-            # Connection file should be in the working dir
-            connection_file = working_dir / "connection.json"
-            conn_settings = _load_connection_settings(str(connection_file))
+                # Connection file should be in the working dir
+                connection_file = working_dir / "connection.json"
+                conn_settings = _load_connection_settings(str(connection_file))
 
-            # Backend process started successfully
-            match = re.search("Started backend process. PID: ([0-9]+)", caplog.text)
-            assert match is not None
-            pid = int(match.group(1))
-            backend_proc = psutil.Process(pid)
+                # Backend process started successfully
+                match = re.search("Started backend process. PID: ([0-9]+)", caplog.text)
+                assert match is not None
+                pid = int(match.group(1))
+                backend_proc = psutil.Process(pid)
 
-            # Unix socket matches connection file and is also in the working dir
-            assert any(
-                [
-                    conn.laddr == conn_settings.socket
-                    for conn in backend_proc.connections(kind="unix")
-                ]
-            )
-            assert conn_settings.socket.startswith(str(working_dir))
+                # Unix socket matches connection file and is also in the working dir
+                assert any(
+                    [
+                        conn.laddr == conn_settings.socket
+                        for conn in backend_proc.connections(kind="unix")
+                    ]
+                )
+                assert conn_settings.socket.startswith(str(working_dir))
 
-        finally:
-            if backend_proc:
-                try:
-                    backend_proc.kill()
-                except psutil.NoSuchProcess:
-                    pass  # Already stopped
+            finally:
+                if backend_proc:
+                    try:
+                        backend_proc.kill()
+                    except psutil.NoSuchProcess:
+                        pass  # Already stopped
 
-            # We don't need to call the `remove` for the NamedPipe server.
-            # NamedPipe servers are managed by Named Pipe File System it is not a regular file.
-            # Once all handles are closed, the system automatically cleans up the named pipe.
-            if OSName.is_posix() and conn_settings:
-                try:
-                    os.remove(conn_settings.socket)
-                except FileNotFoundError:
-                    pass  # Already deleted
+                # We don't need to call the `remove` for the NamedPipe server.
+                # NamedPipe servers are managed by Named Pipe File System it is not a regular file.
+                # Once all handles are closed, the system automatically cleans up the named pipe.
+                if OSName.is_posix() and conn_settings:
+                    try:
+                        os.remove(conn_settings.socket)
+                    except FileNotFoundError:
+                        pass  # Already deleted
 
     class TestAuthentication:
         """
