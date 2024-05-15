@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import signal
+from pathlib import Path
 from threading import Thread, Event
 from types import FrameType
 from typing import Callable, List, Optional, Union
@@ -33,33 +34,15 @@ class BackendRunner:
     Class that runs the backend logic in background mode.
     """
 
-    _connection_file_path: str
-    _working_dir: str | None
-
     def __init__(
         self,
         adaptor_runner: AdaptorRunner,
         *,
-        # TODO: Deprecate connection_file_path
-        connection_file_path: str | None = None,
-        working_dir: str | None = None,
+        connection_file_path: Path,
         log_buffer: LogBuffer | None = None,
     ) -> None:
         self._adaptor_runner = adaptor_runner
-
-        if (connection_file_path and working_dir) or not (connection_file_path or working_dir):
-            raise RuntimeError(
-                "Exactly one of 'connection_file_path' or 'working_dir' must be provided, but got:"
-                f" connection_file_path={connection_file_path} working_dir={working_dir}"
-            )
-
-        if working_dir:
-            self._working_dir = working_dir
-            self._connection_file_path = os.path.join(working_dir, "connection.json")
-        else:
-            assert connection_file_path  # for mypy
-            self._working_dir = None
-            self._connection_file_path = connection_file_path
+        self._connection_file_path = connection_file_path
 
         self._log_buffer = log_buffer
         self._server: Optional[Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer]] = None
@@ -99,8 +82,8 @@ class BackendRunner:
 
         if OSName.is_posix():  # pragma: is-windows
             server_path = SocketPaths.for_os().get_process_socket_path(
-                "runtime",
-                base_dir=self._working_dir,
+                ".openjd_adaptor_runtime",
+                base_dir=os.getcwd(),
                 create_dir=True,
             )
         else:  # pragma: is-posix
@@ -144,12 +127,12 @@ class BackendRunner:
             _logger.info("Shutting down server...")
             shutdown_event.set()
             raise
-        finally:
+        else:
             if on_connection_file_written:
                 callbacks = list(on_connection_file_written)
                 for cb in callbacks:
                     cb()
-
+        finally:
             # Block until the shutdown_event is set
             shutdown_event.wait()
 

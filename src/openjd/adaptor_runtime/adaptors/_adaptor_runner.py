@@ -6,12 +6,11 @@ import logging
 
 from ._adaptor_states import AdaptorState, AdaptorStates
 from ._base_adaptor import BaseAdaptor as BaseAdaptor
+from .._utils._constants import _OPENJD_FAIL_STDOUT_PREFIX
 
 __all__ = ["AdaptorRunner"]
 
 _logger = logging.getLogger(__name__)
-
-_OPENJD_FAIL_STDOUT_PREFIX: str = "openjd_fail: "
 
 
 class AdaptorRunner(AdaptorStates):

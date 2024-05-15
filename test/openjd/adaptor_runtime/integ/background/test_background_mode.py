@@ -7,7 +7,6 @@ import os
 import pathlib
 import re
 import sys
-import tempfile
 import time
 from http import HTTPStatus
 from typing import Generator
@@ -21,8 +20,8 @@ import openjd.adaptor_runtime._entrypoint as runtime_entrypoint
 from openjd.adaptor_runtime._background.frontend_runner import (
     FrontendRunner,
     HTTPError,
-    _load_connection_settings,
 )
+from openjd.adaptor_runtime._background.loaders import ConnectionSettingsFileLoader
 from openjd.adaptor_runtime._osname import OSName
 
 mod_path = (Path(__file__).parent.parent).resolve()
@@ -52,7 +51,7 @@ class TestDaemonMode:
             yield
 
     @pytest.fixture
-    def connection_file_path(self, tmp_path: pathlib.Path) -> str:
+    def connection_file_path(self, tmp_path: pathlib.Path) -> pathlib.Path:
         connection_dir = os.path.join(tmp_path.absolute(), "connection_dir")
         os.mkdir(connection_dir)
         if OSName.is_windows():
@@ -64,18 +63,21 @@ class TestDaemonMode:
             from openjd.adaptor_runtime._utils._secure_open import set_file_permissions_in_windows
 
             set_file_permissions_in_windows(connection_dir)
-        return os.path.join(connection_dir, "connection.json")
+        return pathlib.Path(connection_dir) / "connection.json"
 
     @pytest.fixture
     def initialized_setup(
         self,
-        connection_file_path: str,
+        connection_file_path: pathlib.Path,
         caplog: pytest.LogCaptureFixture,
     ) -> Generator[tuple[FrontendRunner, psutil.Process], None, None]:
         caplog.set_level(0)
-        frontend = FrontendRunner(connection_file_path=connection_file_path, timeout_s=5.0)
-        frontend.init(sys.modules[AdaptorExample.__module__])
-        conn_settings = _load_connection_settings(connection_file_path)
+        frontend = FrontendRunner(timeout_s=5.0)
+        frontend.init(
+            adaptor_module=sys.modules[AdaptorExample.__module__],
+            connection_file_path=connection_file_path,
+        )
+        conn_settings = ConnectionSettingsFileLoader(connection_file_path).load()
 
         match = re.search("Started backend process. PID: ([0-9]+)", caplog.text)
         assert match is not None
@@ -101,7 +103,7 @@ class TestDaemonMode:
     def test_init(
         self,
         initialized_setup: tuple[FrontendRunner, psutil.Process],
-        connection_file_path: str,
+        connection_file_path: pathlib.Path,
     ) -> None:
         # GIVEN
         _, backend_proc = initialized_setup
@@ -109,7 +111,7 @@ class TestDaemonMode:
         # THEN
         assert os.path.exists(connection_file_path)
 
-        connection_settings = _load_connection_settings(connection_file_path)
+        connection_settings = ConnectionSettingsFileLoader(connection_file_path).load()
 
         if OSName.is_windows():
             import pywintypes
@@ -141,11 +143,11 @@ class TestDaemonMode:
     def test_shutdown(
         self,
         initialized_setup: tuple[FrontendRunner, psutil.Process],
-        connection_file_path: str,
+        connection_file_path: pathlib.Path,
     ) -> None:
         # GIVEN
         frontend, backend_proc = initialized_setup
-        conn_settings = _load_connection_settings(connection_file_path)
+        conn_settings = ConnectionSettingsFileLoader(connection_file_path).load()
 
         # WHEN
         frontend.shutdown()
@@ -154,7 +156,7 @@ class TestDaemonMode:
         assert all(
             [
                 _wait_for_file_deletion(p, timeout_s=1)
-                for p in [connection_file_path, conn_settings.socket]
+                for p in [str(connection_file_path), conn_settings.socket]
             ]
         )
 
@@ -262,61 +264,6 @@ class TestDaemonMode:
             frontend.shutdown()
         # THEN
         assert f"Received ACK for chunk: {response.output.id}" in new_response.output.output
-
-    @pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific test")
-    def test_init_uses_working_dir(
-        self,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        backend_proc = None
-        conn_settings = None
-        with tempfile.TemporaryDirectory() as tmpdir:
-            try:
-                # GIVEN
-                caplog.set_level(0)
-                working_dir = pathlib.Path(tmpdir) / "working_dir"
-                working_dir.mkdir()
-                frontend = FrontendRunner(working_dir=str(working_dir), timeout_s=5.0)
-
-                # WHEN
-                frontend.init(sys.modules[AdaptorExample.__module__])
-
-                # THEN
-
-                # Connection file should be in the working dir
-                connection_file = working_dir / "connection.json"
-                conn_settings = _load_connection_settings(str(connection_file))
-
-                # Backend process started successfully
-                match = re.search("Started backend process. PID: ([0-9]+)", caplog.text)
-                assert match is not None
-                pid = int(match.group(1))
-                backend_proc = psutil.Process(pid)
-
-                # Unix socket matches connection file and is also in the working dir
-                assert any(
-                    [
-                        conn.laddr == conn_settings.socket
-                        for conn in backend_proc.connections(kind="unix")
-                    ]
-                )
-                assert conn_settings.socket.startswith(str(working_dir))
-
-            finally:
-                if backend_proc:
-                    try:
-                        backend_proc.kill()
-                    except psutil.NoSuchProcess:
-                        pass  # Already stopped
-
-                # We don't need to call the `remove` for the NamedPipe server.
-                # NamedPipe servers are managed by Named Pipe File System it is not a regular file.
-                # Once all handles are closed, the system automatically cleans up the named pipe.
-                if OSName.is_posix() and conn_settings:
-                    try:
-                        os.remove(conn_settings.socket)
-                    except FileNotFoundError:
-                        pass  # Already deleted
 
     class TestAuthentication:
         """

@@ -6,7 +6,6 @@ import abc
 import os
 import stat
 import tempfile
-import uuid
 
 from .._osname import OSName
 from .exceptions import (
@@ -108,8 +107,10 @@ class SocketPaths(abc.ABC):
 
         def gen_socket_path(dir: str, base_name: str):
             name = base_name
+            i = 0
             while os.path.exists(os.path.join(dir, name)):
-                name = f"{base_name}_{str(uuid.uuid4()).replace('-', '')}"
+                i += 1
+                name = f"{base_name}_{i}"
             return os.path.join(dir, name)
 
         reasons: list[str] = []

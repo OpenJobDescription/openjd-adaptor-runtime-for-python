@@ -32,12 +32,10 @@ class AdaptorServer(UnixStreamServer):
         self,
         actions_queue: ActionsQueue,
         adaptor: BaseAdaptor,
-        *,
-        working_dir: str | None = None,
     ) -> None:  # pragma: no cover
         socket_path = SocketPaths.for_os().get_process_socket_path(
             "dcc",
-            base_dir=working_dir,
+            base_dir=os.getcwd(),
             create_dir=True,
         )
         super().__init__(socket_path, AdaptorHTTPRequestHandler)

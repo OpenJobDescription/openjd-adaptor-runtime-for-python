@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from .http_server import BackgroundHTTPServer
 
 
-from ..adaptors._adaptor_runner import _OPENJD_FAIL_STDOUT_PREFIX
 from .._http import HTTPResponse
+from .._utils._constants import _OPENJD_FAIL_STDOUT_PREFIX
 from .model import (
     AdaptorState,
     AdaptorStatus,

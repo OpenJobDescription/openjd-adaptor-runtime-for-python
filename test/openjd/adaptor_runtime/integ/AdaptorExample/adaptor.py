@@ -3,7 +3,6 @@
 import logging
 import os
 import sys
-import tempfile
 import threading
 import time
 
@@ -47,14 +46,12 @@ class AdaptorExample(Adaptor):
         # execution.
         _logger.info("on_start")
 
-        self.working_dir = tempfile.TemporaryDirectory()
         # Initialize the server thread to manage actions
         self.server = AdaptorServer(
             # actions_queue will be used for storing the actions. In the client application, it will keep polling the
             # actions from this queue and run actions
             actions_queue=self.actions,
             adaptor=self,
-            working_dir=self.working_dir.name,
         )
         # The server will keep running until `stop` is called
         self.server_thread = threading.Thread(
@@ -159,9 +156,6 @@ class AdaptorExample(Adaptor):
             self.server_thread.join(timeout=5)
             if self.server_thread.is_alive():
                 _logger.error("Failed to shutdown the AdaptorExample server")
-
-        if hasattr(self, "working_dir"):
-            self.working_dir.cleanup()
 
     def on_cancel(self):
         """

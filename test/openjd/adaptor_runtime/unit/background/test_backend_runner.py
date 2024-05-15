@@ -68,15 +68,17 @@ class TestBackendRunner:
     ):
         # GIVEN
         caplog.set_level("DEBUG")
-        conn_dir = os.path.join(os.sep, "path", "to", "conn_dir")
+        conn_file = pathlib.Path(os.sep) / "path" / "to" / "conn_file"
         connection_settings = {"socket": socket_path}
         adaptor_runner = Mock()
-        runner = BackendRunner(adaptor_runner, working_dir=conn_dir)
+        runner = BackendRunner(adaptor_runner, connection_file_path=conn_file)
 
         # WHEN
         open_mock: MagicMock
         with patch.object(
-            backend_runner, "secure_open", mock_open(read_data=json.dumps(connection_settings))
+            backend_runner,
+            "secure_open",
+            mock_open(read_data=json.dumps(connection_settings)),
         ) as open_mock:
             runner.run()
 
@@ -94,8 +96,7 @@ class TestBackendRunner:
         )
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
-        conn_file_path = os.path.join(conn_dir, "connection.json")
-        open_mock.assert_called_once_with(conn_file_path, open_mode="w")
+        open_mock.assert_called_once_with(conn_file, open_mode="w")
         mock_json_dump.assert_called_once_with(
             ConnectionSettings(socket_path),
             open_mock.return_value,
@@ -103,9 +104,9 @@ class TestBackendRunner:
         )
         mock_thread.return_value.join.assert_called_once()
         if OSName.is_posix():
-            mock_os_remove.assert_has_calls([call(conn_file_path), call(socket_path)])
+            mock_os_remove.assert_has_calls([call(conn_file), call(socket_path)])
         else:
-            mock_os_remove.assert_has_calls([call(conn_file_path)])
+            mock_os_remove.assert_has_calls([call(conn_file)])
 
     def test_run_raises_when_http_server_fails_to_start(
         self,
@@ -118,7 +119,7 @@ class TestBackendRunner:
         mock_server_cls.side_effect = exc
         runner = BackendRunner(
             Mock(),
-            connection_file_path=os.path.join(os.path.sep, "tmp", "connection.json"),
+            connection_file_path=pathlib.Path(os.path.sep) / "tmp" / "connection.json",
         )
 
         # WHEN
@@ -149,9 +150,9 @@ class TestBackendRunner:
         caplog.set_level("DEBUG")
         err = OSError()
         open_mock.side_effect = err
-        conn_dir = os.path.join(os.sep, "path", "to", "conn_dir")
+        conn_file = pathlib.Path(os.sep) / "path" / "to" / "conn_file"
         adaptor_runner = Mock()
-        runner = BackendRunner(adaptor_runner, working_dir=conn_dir)
+        runner = BackendRunner(adaptor_runner, connection_file_path=conn_file)
 
         # WHEN
         with pytest.raises(OSError) as raised_err:
@@ -169,13 +170,12 @@ class TestBackendRunner:
         ]
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
-        conn_file_path = os.path.join(conn_dir, "connection.json")
-        open_mock.assert_called_once_with(conn_file_path, open_mode="w")
+        open_mock.assert_called_once_with(conn_file, open_mode="w")
         mock_thread.return_value.join.assert_called_once()
         if OSName.is_posix():
-            mock_os_remove.assert_has_calls([call(conn_file_path), call(socket_path)])
+            mock_os_remove.assert_has_calls([call(conn_file), call(socket_path)])
         else:
-            mock_os_remove.assert_has_calls([call(conn_file_path)])
+            mock_os_remove.assert_has_calls([call(conn_file)])
 
     @patch.object(backend_runner.signal, "signal")
     @patch.object(backend_runner.ServerResponseGenerator, "submit_task")
@@ -184,7 +184,7 @@ class TestBackendRunner:
         # as expected.
 
         # GIVEN
-        conn_file_path = os.path.join(os.sep, "path", "to", "conn_file")
+        conn_file_path = pathlib.Path(os.sep) / "path" / "to" / "conn_file"
         adaptor_runner = Mock()
         runner = BackendRunner(adaptor_runner, connection_file_path=conn_file_path)
         server_mock = MagicMock()
@@ -202,55 +202,3 @@ class TestBackendRunner:
         else:
             signal_mock.assert_any_call(signal.SIGBREAK, runner._sigint_handler)  # type: ignore[attr-defined]
         mock_submit.assert_called_with(server_mock, adaptor_runner._cancel, force_immediate=True)
-
-    class ConnectionFileCompat:
-        @pytest.mark.parametrize(
-            argnames=["connection_file", "working_dir"],
-            argvalues=[
-                ["path", "dir"],
-                [None, None],
-            ],
-            ids=["both provided", "neither provided"],
-        )
-        def test_rejects_not_exactly_one_of_connection_file_and_working_dir(
-            self,
-            connection_file: str | None,
-            working_dir: str | None,
-        ) -> None:
-            # GIVEN
-            with pytest.raises(RuntimeError) as raised_err:
-                # WHEN
-                BackendRunner(
-                    Mock(),
-                    connection_file_path=connection_file,
-                    working_dir=working_dir,
-                )
-
-            # THEN
-            assert (
-                f"Exactly one of 'connection_file_path' or 'working_dir' must be provided, but got: connection_file_path={connection_file} working_dir={working_dir}"
-                == str(raised_err.value)
-            )
-
-        @pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific test")
-        @pytest.mark.parametrize(
-            argnames=["working_dir"], argvalues=[["dir"], [None]], ids=["provided", "not provided"]
-        )
-        def test_run_uses_working_dir_for_socket_path(self, working_dir: str | None) -> None:
-            # GIVEN
-            runner = BackendRunner(Mock(), working_dir=working_dir)
-
-            with patch.object(
-                backend_runner.SocketPaths,
-                "get_process_socket_path",
-                wraps=backend_runner.SocketPaths.get_process_socket_path,
-            ) as mock_get_process_socket_path:
-                # WHEN
-                runner.run()
-
-            # THEN
-            mock_get_process_socket_path.assert_called_once_with(
-                "runtime",
-                base_dir=working_dir,
-                create_dir=True,
-            )

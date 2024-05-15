@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import signal
 import sys
+import tempfile
 
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
@@ -29,13 +31,17 @@ import yaml
 
 from .adaptors import AdaptorRunner, BaseAdaptor
 from ._background import BackendRunner, FrontendRunner, InMemoryLogBuffer, LogBufferHandler
+from ._background.loaders import (
+    ConnectionSettingsFileLoader,
+    ConnectionSettingsEnvLoader,
+)
 from .adaptors.configuration import (
     RuntimeConfiguration,
     ConfigurationManager,
 )
 from ._osname import OSName
+from ._utils._constants import _OPENJD_ADAPTOR_SOCKET_ENV, _OPENJD_LOG_REGEX
 from ._utils._logging import (
-    _OPENJD_LOG_REGEX,
     ConditionalFormatter,
 )
 from .adaptors import SemanticVersion
@@ -65,8 +71,12 @@ _CLI_HELP_TEXT = {
         "file://path/to/file.json"
     ),
     "show_config": "Prints the adaptor runtime configuration, then the program exits.",
-    "connection_file": "DEPRECATED. Please use 'working_dir' instead.\n\nThe file path to the connection file for use in background mode.",
-    "working_dir": "The path to the directory to use for runtime files. This directory must not already exist.",
+    "connection_file": (
+        "The file path to the connection file for use in daemon mode. For the 'daemon start' command, this file "
+        "must not exist. For all other commands, this file must exist. This option is highly "
+        "recommended if using the adaptor in an interactive terminal. Default is to read the "
+        f"connection data from the environment variable: {_OPENJD_ADAPTOR_SOCKET_ENV}"
+    ),
     "log_file": "The file to log adaptor output to. Default is to not log to a file.",
 }
 
@@ -78,7 +88,6 @@ _system_config_path = os.path.abspath(
     os.path.join(
         _system_config_path_prefix,
         "openjd",
-        "worker",
         "adaptors",
         "runtime",
         "configuration.json",
@@ -89,12 +98,25 @@ _runtime_config_paths: dict[Any, Any] = {
     "schema_path": os.path.abspath(os.path.join(_DIR, "configuration.schema.json")),
     "default_config_path": os.path.abspath(os.path.join(_DIR, "configuration.json")),
     "system_config_path": _system_config_path,
-    "user_config_rel_path": os.path.join(
-        ".openjd", "worker", "adaptors", "runtime", "configuration.json"
-    ),
+    "user_config_rel_path": os.path.join(".openjd", "adaptors", "runtime", "configuration.json"),
 }
 
 _logger = logging.getLogger(__name__)
+
+
+class _ParsedArgs(Namespace):
+    command: str
+
+    # common args
+    init_data: str
+    run_data: str
+    path_mapping_rules: str
+    connection_file: str | None
+    log_file: str | None
+
+    # is-compatible args
+    openjd_adaptor_cli_version: str | None
+    integration_data_interface_version: str | None
 
 
 class _LogConfig(NamedTuple):
@@ -237,23 +259,6 @@ class EntryPoint:
         )
 
         interface_version_info = self._get_version_info()
-        # adaptor_pkg = self.adaptor_class.__package__ if hasattr(self.adaptor_class, )
-        # adaptor_version = adaptor_pkg.version if hasattr(adaptor_pkg, "version") else adaptor_pkg.__version__ if hasattr(adaptor_pkg, "__version__") else "unknown"
-        runtime_version = (
-            __package__.version
-            if hasattr(__package__, "version")
-            else __package__.__version__ if hasattr(__package__, "__version__") else "unknown"
-        )
-
-        _logger.info(f"Adaptor runtime version: {runtime_version}")
-        _logger.info(
-            f"Adaptor runtime CLI version: {str(interface_version_info.adaptor_cli_version)}"
-        )
-        # _logger.info(f"{self.adaptor_class.__name__} version: {adaptor_version}")
-        _logger.info(
-            f"{self.adaptor_class.__name__} integration data interface version: {str(interface_version_info.integration_data_interface_version)}"
-        )
-        _logger.info("")
 
         if parsed_args.command == "is-compatible":
             return self._handle_is_compatible(interface_version_info, parsed_args, parser)
@@ -355,33 +360,26 @@ class EntryPoint:
     def _handle_daemon(
         self,
         adaptor: BaseAdaptor[AdaptorConfiguration],
-        parsed_args: Namespace,
+        parsed_args: _ParsedArgs,
         log_config: _LogConfig,
         integration_data: _IntegrationData,
         reentry_exe: Optional[Path] = None,
     ):
         # Validate args
-        connection_file = None
-        if hasattr(parsed_args, "connection_file"):
-            connection_file = parsed_args.connection_file
-
-        working_dir = None
-        if hasattr(parsed_args, "working_dir"):
-            working_dir = parsed_args.working_dir
-
-        if (connection_file and working_dir) or not (connection_file or working_dir):
-            raise RuntimeError(
-                "Expected exactly one of 'connection_file' or 'working_dir' to be provided, "
-                f"but got args: {parsed_args}"
-            )
-
-        if connection_file and not os.path.isabs(connection_file):
-            connection_file = os.path.abspath(connection_file)
-        if working_dir and not os.path.isabs(working_dir):
-            working_dir = os.path.abspath(working_dir)
         subcommand = parsed_args.subcommand if hasattr(parsed_args, "subcommand") else None
 
+        connection_file: Path | None = None
+        if hasattr(parsed_args, "connection_file") and parsed_args.connection_file:
+            connection_file = Path(parsed_args.connection_file)
+        if connection_file and not connection_file.is_absolute():
+            connection_file = connection_file.absolute()
+
         if subcommand == "_serve":
+            if not connection_file:
+                raise RuntimeError(
+                    "--connection file is required for the '_serve' command but was not provided."
+                )
+
             # Replace stream handler with log buffer handler since output will be buffered in
             # background mode
             log_buffer = InMemoryLogBuffer(formatter=log_config.formatter)
@@ -395,7 +393,6 @@ class EntryPoint:
             backend = BackendRunner(
                 AdaptorRunner(adaptor=adaptor),
                 connection_file_path=connection_file,
-                working_dir=working_dir,
                 log_buffer=log_buffer,
             )
             backend.run(
@@ -406,34 +403,45 @@ class EntryPoint:
         else:
             # This process is running in frontend mode. Create the frontend runner and send
             # the appropriate request to the backend.
-            frontend = FrontendRunner(
-                connection_file_path=connection_file,
-                working_dir=working_dir,
-            )
             if subcommand == "start":
+                frontend = FrontendRunner()
                 adaptor_module = sys.modules.get(self.adaptor_class.__module__)
                 if adaptor_module is None:
                     raise ModuleNotFoundError(
                         f"Adaptor module is not loaded: {self.adaptor_class.__module__}"
                     )
 
-                frontend.init(
-                    adaptor_module,
-                    integration_data.init_data,
-                    integration_data.path_mapping_data,
-                    reentry_exe,
-                )
-                frontend.start()
-            elif subcommand == "run":
-                frontend.run(integration_data.run_data)
-            elif subcommand == "stop":
-                frontend.stop()
-                frontend.shutdown()
+                with contextlib.ExitStack() as stack:
+                    if not connection_file:
+                        tmpdir = stack.enter_context(tempfile.TemporaryDirectory(prefix="ojd-ar-"))
+                        connection_file = Path(tmpdir) / "connection.json"
 
-    def _parse_args(self) -> Tuple[ArgumentParser, Namespace]:
+                    frontend.init(
+                        adaptor_module=adaptor_module,
+                        connection_file_path=connection_file,
+                        init_data=integration_data.init_data,
+                        path_mapping_data=integration_data.path_mapping_data,
+                        reentry_exe=reentry_exe,
+                    )
+                frontend.start()
+            else:
+                conn_settings_loader = (
+                    ConnectionSettingsFileLoader(connection_file)
+                    if connection_file
+                    else ConnectionSettingsEnvLoader()
+                )
+                conn_settings = conn_settings_loader.load()
+                frontend = FrontendRunner(connection_settings=conn_settings)
+                if subcommand == "run":
+                    frontend.run(integration_data.run_data)
+                elif subcommand == "stop":
+                    frontend.stop()
+                    frontend.shutdown()
+
+    def _parse_args(self) -> Tuple[ArgumentParser, _ParsedArgs]:
         parser = self._build_argparser()
         try:
-            parsed_args = parser.parse_args(sys.argv[1:])
+            parsed_args = parser.parse_args(sys.argv[1:], _ParsedArgs())
         except Exception as e:
             _logger.error(f"Error parsing command line arguments: {e}")
             raise
@@ -502,13 +510,6 @@ class EntryPoint:
             required=False,
         )
 
-        working_dir = ArgumentParser(add_help=False)
-        working_dir.add_argument(
-            "--working-dir",
-            help=_CLI_HELP_TEXT["working_dir"],
-            required=False,
-        )
-
         log_file = ArgumentParser(add_help=False)
         log_file.add_argument(
             "--log-file",
@@ -528,14 +529,11 @@ class EntryPoint:
         # "Hidden" command that actually runs the adaptor runtime in background mode
         bg_subparser.add_parser(
             "_serve",
-            parents=[init_data, path_mapping_rules, connection_file, working_dir, log_file],
+            parents=[init_data, path_mapping_rules, connection_file, log_file],
         )
-
-        bg_subparser.add_parser(
-            "start", parents=[init_data, path_mapping_rules, connection_file, working_dir]
-        )
-        bg_subparser.add_parser("run", parents=[run_data, connection_file, working_dir])
-        bg_subparser.add_parser("stop", parents=[connection_file, working_dir])
+        bg_subparser.add_parser("start", parents=[init_data, path_mapping_rules, connection_file])
+        bg_subparser.add_parser("run", parents=[run_data, connection_file])
+        bg_subparser.add_parser("stop", parents=[connection_file])
 
         return parser
 
