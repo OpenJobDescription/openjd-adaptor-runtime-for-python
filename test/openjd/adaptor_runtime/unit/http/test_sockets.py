@@ -3,8 +3,9 @@
 import os
 import re
 import stat
+import tempfile
 from typing import Generator
-from unittest.mock import ANY, MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -76,66 +77,23 @@ class TestSocketPaths:
             with patch.object(sockets.os, "makedirs") as mock:
                 yield mock
 
-        @pytest.fixture
-        def home_dir(self) -> str:
-            return os.path.join("home", "user")
-
-        @pytest.fixture(autouse=True)
-        def mock_expanduser(self, home_dir: str) -> Generator[MagicMock, None, None]:
-            with patch.object(sockets.os.path, "expanduser", return_value=home_dir) as mock:
-                yield mock
-
-        @pytest.fixture
-        def temp_dir(self) -> str:
-            return "tmp"
-
-        @pytest.fixture(autouse=True)
-        def mock_gettempdir(self, temp_dir: str) -> Generator[MagicMock, None, None]:
-            with patch.object(sockets.tempfile, "gettempdir", return_value=temp_dir) as mock:
-                yield mock
-
-        def test_gets_home_dir(
-            self,
-            mock_expanduser: MagicMock,
-            home_dir: str,
-        ) -> None:
-            # GIVEN
-            subject = SocketPathsStub()
-
-            # WHEN
-            result = subject.get_socket_path("sock")
-
-            # THEN
-            mock_expanduser.assert_called_once_with("~")
-            assert result.startswith(home_dir)
-
+        @patch.object(sockets.tempfile, "gettempdir", wraps=sockets.tempfile.gettempdir)
         @patch.object(sockets.os, "stat")
-        @patch.object(SocketPathsStub, "verify_socket_path")
         def test_gets_temp_dir(
             self,
-            mock_verify_socket_path: MagicMock,
             mock_stat: MagicMock,
             mock_gettempdir: MagicMock,
-            temp_dir: str,
         ) -> None:
             # GIVEN
-            exc = NonvalidSocketPathException()
-            mock_verify_socket_path.side_effect = [exc, None]  # Raise exc only once
             mock_stat.return_value.st_mode = stat.S_ISVTX
             subject = SocketPathsStub()
 
             # WHEN
-            result = subject.get_socket_path("sock")
+            subject.get_socket_path("sock")
 
             # THEN
             mock_gettempdir.assert_called_once()
-            mock_verify_socket_path.assert_has_calls(
-                [
-                    call(ANY),  # home dir
-                    call(result),  # temp dir
-                ]
-            )
-            mock_stat.assert_called_once_with(temp_dir)
+            mock_stat.assert_called_once()
 
         @pytest.mark.parametrize(
             argnames=["create"],
@@ -190,10 +148,8 @@ class TestSocketPaths:
                 subject.get_socket_path("sock")
 
             # THEN
-            assert raised_exc.match(
-                "Failed to find a suitable socket path for the following reasons: "
-            )
-            assert mock_verify_socket_path.call_count == 2
+            assert raised_exc.match("^Socket path '.*' failed verification: .*")
+            assert mock_verify_socket_path.call_count == 1
 
         @patch.object(SocketPathsStub, "verify_socket_path")
         @patch.object(sockets.os, "stat")
@@ -201,7 +157,6 @@ class TestSocketPaths:
             self,
             mock_stat: MagicMock,
             mock_verify_socket_path: MagicMock,
-            temp_dir: str,
         ) -> None:
             # GIVEN
             mock_verify_socket_path.side_effect = [NonvalidSocketPathException(), None]
@@ -215,7 +170,7 @@ class TestSocketPaths:
             # THEN
             assert raised_exc.match(
                 re.escape(
-                    f"Cannot use temporary directory {temp_dir} because it does not have the "
+                    f"Cannot use temporary directory {tempfile.gettempdir()} because it does not have the "
                     "sticky bit (restricted deletion flag) set"
                 )
             )

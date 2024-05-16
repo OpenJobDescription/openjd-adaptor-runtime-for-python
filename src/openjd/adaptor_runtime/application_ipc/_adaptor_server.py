@@ -34,8 +34,7 @@ class AdaptorServer(UnixStreamServer):
         adaptor: BaseAdaptor,
     ) -> None:  # pragma: no cover
         socket_path = SocketPaths.for_os().get_process_socket_path(
-            "dcc",
-            base_dir=os.getcwd(),
+            ".openjd_adaptor_server",
             create_dir=True,
         )
         super().__init__(socket_path, AdaptorHTTPRequestHandler)

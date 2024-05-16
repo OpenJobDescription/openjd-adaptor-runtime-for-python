@@ -83,7 +83,6 @@ class BackendRunner:
         if OSName.is_posix():  # pragma: is-windows
             server_path = SocketPaths.for_os().get_process_socket_path(
                 ".openjd_adaptor_runtime",
-                base_dir=os.getcwd(),
                 create_dir=True,
             )
         else:  # pragma: is-posix

@@ -29,14 +29,14 @@ class SocketPaths(abc.ABC):
         Gets the SocketPaths class for a specific OS.
 
         Args:
-            osname (OSName, optional): The OS to get socket directories for.
+            osname (OSName, optional): The OS to get socket paths for.
                 Defaults to the current OS.
 
         Raises:
             UnsupportedPlatformException: Raised when this class is requested for an unsupported
                 platform.
         """
-        klass = _get_socket_directories_cls(osname)
+        klass = _get_socket_paths_cls(osname)
         if not klass:
             raise UnsupportedPlatformException(osname)
         return klass()
@@ -53,8 +53,7 @@ class SocketPaths(abc.ABC):
 
         Args:
             namespace (Optional[str]): The optional namespace (subdirectory) where the sockets go.
-            base_dir (Optional[str]): The base directory to create sockets in. Defaults to user's home
-                directory, then the temp directory.
+            base_dir (Optional[str]): The base directory to create sockets in. Defaults to the temp directory.
             create_dir (bool): Whether to create the socket directory. Default is false.
 
         Raises:
@@ -89,8 +88,7 @@ class SocketPaths(abc.ABC):
         Args:
             base_socket_name (str): The name of the socket
             namespace (Optional[str]): The optional namespace (subdirectory) where the sockets go
-            base_dir (Optional[str]): The base directory to create sockets in. Defaults to user's home
-                directory, then the temp directory.
+            base_dir (Optional[str]): The base directory to create sockets in. Defaults to the temp directory.
             create_dir (bool): Whether to create the directory or not. Default is false.
 
         Raises:
@@ -113,65 +111,30 @@ class SocketPaths(abc.ABC):
                 name = f"{base_name}_{i}"
             return os.path.join(dir, name)
 
-        reasons: list[str] = []
-
-        if base_dir:
-            # Only try to use the provided base directory
-            socket_dir = base_dir if not namespace else os.path.join(base_dir, namespace)
-            socket_path = gen_socket_path(socket_dir, base_socket_name)
-            try:
-                self.verify_socket_path(socket_path)
-            except NonvalidSocketPathException as e:
-                reasons.append(
-                    f"Cannot create socket in the base directory at '{socket_dir}' because: {e}"
+        if not base_dir:
+            socket_dir = tempfile.gettempdir()
+            # Check that the sticky bit is set on the temp dir
+            if not os.stat(socket_dir).st_mode & stat.S_ISVTX:
+                raise NoSocketPathFoundException(
+                    f"Cannot use temporary directory {socket_dir} because it does not have the "
+                    "sticky bit (restricted deletion flag) set"
                 )
-            else:
-                mkdir(socket_dir)
-                return socket_path
         else:
-            rel_path = os.path.join(".openjd", "adaptors", "sockets")
-            if namespace:
-                rel_path = os.path.join(rel_path, namespace)
+            socket_dir = base_dir
 
-            # First try home directory
-            home_dir = os.path.expanduser("~")
-            socket_dir = os.path.join(home_dir, rel_path)
-            socket_path = gen_socket_path(socket_dir, base_socket_name)
-            try:
-                self.verify_socket_path(socket_path)
-            except NonvalidSocketPathException as e:
-                reasons.append(
-                    f"Cannot create socket in the home directory at '{socket_dir}' because: {e}"
-                )
-            else:
-                mkdir(socket_dir)
-                return socket_path
+        if namespace:
+            socket_dir = os.path.join(socket_dir, namespace)
 
-            # Last resort is the temp directory
-            temp_dir = tempfile.gettempdir()
-            socket_dir = os.path.join(temp_dir, rel_path)
-            socket_path = gen_socket_path(socket_dir, base_socket_name)
-            try:
-                self.verify_socket_path(socket_path)
-            except NonvalidSocketPathException as e:
-                reasons.append(
-                    f"Cannot create socket in the temp directory at '{socket_dir}' because: {e}"
-                )
-            else:
-                # Also check that the sticky bit is set on the temp dir
-                if not os.stat(temp_dir).st_mode & stat.S_ISVTX:
-                    reasons.append(
-                        f"Cannot use temporary directory {temp_dir} because it does not have the "
-                        "sticky bit (restricted deletion flag) set"
-                    )
-                else:
-                    mkdir(socket_dir)
-                    return socket_path
+        socket_path = gen_socket_path(socket_dir, base_socket_name)
+        try:
+            self.verify_socket_path(socket_path)
+        except NonvalidSocketPathException as e:
+            raise NoSocketPathFoundException(
+                f"Socket path '{socket_path}' failed verification: {e}"
+            ) from e
+        mkdir(socket_dir)
 
-        raise NoSocketPathFoundException(
-            "Failed to find a suitable socket path for the following "
-            f"reasons: {os.linesep.join(reasons)}"
-        )
+        return socket_path
 
     @abc.abstractmethod
     def verify_socket_path(self, path: str) -> None:  # pragma: no cover
@@ -231,7 +194,7 @@ _os_map: dict[str, type[SocketPaths]] = {
 }
 
 
-def _get_socket_directories_cls(
+def _get_socket_paths_cls(
     osname: OSName,
 ) -> type[SocketPaths] | None:  # pragma: no cover
     return _os_map.get(osname, None)

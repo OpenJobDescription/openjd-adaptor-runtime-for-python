@@ -76,16 +76,170 @@ class TestCommandAdaptorDaemon:
     Tests for the CommandAdaptor running using the `daemon` command-line.
     """
 
-    def test_start_stop(self, caplog: pytest.LogCaptureFixture, tmp_path: Path):
-        # GIVEN
-        caplog.set_level(INFO)
-        connection_file = tmp_path / "connection.json"
-        test_start_argv = [
+    class TestUsingConnectionFile:
+        """
+        Daemon tests using the --connection-file option
+        """
+
+        def test_start_stop(self, caplog: pytest.LogCaptureFixture, tmp_path: Path):
+            # GIVEN
+            caplog.set_level(INFO)
+            connection_file = tmp_path / "connection.json"
+            entrypoint = EntryPoint(CommandAdaptorExample)
+
+            # WHEN
+            with (
+                patch.object(
+                    runtime_entrypoint.sys,
+                    "argv",
+                    TestCommandAdaptorDaemon.get_start_argv(connection_file=connection_file),
+                ),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+            ):
+                entrypoint.start()
+            with (
+                patch.object(
+                    runtime_entrypoint.sys,
+                    "argv",
+                    TestCommandAdaptorDaemon.get_stop_argv(connection_file=connection_file),
+                ),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+            ):
+                entrypoint.start()
+
+            # THEN
+            assert "Initializing backend process" in caplog.text
+            assert "Connected successfully" in caplog.text
+            assert "Running in background daemon mode." in caplog.text
+            assert "Daemon background process stopped." in caplog.text
+            assert "on_prerun" not in caplog.text
+            assert "on_postrun" not in caplog.text
+
+        def test_run(self, caplog: pytest.LogCaptureFixture, tmp_path: Path):
+            # GIVEN
+            caplog.set_level(INFO)
+            connection_file = tmp_path / "connection.json"
+            test_run_argv = [
+                "program_filename.py",
+                "daemon",
+                "run",
+                "--connection-file",
+                str(connection_file),
+                "--run-data",
+                json.dumps(
+                    {"args": ["echo", "hello world"] if OSName.is_windows() else ["hello world"]}
+                ),
+            ]
+            entrypoint = EntryPoint(CommandAdaptorExample)
+
+            # WHEN
+            with (
+                patch.object(
+                    runtime_entrypoint.sys,
+                    "argv",
+                    TestCommandAdaptorDaemon.get_start_argv(connection_file=connection_file),
+                ),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+            ):
+                entrypoint.start()
+            with (
+                patch.object(runtime_entrypoint.sys, "argv", test_run_argv),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+            ):
+                entrypoint.start()
+            with (
+                patch.object(
+                    runtime_entrypoint.sys,
+                    "argv",
+                    TestCommandAdaptorDaemon.get_stop_argv(connection_file=connection_file),
+                ),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+            ):
+                entrypoint.start()
+
+            # THEN
+            assert "on_prerun" in caplog.text
+            assert "hello world" in caplog.text
+            assert "on_postrun" in caplog.text
+
+    class TestUsingEnvVar:
+        """
+        Daemon tests that do not use the --connection-file option and instead use the
+        OPENJD_ADAPTOR_SOCKET environment variable
+        """
+
+        def test_full_cycle(self, caplog: pytest.LogCaptureFixture) -> None:
+            # GIVEN
+            caplog.set_level(INFO)
+            entrypoint = EntryPoint(CommandAdaptorExample)
+
+            # WHEN
+            with (
+                patch.object(
+                    runtime_entrypoint.sys,
+                    "argv",
+                    TestCommandAdaptorDaemon.get_start_argv(connection_file=None),
+                ),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+            ):
+                entrypoint.start()
+
+            # THEN
+            match = re.search(
+                "openjd_env: OPENJD_ADAPTOR_SOCKET=(.*)$",
+                caplog.text,
+                re.MULTILINE,
+            )
+            assert (
+                match is not None
+            ), f"Expected openjd_env statement not found in output: {caplog.text}"
+            openjd_adaptor_socket = match.group(1)
+            print(
+                f"DEBUG: Using OPENJD_ADAPTOR_SOCKET={openjd_adaptor_socket} (exists={os.path.exists(openjd_adaptor_socket)})"
+            )
+
+            # WHEN
+            with (
+                patch.object(
+                    runtime_entrypoint.sys,
+                    "argv",
+                    TestCommandAdaptorDaemon.get_run_argv(connection_file=None),
+                ),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+                patch.dict(
+                    runtime_entrypoint.os.environ, {"OPENJD_ADAPTOR_SOCKET": openjd_adaptor_socket}
+                ),
+            ):
+                entrypoint.start()
+            with (
+                patch.object(
+                    runtime_entrypoint.sys,
+                    "argv",
+                    TestCommandAdaptorDaemon.get_stop_argv(connection_file=None),
+                ),
+                patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
+                patch.dict(
+                    runtime_entrypoint.os.environ, {"OPENJD_ADAPTOR_SOCKET": openjd_adaptor_socket}
+                ),
+            ):
+                entrypoint.start()
+
+            # THEN
+            assert "Initializing backend process" in caplog.text
+            assert "Connected successfully" in caplog.text
+            assert "Running in background daemon mode." in caplog.text
+            assert "on_prerun" in caplog.text
+            assert "hello world" in caplog.text
+            assert "on_postrun" in caplog.text
+            assert "Daemon background process stopped." in caplog.text
+
+    @staticmethod
+    def get_start_argv(*, connection_file: Path | None = None) -> list[str]:
+        return [
             "program_filename.py",
             "daemon",
             "start",
-            "--connection-file",
-            str(connection_file),
+            *(["--connection-file", str(connection_file)] if connection_file else []),
             "--init-data",
             json.dumps(
                 {
@@ -94,91 +248,32 @@ class TestCommandAdaptorDaemon:
                 }
             ),
         ]
-        test_stop_argv = [
-            "program_filename.py",
-            "daemon",
-            "stop",
-            "--connection-file",
-            str(connection_file),
-        ]
-        entrypoint = EntryPoint(CommandAdaptorExample)
 
-        # WHEN
-        with (
-            patch.object(runtime_entrypoint.sys, "argv", test_start_argv),
-            patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
-        ):
-            entrypoint.start()
-        with (
-            patch.object(runtime_entrypoint.sys, "argv", test_stop_argv),
-            patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
-        ):
-            entrypoint.start()
-
-        # THEN
-        assert "Initializing backend process" in caplog.text
-        assert "Connected successfully" in caplog.text
-        assert "Running in background daemon mode." in caplog.text
-        assert "Daemon background process stopped." in caplog.text
-        assert "on_prerun" not in caplog.text
-        assert "on_postrun" not in caplog.text
-
-    def test_run(self, caplog: pytest.LogCaptureFixture, tmp_path: Path):
-        # GIVEN
-        caplog.set_level(INFO)
-        connection_file = tmp_path / "connection.json"
-        test_start_argv = [
-            "program_filename.py",
-            "daemon",
-            "start",
-            "--connection-file",
-            str(connection_file),
-            "--init-data",
-            json.dumps(
-                {
-                    "on_prerun": "on_prerun",
-                    "on_postrun": "on_postrun",
-                }
-            ),
-        ]
-        test_run_argv = [
+    @staticmethod
+    def get_run_argv(*, connection_file: Path | None = None) -> list[str]:
+        return [
             "program_filename.py",
             "daemon",
             "run",
-            "--connection-file",
-            str(connection_file),
+            *(["--connection-file", str(connection_file)] if connection_file else []),
             "--run-data",
             json.dumps(
                 {"args": ["echo", "hello world"] if OSName.is_windows() else ["hello world"]}
             ),
         ]
-        test_stop_argv = [
+
+    @staticmethod
+    def get_stop_argv(*, connection_file: Path | None = None) -> list[str]:
+        return [
             "program_filename.py",
             "daemon",
             "stop",
-            "--connection-file",
-            str(connection_file),
+            *(
+                [
+                    "--connection-file",
+                    str(connection_file),
+                ]
+                if connection_file
+                else []
+            ),
         ]
-        entrypoint = EntryPoint(CommandAdaptorExample)
-
-        # WHEN
-        with (
-            patch.object(runtime_entrypoint.sys, "argv", test_start_argv),
-            patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
-        ):
-            entrypoint.start()
-        with (
-            patch.object(runtime_entrypoint.sys, "argv", test_run_argv),
-            patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
-        ):
-            entrypoint.start()
-        with (
-            patch.object(runtime_entrypoint.sys, "argv", test_stop_argv),
-            patch.object(runtime_entrypoint.logging.Logger, "setLevel"),
-        ):
-            entrypoint.start()
-
-        # THEN
-        assert "on_prerun" in caplog.text
-        assert "hello world" in caplog.text
-        assert "on_postrun" in caplog.text

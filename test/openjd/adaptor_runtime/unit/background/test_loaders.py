@@ -141,6 +141,6 @@ class TestConnectionSettingsEnvLoader:
 
         # THEN
         assert re.match(
-            "Required attribute '.*' does not have its corresponding environment variable '.*' set",
+            "^Required attribute '.*' does not have its corresponding environment variable '.*' set",
             str(raised_err.value),
         )
