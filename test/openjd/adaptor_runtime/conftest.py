@@ -1,11 +1,14 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 import platform
+import random
+import string
 from typing import Generator
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from openjd.adaptor_runtime._osname import OSName
-import string
-import random
-import pytest
+from openjd.adaptor_runtime._http import sockets
 
 if OSName.is_windows():
     import win32net
@@ -92,3 +95,13 @@ def win_test_user() -> Generator:
     yield username, password
     # Delete the user after test completes
     delete_user()
+
+
+@pytest.fixture(scope="session", autouse=OSName().is_macos())
+def mock_sockets_py_tempfile_gettempdir_to_slash_tmp() -> Generator[MagicMock, None, None]:
+    """
+    Mock that is automatically used on Mac to override the tempfile.gettempdir() usages in sockets.py
+    because the folder returned by it on Mac is too long for the socket name to fit (max 104 bytes, see sockets.py)
+    """
+    with patch.object(sockets.tempfile, "gettempdir", return_value="/tmp") as m:
+        yield m

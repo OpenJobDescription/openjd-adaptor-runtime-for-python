@@ -112,15 +112,17 @@ class SocketPaths(abc.ABC):
             return os.path.join(dir, name)
 
         if not base_dir:
-            socket_dir = tempfile.gettempdir()
-            # Check that the sticky bit is set on the temp dir
-            if not os.stat(socket_dir).st_mode & stat.S_ISVTX:
-                raise NoSocketPathFoundException(
-                    f"Cannot use temporary directory {socket_dir} because it does not have the "
-                    "sticky bit (restricted deletion flag) set"
-                )
+            socket_dir = os.path.realpath(tempfile.gettempdir())
         else:
-            socket_dir = base_dir
+            socket_dir = os.path.realpath(base_dir)
+
+        # Check that the sticky bit is set if the dir is world writable
+        socket_dir_stat = os.stat(socket_dir)
+        if socket_dir_stat.st_mode & stat.S_IWOTH and not socket_dir_stat.st_mode & stat.S_ISVTX:
+            raise NoSocketPathFoundException(
+                f"Cannot use directory {socket_dir} because it is world writable and does not "
+                "have the sticky bit (restricted deletion flag) set"
+            )
 
         if namespace:
             socket_dir = os.path.join(socket_dir, namespace)

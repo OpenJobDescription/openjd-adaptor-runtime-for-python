@@ -1,9 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import os
+import pathlib
 import re
 import stat
-import tempfile
 from typing import Generator
 from unittest.mock import MagicMock, patch
 
@@ -115,10 +115,10 @@ class TestSocketPaths:
             else:
                 mock_makedirs.assert_not_called()
 
-        def test_uses_base_dir(self) -> None:
+        def test_uses_base_dir(self, tmp_path: pathlib.Path) -> None:
             # GIVEN
             subject = SocketPathsStub()
-            base_dir = os.path.join(os.sep, "base", "dir")
+            base_dir = str(tmp_path)
 
             # WHEN
             result = subject.get_socket_path("sock", base_dir=base_dir)
@@ -160,7 +160,7 @@ class TestSocketPaths:
         ) -> None:
             # GIVEN
             mock_verify_socket_path.side_effect = [NonvalidSocketPathException(), None]
-            mock_stat.return_value.st_mode = 0
+            mock_stat.return_value.st_mode = stat.S_IWOTH
             subject = SocketPathsStub()
 
             # WHEN
@@ -170,8 +170,8 @@ class TestSocketPaths:
             # THEN
             assert raised_exc.match(
                 re.escape(
-                    f"Cannot use temporary directory {tempfile.gettempdir()} because it does not have the "
-                    "sticky bit (restricted deletion flag) set"
+                    f"Cannot use directory {os.path.realpath(sockets.tempfile.gettempdir())} because it is world writable"
+                    " and does not have the sticky bit (restricted deletion flag) set"
                 )
             )
 
@@ -193,7 +193,7 @@ class TestSocketPaths:
 
             # THEN
             assert result.endswith(expected_sock_name)
-            mock_exists.call_count == len(existing_sock_names) + 1
+            assert mock_exists.call_count == (len(existing_sock_names) + 1)
 
 
 class TestLinuxSocketPaths:
