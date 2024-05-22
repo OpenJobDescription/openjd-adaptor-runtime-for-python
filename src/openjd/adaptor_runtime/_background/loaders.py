@@ -38,11 +38,11 @@ class ConnectionSettingsFileLoader(ConnectionSettingsLoader):
             with open(self.file_path) as conn_file:
                 loaded_settings = json.load(conn_file)
         except OSError as e:
-            errmsg = f"Failed to open connection file: {e}"
+            errmsg = f"Failed to open connection file '{self.file_path}': {e}"
             _logger.error(errmsg)
             raise ConnectionSettingsLoadingError(errmsg) from e
         except json.JSONDecodeError as e:
-            errmsg = f"Failed to decode connection file: {e}"
+            errmsg = f"Failed to decode connection file '{self.file_path}': {e}"
             _logger.error(errmsg)
             raise ConnectionSettingsLoadingError(errmsg) from e
         return DataclassMapper(ConnectionSettings).map(loaded_settings)

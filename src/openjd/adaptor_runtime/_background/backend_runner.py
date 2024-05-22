@@ -8,6 +8,7 @@ import os
 import signal
 from pathlib import Path
 from threading import Thread, Event
+import traceback
 from types import FrameType
 from typing import Callable, List, Optional, Union
 
@@ -126,6 +127,11 @@ class BackendRunner:
             _logger.info("Shutting down server...")
             shutdown_event.set()
             raise
+        except Exception as e:
+            _logger.critical(f"Unexpected error occurred when writing to connection file: {e}")
+            _logger.critical(traceback.format_exc())
+            _logger.info("Shutting down server")
+            shutdown_event.set()
         else:
             if on_connection_file_written:
                 callbacks = list(on_connection_file_written)

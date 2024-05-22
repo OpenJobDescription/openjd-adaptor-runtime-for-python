@@ -496,7 +496,7 @@ class TestStart:
         )
         mock_init.assert_called_once_with(
             mock_adaptor_runner.return_value,
-            connection_file_path=conn_file,
+            connection_file_path=conn_file.resolve(),
             log_buffer=mock_log_buffer.return_value,
         )
         mock_run.assert_called_once()
@@ -609,7 +609,7 @@ class TestStart:
         mock_magic_init.assert_called_once_with()
         mock_init.assert_called_once_with(
             adaptor_module=mock_adaptor_module,
-            connection_file_path=conn_file,
+            connection_file_path=conn_file.resolve(),
             init_data={},
             path_mapping_data={},
             reentry_exe=reentry_exe,

@@ -81,7 +81,7 @@ def get_file_owner_in_windows(filepath: "StrOrBytesPath") -> str:  # pragma: is-
     Returns:
         str: A string in the format 'DOMAIN\\Username' representing the file's owner.
     """
-    sd = win32security.GetFileSecurity(filepath, win32security.OWNER_SECURITY_INFORMATION)
+    sd = win32security.GetFileSecurity(str(filepath), win32security.OWNER_SECURITY_INFORMATION)
     owner_sid = sd.GetSecurityDescriptorOwner()
     name, domain, _ = win32security.LookupAccountSid(None, owner_sid)
     return f"{domain}\\{name}"
@@ -108,13 +108,13 @@ def set_file_permissions_in_windows(filepath: "StrOrBytesPath") -> None:  # prag
     dacl.AddAccessAllowedAce(win32security.ACL_REVISION, win32con.DELETE, user_sid)
 
     # Apply the DACL to the file
-    sd = win32security.GetFileSecurity(filepath, win32security.DACL_SECURITY_INFORMATION)
+    sd = win32security.GetFileSecurity(str(filepath), win32security.DACL_SECURITY_INFORMATION)
     sd.SetSecurityDescriptorDacl(
         1,  # A flag that indicates the presence of a DACL in the security descriptor.
         dacl,  # An ACL structure that specifies the DACL for the security descriptor.
         0,  # Don't retrieve the default DACL
     )
-    win32security.SetFileSecurity(filepath, win32security.DACL_SECURITY_INFORMATION, sd)
+    win32security.SetFileSecurity(str(filepath), win32security.DACL_SECURITY_INFORMATION, sd)
 
 
 def _get_flags_from_mode_str(open_mode: str) -> int:

@@ -18,7 +18,7 @@ from pathlib import Path
 from threading import Event
 from types import FrameType
 from types import ModuleType
-from typing import Optional, Dict
+from typing import Optional, Callable, Dict
 
 from .._osname import OSName
 from ..process._logging import _ADAPTOR_OUTPUT_LEVEL
@@ -169,7 +169,7 @@ class FrontendRunner:
 
         # Wait for backend process to create connection file
         try:
-            _wait_for_file(str(connection_file_path), timeout_s=5)
+            _wait_for_connection_file(str(connection_file_path), max_retries=5, interval_s=1)
         except TimeoutError:
             _logger.error(
                 "Backend process failed to write connection file in time at: "
@@ -414,38 +414,84 @@ class FrontendRunner:
         self.cancel()
 
 
-def _wait_for_file(filepath: str, timeout_s: float, interval_s: float = 1) -> None:
+def _wait_for_connection_file(
+    filepath: str, max_retries: int, interval_s: float = 1
+) -> ConnectionSettings:
     """
-    Waits for a file at the specified path to exist and to be openable.
+    Waits for a connection file at the specified path to exist, be openable, and have connection settings.
 
     Args:
         filepath (str): The file path to check.
-        timeout_s (float): The max duration to wait before timing out, in seconds.
+        max_retries (int): The max number of retries before timing out.
         interval_s (float, optional): The interval between checks, in seconds. Default is 0.01s.
 
     Raises:
         TimeoutError: Raised when the file does not exist after timeout_s seconds.
     """
+    wait_for(
+        description=f"File '{filepath}' to exist",
+        predicate=lambda: os.path.exists(filepath),
+        interval_s=interval_s,
+        max_retries=max_retries,
+    )
 
-    def _wait():
-        if time.time() - start < timeout_s:
-            time.sleep(interval_s)
-        else:
-            raise TimeoutError(f"Timed out after {timeout_s}s waiting for file at {filepath}")
+    # Wait before opening to give the backend time to open it first
+    time.sleep(interval_s)
 
-    start = time.time()
-    while not os.path.exists(filepath):
-        _wait()
-
-    while True:
-        # Wait before opening to give the backend time to open it first
-        _wait()
+    def file_is_openable() -> bool:
         try:
             open(filepath, mode="r").close()
-            break
         except IOError:
             # File is not available yet
-            pass
+            return False
+        else:
+            return True
+
+    wait_for(
+        description=f"File '{filepath}' to be openable",
+        predicate=file_is_openable,
+        interval_s=interval_s,
+        max_retries=max_retries,
+    )
+
+    def connection_file_loadable() -> bool:
+        try:
+            ConnectionSettingsFileLoader(Path(filepath)).load()
+        except Exception:
+            return False
+        else:
+            return True
+
+    wait_for(
+        description=f"File '{filepath}' to have valid ConnectionSettings",
+        predicate=connection_file_loadable,
+        interval_s=interval_s,
+        max_retries=max_retries,
+    )
+
+    return ConnectionSettingsFileLoader(Path(filepath)).load()
+
+
+def wait_for(
+    *,
+    description: str,
+    predicate: Callable[[], bool],
+    interval_s: float,
+    max_retries: int | None = None,
+) -> None:
+    if max_retries is not None:
+        assert max_retries >= 0, "max_retries must be a non-negative integer"
+    assert interval_s > 0, "interval_s must be a positive number"
+
+    _logger.info(f"Waiting for {description}")
+    retry_count = 0
+    while not predicate():
+        if max_retries is not None and retry_count >= max_retries:
+            raise TimeoutError(f"Timed out waiting for {description}")
+
+        _logger.info(f"Retrying in {interval_s}s...")
+        retry_count += 1
+        time.sleep(interval_s)
 
 
 class AdaptorFailedException(Exception):

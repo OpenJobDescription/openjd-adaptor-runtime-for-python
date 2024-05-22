@@ -65,6 +65,7 @@ class TestConnectionSettingsFileLoader:
         self,
         open_mock: MagicMock,
         loader: ConnectionSettingsFileLoader,
+        connection_file_path: pathlib.Path,
         caplog: pytest.LogCaptureFixture,
     ):
         # GIVEN
@@ -76,11 +77,12 @@ class TestConnectionSettingsFileLoader:
             loader.load()
 
         # THEN
-        assert "Failed to open connection file: " in caplog.text
+        assert f"Failed to open connection file '{connection_file_path}': " in caplog.text
 
     def test_raises_when_json_decode_fails(
         self,
         loader: ConnectionSettingsFileLoader,
+        connection_file_path: pathlib.Path,
         caplog: pytest.LogCaptureFixture,
     ):
         # GIVEN
@@ -92,7 +94,7 @@ class TestConnectionSettingsFileLoader:
                 loader.load()
 
         # THEN
-        assert "Failed to decode connection file: " in caplog.text
+        assert f"Failed to decode connection file '{connection_file_path}': " in caplog.text
 
 
 class TestConnectionSettingsEnvLoader:

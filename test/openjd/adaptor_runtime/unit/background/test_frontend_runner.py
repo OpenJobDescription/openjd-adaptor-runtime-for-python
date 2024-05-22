@@ -24,7 +24,7 @@ from openjd.adaptor_runtime._background.frontend_runner import (
     AdaptorFailedException,
     FrontendRunner,
     HTTPError,
-    _wait_for_file,
+    _wait_for_connection_file,
 )
 from openjd.adaptor_runtime._background.model import (
     AdaptorStatus,
@@ -90,8 +90,8 @@ class TestFrontendRunner:
                 yield m
 
         @pytest.fixture(autouse=True)
-        def mock_wait_for_file(self) -> Generator[MagicMock, None, None]:
-            with patch.object(frontend_runner, "_wait_for_file") as m:
+        def mock_wait_for_connection_file(self) -> Generator[MagicMock, None, None]:
+            with patch.object(frontend_runner, "_wait_for_connection_file") as m:
                 yield m
 
         @pytest.fixture(autouse=True)
@@ -125,7 +125,7 @@ class TestFrontendRunner:
             self,
             mock_path_exists: MagicMock,
             mock_Popen: MagicMock,
-            mock_wait_for_file: MagicMock,
+            mock_wait_for_connection_file: MagicMock,
             mock_heartbeat: MagicMock,
             mock_sys_executable: MagicMock,
             mock_sys_argv: MagicMock,
@@ -212,7 +212,11 @@ class TestFrontendRunner:
                 stdout=open_mock.return_value,
                 stderr=open_mock.return_value,
             )
-            mock_wait_for_file.assert_called_once_with(str(connection_file_path), timeout_s=5)
+            mock_wait_for_connection_file.assert_called_once_with(
+                str(connection_file_path),
+                max_retries=5,
+                interval_s=1,
+            )
             mock_heartbeat.assert_called_once()
 
         def test_raises_when_adaptor_module_not_package(self):
@@ -251,8 +255,9 @@ class TestFrontendRunner:
 
             # THEN
             assert raised_err.match(
-                "Cannot init a new backend process with an existing connection file at: "
-                + str(conn_file_path)
+                re.escape(
+                    f"Cannot init a new backend process with an existing connection file at: {conn_file_path}"
+                )
             )
             mock_path_exists.assert_called_once_with()
 
@@ -295,13 +300,13 @@ class TestFrontendRunner:
             self,
             mock_path_exists: MagicMock,
             mock_Popen: MagicMock,
-            mock_wait_for_file: MagicMock,
+            mock_wait_for_connection_file: MagicMock,
             caplog: pytest.LogCaptureFixture,
         ):
             # GIVEN
             caplog.set_level("DEBUG")
             err = TimeoutError()
-            mock_wait_for_file.side_effect = err
+            mock_wait_for_connection_file.side_effect = err
             mock_path_exists.return_value = False
             pid = 123
             mock_Popen.return_value.pid = pid
@@ -329,7 +334,11 @@ class TestFrontendRunner:
             )
             mock_path_exists.assert_called_once_with()
             mock_Popen.assert_called_once()
-            mock_wait_for_file.assert_called_once_with(str(conn_file_path), timeout_s=5)
+            mock_wait_for_connection_file.assert_called_once_with(
+                str(conn_file_path),
+                max_retries=5,
+                interval_s=1,
+            )
 
     class TestHeartbeat:
         """
@@ -741,16 +750,23 @@ class TestFrontendRunner:
                 mock_read_from_pipe.return_value = mock_response
                 yield mock_read_from_pipe
 
+        @pytest.fixture
+        def connection_settings(self) -> ConnectionSettings:
+            return ConnectionSettings("\\\\.\\pipe")
+
+        @pytest.fixture
+        def runner(self, connection_settings: ConnectionSettings) -> FrontendRunner:
+            return FrontendRunner(connection_settings=connection_settings)
+
         def test_sends_request(
             self,
             mock_read_from_pipe: MagicMock,
             mock_response: str,
+            runner: FrontendRunner,
         ):
             # GIVEN
             method = "GET"
             path = "/path"
-
-            runner = FrontendRunner()
 
             # WHEN
             with patch.object(
@@ -772,6 +788,7 @@ class TestFrontendRunner:
             self,
             mock_read_from_pipe: MagicMock,
             mock_response: str,
+            runner: FrontendRunner,
             caplog: pytest.LogCaptureFixture,
         ):
             # GIVEN
@@ -781,7 +798,6 @@ class TestFrontendRunner:
             mock_read_from_pipe.side_effect = error_instance
             method = "GET"
             path = "/path"
-            runner = FrontendRunner()
 
             # WHEN
             with patch.object(
@@ -804,12 +820,12 @@ class TestFrontendRunner:
         def test_raises_when_error_response_received(
             self,
             mock_response: str,
+            runner: FrontendRunner,
             caplog: pytest.LogCaptureFixture,
         ):
             # GIVEN
             method = "GET"
             path = "/path"
-            runner = FrontendRunner()
 
             # WHEN
             with patch.object(
@@ -840,13 +856,13 @@ class TestFrontendRunner:
             self,
             mock_read_from_pipe,
             mock_response: str,
+            runner: FrontendRunner,
             caplog: pytest.LogCaptureFixture,
         ):
             # GIVEN
             method = "GET"
             path = "/path"
             params = {"first param": 1, "second_param": ["one", "two three"]}
-            runner = FrontendRunner()
 
             # WHEN
             with patch.object(
@@ -869,13 +885,13 @@ class TestFrontendRunner:
             self,
             mock_read_from_pipe,
             mock_response: str,
+            runner: FrontendRunner,
             caplog: pytest.LogCaptureFixture,
         ):
             # GIVEN
             method = "GET"
             path = "/path"
             json_body = {"the": "body"}
-            runner = FrontendRunner()
 
             # WHEN
             with patch.object(
@@ -916,62 +932,57 @@ class TestFrontendRunner:
             cancel_mock.assert_called_once()
 
 
-class TestWaitForFile:
+class TestWaitForConnectionFile:
     """
-    Tests for the _wait_for_file method
+    Tests for the _wait_for_connection_file method
     """
 
+    @patch.object(frontend_runner.ConnectionSettingsFileLoader, "load")
     @patch.object(frontend_runner, "open")
-    @patch.object(frontend_runner.time, "time")
     @patch.object(frontend_runner.time, "sleep")
     @patch.object(frontend_runner.os.path, "exists")
     def test_waits_for_file(
         self,
         mock_exists: MagicMock,
         mock_sleep: MagicMock,
-        mock_time: MagicMock,
         open_mock: MagicMock,
+        mock_conn_file_loader_load: MagicMock,
     ):
         # GIVEN
         filepath = "/path"
-        timeout = sys.float_info.max
+        max_retries = 9999
         interval = 0.01
-        mock_time.side_effect = [1, 2, 3, 4]
         mock_exists.side_effect = [False, True]
         err = IOError()
         open_mock.side_effect = [err, MagicMock()]
+        mock_conn_file_loader_load.return_value = ConnectionSettings("/server")
 
         # WHEN
-        _wait_for_file(filepath, timeout, interval)
+        _wait_for_connection_file(filepath, max_retries, interval)
 
         # THEN
-        assert mock_time.call_count == 4
         mock_exists.assert_has_calls([call(filepath)] * 2)
         mock_sleep.assert_has_calls([call(interval)] * 3)
         open_mock.assert_has_calls([call(filepath, mode="r")] * 2)
 
-    @patch.object(frontend_runner.time, "time")
     @patch.object(frontend_runner.time, "sleep")
     @patch.object(frontend_runner.os.path, "exists")
-    def test_raises_when_timeout_reached(
+    def test_raises_when_retries_reached(
         self,
         mock_exists: MagicMock,
         mock_sleep: MagicMock,
-        mock_time: MagicMock,
     ):
         # GIVEN
         filepath = "/path"
-        timeout = 0
+        max_retries = 0
         interval = 0.01
-        mock_time.side_effect = [1, 2]
-        mock_exists.side_effect = [False]
+        mock_exists.return_value = False
 
         # WHEN
         with pytest.raises(TimeoutError) as raised_err:
-            _wait_for_file(filepath, timeout, interval)
+            _wait_for_connection_file(filepath, max_retries, interval)
 
         # THEN
-        assert raised_err.match(f"Timed out after {timeout}s waiting for file at {filepath}")
-        assert mock_time.call_count == 2
+        assert raised_err.match(f"Timed out waiting for File '{filepath}' to exist")
         mock_exists.assert_called_once_with(filepath)
         mock_sleep.assert_not_called()

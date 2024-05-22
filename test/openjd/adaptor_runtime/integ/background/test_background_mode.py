@@ -21,7 +21,10 @@ from openjd.adaptor_runtime._background.frontend_runner import (
     FrontendRunner,
     HTTPError,
 )
-from openjd.adaptor_runtime._background.loaders import ConnectionSettingsFileLoader
+from openjd.adaptor_runtime._background.loaders import (
+    ConnectionSettingsLoadingError,
+    ConnectionSettingsFileLoader,
+)
 from openjd.adaptor_runtime._osname import OSName
 
 mod_path = (Path(__file__).parent.parent).resolve()
@@ -77,7 +80,6 @@ class TestDaemonMode:
             adaptor_module=sys.modules[AdaptorExample.__module__],
             connection_file_path=connection_file_path,
         )
-        conn_settings = ConnectionSettingsFileLoader(connection_file_path).load()
 
         match = re.search("Started backend process. PID: ([0-9]+)", caplog.text)
         assert match is not None
@@ -96,9 +98,16 @@ class TestDaemonMode:
         # Once all handles are closed, the system automatically cleans up the named pipe.
         if OSName.is_posix():
             try:
-                os.remove(conn_settings.socket)
-            except FileNotFoundError:
-                pass  # Already deleted
+                conn_settings = ConnectionSettingsFileLoader(connection_file_path).load()
+            except ConnectionSettingsLoadingError as e:
+                print(
+                    f"Failed to load connection settings, socket file cleanup will be skipped: {e}"
+                )
+            else:
+                try:
+                    os.remove(conn_settings.socket)
+                except FileNotFoundError:
+                    pass  # Already deleted
 
     def test_init(
         self,

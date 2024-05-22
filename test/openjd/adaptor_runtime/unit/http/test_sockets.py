@@ -16,6 +16,7 @@ from openjd.adaptor_runtime._http.sockets import (
     NonvalidSocketPathException,
     NoSocketPathFoundException,
     SocketPaths,
+    UnixSocketPaths,
 )
 
 
@@ -86,14 +87,14 @@ class TestSocketPaths:
         ) -> None:
             # GIVEN
             mock_stat.return_value.st_mode = stat.S_ISVTX
-            subject = SocketPathsStub()
+            subject = UnixSocketPaths()
 
             # WHEN
             subject.get_socket_path("sock")
 
             # THEN
             mock_gettempdir.assert_called_once()
-            mock_stat.assert_called_once()
+            mock_stat.assert_called()
 
         @pytest.mark.parametrize(
             argnames=["create"],
@@ -151,30 +152,6 @@ class TestSocketPaths:
             assert raised_exc.match("^Socket path '.*' failed verification: .*")
             assert mock_verify_socket_path.call_count == 1
 
-        @patch.object(SocketPathsStub, "verify_socket_path")
-        @patch.object(sockets.os, "stat")
-        def test_raises_when_no_tmpdir_sticky_bit(
-            self,
-            mock_stat: MagicMock,
-            mock_verify_socket_path: MagicMock,
-        ) -> None:
-            # GIVEN
-            mock_verify_socket_path.side_effect = [NonvalidSocketPathException(), None]
-            mock_stat.return_value.st_mode = stat.S_IWOTH
-            subject = SocketPathsStub()
-
-            # WHEN
-            with pytest.raises(NoSocketPathFoundException) as raised_exc:
-                subject.get_socket_path("sock")
-
-            # THEN
-            assert raised_exc.match(
-                re.escape(
-                    f"Cannot use directory {os.path.realpath(sockets.tempfile.gettempdir())} because it is world writable"
-                    " and does not have the sticky bit (restricted deletion flag) set"
-                )
-            )
-
         @patch.object(sockets.os.path, "exists")
         def test_handles_socket_name_collisions(
             self,
@@ -196,87 +173,135 @@ class TestSocketPaths:
             assert mock_exists.call_count == (len(existing_sock_names) + 1)
 
 
-class TestLinuxSocketPaths:
+class TestUnixSocketPaths:
+    @pytest.fixture(autouse=True)
+    def mock_stat(self) -> Generator[MagicMock, None, None]:
+        with patch.object(sockets.os, "stat") as m:
+            yield m
+
     @pytest.mark.parametrize(
-        argnames=["path"],
+        argnames=["mode", "should_fail"],
         argvalues=[
-            ["a"],
-            ["a" * 107],
+            [stat.S_IWOTH & stat.S_ISVTX, False],
+            [stat.S_IWOTH, True],
+            [stat.S_IROTH, False],
         ],
-        ids=["one byte", "107 bytes"],
+        ids=[
+            "world-writable, sticky, passes",
+            "world-writable, not sticky, fails",
+            "world-readable, not sticky, passes",
+        ],
     )
-    def test_accepts_names_within_107_bytes(self, path: str):
-        """
-        Verifies the function accepts paths up to 100 bytes (108 byte max - 1 byte null terminator)
-        """
-        # GIVEN
-        subject = LinuxSocketPaths()
+    def test_verifies_all_parent_directories(
+        self,
+        mode: int,
+        should_fail: bool,
+        mock_stat: MagicMock,
+    ) -> None:
+        pass
 
-        try:
-            # WHEN
-            subject.verify_socket_path(path)
-        except NonvalidSocketPathException as e:
-            pytest.fail(f"verify_socket_path raised an error when it should not have: {e}")
-        else:
-            # THEN
-            pass  # success
-
-    def test_rejects_names_over_107_bytes(self):
+    @patch.object(sockets.os, "stat")
+    def test_raises_when_no_tmpdir_sticky_bit(
+        self,
+        mock_stat: MagicMock,
+    ) -> None:
         # GIVEN
-        length = 108
-        path = "a" * length
-        subject = LinuxSocketPaths()
+        mock_stat.return_value.st_mode = stat.S_IWOTH
+        socket_name = "/sock"
+        subject = UnixSocketPaths()
 
         # WHEN
-        with pytest.raises(NonvalidSocketPathException) as raised_exc:
-            subject.verify_socket_path(path)
+        with pytest.raises(NoSocketPathFoundException) as raised_exc:
+            subject.verify_socket_path(socket_name)
 
         # THEN
         assert raised_exc.match(
-            "Socket name too long. The maximum allowed size is "
-            f"{subject._socket_name_max_length} bytes, but the name has a size of "
-            f"{length}: {path}"
+            re.escape(
+                f"Cannot use directory {os.path.dirname(socket_name)} because it is world writable"
+                " and does not have the sticky bit (restricted deletion flag) set"
+            )
         )
 
+    class TestLinuxSocketPaths:
+        @pytest.mark.parametrize(
+            argnames=["path"],
+            argvalues=[
+                ["a"],
+                ["a" * 107],
+            ],
+            ids=["one byte", "107 bytes"],
+        )
+        def test_accepts_names_within_107_bytes(self, path: str):
+            """
+            Verifies the function accepts paths up to 100 bytes (108 byte max - 1 byte null terminator)
+            """
+            # GIVEN
+            subject = LinuxSocketPaths()
 
-class TestMacOSSocketPaths:
-    @pytest.mark.parametrize(
-        argnames=["path"],
-        argvalues=[
-            ["a"],
-            ["a" * 103],
-        ],
-        ids=["one byte", "103 bytes"],
-    )
-    def test_accepts_paths_within_103_bytes(self, path: str):
-        """
-        Verifies the function accepts paths up to 103 bytes (104 byte max - 1 byte null terminator)
-        """
-        # GIVEN
-        subject = MacOSSocketPaths()
+            try:
+                # WHEN
+                subject.verify_socket_path(path)
+            except NonvalidSocketPathException as e:
+                pytest.fail(f"verify_socket_path raised an error when it should not have: {e}")
+            else:
+                # THEN
+                pass  # success
 
-        try:
+        def test_rejects_names_over_107_bytes(self):
+            # GIVEN
+            length = 108
+            path = "a" * length
+            subject = LinuxSocketPaths()
+
             # WHEN
-            subject.verify_socket_path(path)
-        except NonvalidSocketPathException as e:
-            pytest.fail(f"verify_socket_path raised an error when it should not have: {e}")
-        else:
+            with pytest.raises(NonvalidSocketPathException) as raised_exc:
+                subject.verify_socket_path(path)
+
             # THEN
-            pass  # success
+            assert raised_exc.match(
+                "Socket name too long. The maximum allowed size is "
+                f"{subject._socket_name_max_length} bytes, but the name has a size of "
+                f"{length}: {path}"
+            )
 
-    def test_rejects_paths_over_103_bytes(self):
-        # GIVEN
-        length = 104
-        path = "a" * length
-        subject = MacOSSocketPaths()
-
-        # WHEN
-        with pytest.raises(NonvalidSocketPathException) as raised_exc:
-            subject.verify_socket_path(path)
-
-        # THEN
-        assert raised_exc.match(
-            "Socket name too long. The maximum allowed size is "
-            f"{subject._socket_name_max_length} bytes, but the name has a size of "
-            f"{length}: {path}"
+    class TestMacOSSocketPaths:
+        @pytest.mark.parametrize(
+            argnames=["path"],
+            argvalues=[
+                ["a"],
+                ["a" * 103],
+            ],
+            ids=["one byte", "103 bytes"],
         )
+        def test_accepts_paths_within_103_bytes(self, path: str):
+            """
+            Verifies the function accepts paths up to 103 bytes (104 byte max - 1 byte null terminator)
+            """
+            # GIVEN
+            subject = MacOSSocketPaths()
+
+            try:
+                # WHEN
+                subject.verify_socket_path(path)
+            except NonvalidSocketPathException as e:
+                pytest.fail(f"verify_socket_path raised an error when it should not have: {e}")
+            else:
+                # THEN
+                pass  # success
+
+        def test_rejects_paths_over_103_bytes(self):
+            # GIVEN
+            length = 104
+            path = "a" * length
+            subject = MacOSSocketPaths()
+
+            # WHEN
+            with pytest.raises(NonvalidSocketPathException) as raised_exc:
+                subject.verify_socket_path(path)
+
+            # THEN
+            assert raised_exc.match(
+                "Socket name too long. The maximum allowed size is "
+                f"{subject._socket_name_max_length} bytes, but the name has a size of "
+                f"{length}: {path}"
+            )

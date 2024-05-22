@@ -116,16 +116,10 @@ class SocketPaths(abc.ABC):
         else:
             socket_dir = os.path.realpath(base_dir)
 
-        # Check that the sticky bit is set if the dir is world writable
-        socket_dir_stat = os.stat(socket_dir)
-        if socket_dir_stat.st_mode & stat.S_IWOTH and not socket_dir_stat.st_mode & stat.S_ISVTX:
-            raise NoSocketPathFoundException(
-                f"Cannot use directory {socket_dir} because it is world writable and does not "
-                "have the sticky bit (restricted deletion flag) set"
-            )
-
         if namespace:
             socket_dir = os.path.join(socket_dir, namespace)
+
+        mkdir(socket_dir)
 
         socket_path = gen_socket_path(socket_dir, base_socket_name)
         try:
@@ -134,7 +128,6 @@ class SocketPaths(abc.ABC):
             raise NoSocketPathFoundException(
                 f"Socket path '{socket_path}' failed verification: {e}"
             ) from e
-        mkdir(socket_dir)
 
         return socket_path
 
@@ -150,7 +143,37 @@ class SocketPaths(abc.ABC):
         pass
 
 
-class LinuxSocketPaths(SocketPaths):
+class WindowsSocketPaths(SocketPaths):
+    """
+    Specialization for verifying socket paths on Windows systems.
+    """
+
+    def verify_socket_path(self, path: str) -> None:
+        # TODO: Verify Windows permissions of parent directories are least privileged
+        pass
+
+
+class UnixSocketPaths(SocketPaths):
+    """
+    Specialization for verifying socket paths on Unix systems.
+    """
+
+    def verify_socket_path(self, path: str) -> None:
+        # Walk up directories and check that the sticky bit is set if the dir is world writable
+        prev_path = path
+        curr_path = os.path.dirname(path)
+        while prev_path != curr_path and len(curr_path) > 0:
+            path_stat = os.stat(curr_path)
+            if path_stat.st_mode & stat.S_IWOTH and not path_stat.st_mode & stat.S_ISVTX:
+                raise NoSocketPathFoundException(
+                    f"Cannot use directory {curr_path} because it is world writable and does not "
+                    "have the sticky bit (restricted deletion flag) set"
+                )
+            prev_path = curr_path
+            curr_path = os.path.dirname(curr_path)
+
+
+class LinuxSocketPaths(UnixSocketPaths):
     """
     Specialization for socket paths in Linux systems.
     """
@@ -161,6 +184,7 @@ class LinuxSocketPaths(SocketPaths):
     _socket_name_max_length = 108 - 1
 
     def verify_socket_path(self, path: str) -> None:
+        super().verify_socket_path(path)
         path_length = len(path.encode("utf-8"))
         if path_length > self._socket_name_max_length:
             raise NonvalidSocketPathException(
@@ -170,7 +194,7 @@ class LinuxSocketPaths(SocketPaths):
             )
 
 
-class MacOSSocketPaths(SocketPaths):
+class MacOSSocketPaths(UnixSocketPaths):
     """
     Specialization for socket paths in macOS systems.
     """
@@ -181,6 +205,7 @@ class MacOSSocketPaths(SocketPaths):
     _socket_name_max_length = 104 - 1
 
     def verify_socket_path(self, path: str) -> None:
+        super().verify_socket_path(path)
         path_length = len(path.encode("utf-8"))
         if path_length > self._socket_name_max_length:
             raise NonvalidSocketPathException(
@@ -193,6 +218,7 @@ class MacOSSocketPaths(SocketPaths):
 _os_map: dict[str, type[SocketPaths]] = {
     OSName.LINUX: LinuxSocketPaths,
     OSName.MACOS: MacOSSocketPaths,
+    OSName.WINDOWS: WindowsSocketPaths,
 }
 
 
