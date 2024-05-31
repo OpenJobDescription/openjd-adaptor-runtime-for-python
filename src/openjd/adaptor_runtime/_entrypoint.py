@@ -112,7 +112,7 @@ class _ParsedArgs(Namespace):
     run_data: str
     path_mapping_rules: str
     connection_file: str | None
-    log_file: str | None
+    bootstrap_log_file: str | None
 
     # is-compatible args
     openjd_adaptor_cli_version: str | None
@@ -255,7 +255,11 @@ class EntryPoint:
         """
         parser, parsed_args = self._parse_args()
         log_config = self._init_loggers(
-            bootstrap_log_path=parsed_args.log_file if hasattr(parsed_args, "log_file") else None
+            bootstrap_log_path=(
+                parsed_args.bootstrap_log_file
+                if hasattr(parsed_args, "bootstrap_log_file")
+                else None
+            )
         )
 
         interface_version_info = self._get_version_info()
@@ -512,7 +516,7 @@ class EntryPoint:
 
         log_file = ArgumentParser(add_help=False)
         log_file.add_argument(
-            "--log-file",
+            "--bootstrap-log-file",
             help=_CLI_HELP_TEXT["log_file"],
             required=False,
         )

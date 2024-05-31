@@ -196,7 +196,7 @@ class TestFrontendRunner:
                 ]
             expected_args.extend(
                 [
-                    "--log-file",
+                    "--bootstrap-log-file",
                     os.path.join(
                         tempfile.gettempdir(),
                         f"adaptor-runtime-background-bootstrap-{mock_uuid.return_value}.log",
