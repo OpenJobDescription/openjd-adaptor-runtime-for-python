@@ -1,3 +1,10 @@
+## 0.8.0 (2024-06-03)
+
+### BREAKING CHANGES
+* handle socket name collisions (#125) ([`a123717`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/a1237171d2fe86e99b4eed5fd7f6f9578ff24aa9))
+
+
+
 ## 0.7.2 (2024-04-24)
 
 ### CI
