@@ -26,7 +26,11 @@ class WinAdaptorServer(NamedPipeServer):
     actions_queue: ActionsQueue
     adaptor: BaseAdaptor
 
-    def __init__(self, actions_queue: ActionsQueue, adaptor: BaseAdaptor) -> None:
+    def __init__(
+        self,
+        actions_queue: ActionsQueue,
+        adaptor: BaseAdaptor,
+    ) -> None:
         """
         Adaptor Server class in Windows.
 

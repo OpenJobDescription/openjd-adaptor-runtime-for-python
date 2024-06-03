@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,7 @@ from openjd.adaptor_runtime.adaptors.configuration import (
 )
 from openjd.adaptor_runtime.adaptors import BaseAdaptor, SemanticVersion
 from openjd.adaptor_runtime._background import BackendRunner, FrontendRunner
+from openjd.adaptor_runtime._background.model import ConnectionSettings
 from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime._entrypoint import _load_data
 
@@ -214,7 +216,14 @@ class TestStart:
         # GIVEN
         init_data = {"init": "data"}
         with patch.object(
-            runtime_entrypoint.sys, "argv", ["Adaptor", "run", "--init-data", json.dumps(init_data)]
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "run",
+                "--init-data",
+                json.dumps(init_data),
+            ],
         ):
             entrypoint = EntryPoint(mock_adaptor_cls)
 
@@ -461,7 +470,7 @@ class TestStart:
     ):
         # GIVEN
         init_data = {"init": "data"}
-        conn_file = "/path/to/conn_file"
+        conn_file = Path(os.sep) / "path" / "to" / "conn_file"
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -472,7 +481,7 @@ class TestStart:
                 "--init-data",
                 json.dumps(init_data),
                 "--connection-file",
-                conn_file,
+                str(conn_file),
             ],
         ):
             entrypoint = EntryPoint(mock_adaptor_cls)
@@ -487,7 +496,7 @@ class TestStart:
         )
         mock_init.assert_called_once_with(
             mock_adaptor_runner.return_value,
-            conn_file,
+            connection_file_path=conn_file.resolve(),
             log_buffer=mock_log_buffer.return_value,
         )
         mock_run.assert_called_once()
@@ -506,7 +515,7 @@ class TestStart:
     ):
         # GIVEN
         init_data = {"init": "data"}
-        conn_file = "/path/to/conn_file"
+        conn_file = os.path.join(os.sep, "path", "to", "conn_file")
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -534,7 +543,7 @@ class TestStart:
         mock_magic_init: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = Path(os.sep) / "path" / "to" / "conn_file"
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -543,7 +552,7 @@ class TestStart:
                 "daemon",
                 "start",
                 "--connection-file",
-                conn_file,
+                str(conn_file),
             ],
         ):
             entrypoint = EntryPoint(FakeAdaptor)
@@ -555,7 +564,7 @@ class TestStart:
 
         # THEN
         assert raised_err.match(f"Adaptor module is not loaded: {FakeAdaptor.__module__}")
-        mock_magic_init.assert_called_once_with(conn_file)
+        mock_magic_init.assert_called_once_with()
 
     @pytest.mark.parametrize(
         argnames="reentry_exe",
@@ -570,12 +579,12 @@ class TestStart:
     def test_runs_background_start(
         self,
         mock_start: MagicMock,
+        mock_init: MagicMock,
         mock_magic_init: MagicMock,
-        mock_magic_start: MagicMock,
         reentry_exe: Optional[Path],
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = Path(os.sep) / "path" / "to" / "conn_file"
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -584,7 +593,7 @@ class TestStart:
                 "daemon",
                 "start",
                 "--connection-file",
-                conn_file,
+                str(conn_file),
             ],
         ):
             mock_adaptor_module = Mock()
@@ -597,10 +606,17 @@ class TestStart:
                 entrypoint.start(reentry_exe=reentry_exe)
 
         # THEN
-        mock_magic_init.assert_called_once_with(mock_adaptor_module, {}, {}, reentry_exe)
-        mock_magic_start.assert_called_once_with(conn_file)
+        mock_magic_init.assert_called_once_with()
+        mock_init.assert_called_once_with(
+            adaptor_module=mock_adaptor_module,
+            connection_file_path=conn_file.resolve(),
+            init_data={},
+            path_mapping_data={},
+            reentry_exe=reentry_exe,
+        )
         mock_start.assert_called_once_with()
 
+    @patch.object(runtime_entrypoint.ConnectionSettingsFileLoader, "load")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "shutdown")
     @patch.object(FrontendRunner, "stop")
@@ -609,9 +625,11 @@ class TestStart:
         mock_end: MagicMock,
         mock_shutdown: MagicMock,
         mock_magic_init: MagicMock,
+        mock_connection_settings_load: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        connection_settings = ConnectionSettings("socket")
+        mock_connection_settings_load.return_value = connection_settings
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -620,7 +638,7 @@ class TestStart:
                 "daemon",
                 "stop",
                 "--connection-file",
-                conn_file,
+                "/path/to/conn/file",
             ],
         ):
             entrypoint = EntryPoint(FakeAdaptor)
@@ -629,19 +647,22 @@ class TestStart:
             entrypoint.start()
 
         # THEN
-        mock_magic_init.assert_called_once_with(conn_file)
+        mock_magic_init.assert_called_once_with(connection_settings=connection_settings)
         mock_end.assert_called_once()
         mock_shutdown.assert_called_once_with()
 
+    @patch.object(runtime_entrypoint.ConnectionSettingsFileLoader, "load")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "run")
     def test_runs_background_run(
         self,
         mock_run: MagicMock,
         mock_magic_init: MagicMock,
+        mock_connection_settings_load: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_settings = ConnectionSettings("socket")
+        mock_connection_settings_load.return_value = conn_settings
         run_data = {"run": "data"}
         with patch.object(
             runtime_entrypoint.sys,
@@ -653,7 +674,7 @@ class TestStart:
                 "--run-data",
                 json.dumps(run_data),
                 "--connection-file",
-                conn_file,
+                "/path/to/conn/file",
             ],
         ):
             entrypoint = EntryPoint(FakeAdaptor)
@@ -662,9 +683,11 @@ class TestStart:
             entrypoint.start()
 
         # THEN
-        mock_magic_init.assert_called_once_with(conn_file)
+        mock_magic_init.assert_called_once_with(connection_settings=conn_settings)
         mock_run.assert_called_once_with(run_data)
+        mock_connection_settings_load.assert_called_once()
 
+    @patch.object(runtime_entrypoint.ConnectionSettingsFileLoader, "load")
     @patch.object(FrontendRunner, "__init__", return_value=None)
     @patch.object(FrontendRunner, "run")
     @patch.object(runtime_entrypoint.signal, "signal")
@@ -673,9 +696,10 @@ class TestStart:
         signal_mock: MagicMock,
         mock_run: MagicMock,
         mock_magic_init: MagicMock,
+        mock_connection_settings_load: MagicMock,
     ):
         # GIVEN
-        conn_file = "/path/to/conn_file"
+        conn_file = Path(os.sep) / "path" / "to" / "conn_file"
         run_data = {"run": "data"}
         with patch.object(
             runtime_entrypoint.sys,
@@ -687,7 +711,7 @@ class TestStart:
                 "--run-data",
                 json.dumps(run_data),
                 "--connection-file",
-                conn_file,
+                str(conn_file),
             ],
         ):
             entrypoint = EntryPoint(FakeAdaptor)
@@ -698,13 +722,15 @@ class TestStart:
         # THEN
         signal_mock.assert_not_called()
 
+    @patch.object(runtime_entrypoint, "ConnectionSettingsFileLoader")
     @patch.object(runtime_entrypoint, "FrontendRunner")
     def test_makes_connection_file_path_absolute(
         self,
         mock_runner: MagicMock,
+        mock_connection_settings_loader: MagicMock,
     ):
         # GIVEN
-        conn_file = "relpath"
+        conn_file = Path("relpath")
         with patch.object(
             runtime_entrypoint.sys,
             "argv",
@@ -713,23 +739,30 @@ class TestStart:
                 "daemon",
                 "run",
                 "--connection-file",
-                conn_file,
+                str(conn_file),
             ],
         ):
             entrypoint = EntryPoint(FakeAdaptor)
 
             # WHEN
-            mock_isabs: MagicMock
+            mock_is_absolute: MagicMock
             with (
-                patch.object(runtime_entrypoint.os.path, "isabs", return_value=False) as mock_isabs,
-                patch.object(runtime_entrypoint.os.path, "abspath") as mock_abspath,
+                patch.object(
+                    runtime_entrypoint.Path, "is_absolute", return_value=False
+                ) as mock_is_absolute,
+                patch.object(
+                    runtime_entrypoint.Path, "absolute", return_value=Path("absolute")
+                ) as mock_absolute,
             ):
                 entrypoint.start()
 
         # THEN
-        mock_isabs.assert_any_call(conn_file)
-        mock_abspath.assert_any_call(conn_file)
-        mock_runner.assert_called_once_with(mock_abspath.return_value)
+        mock_is_absolute.assert_called_once()
+        mock_absolute.assert_any_call()
+        mock_connection_settings_loader.assert_called_once_with(mock_absolute.return_value)
+        mock_runner.assert_called_once_with(
+            connection_settings=mock_connection_settings_loader.return_value.load.return_value
+        )
 
 
 class TestLoadData:

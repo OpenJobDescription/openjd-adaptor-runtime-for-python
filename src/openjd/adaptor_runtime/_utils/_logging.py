@@ -6,9 +6,6 @@ from typing import (
     Optional,
 )
 
-_OPENJD_LOG_PATTERN = r"^openjd_\S+: "
-_OPENJD_LOG_REGEX = re.compile(_OPENJD_LOG_PATTERN)
-
 
 class ConditionalFormatter(logging.Formatter):
     """

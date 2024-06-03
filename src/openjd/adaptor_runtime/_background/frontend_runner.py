@@ -10,16 +10,20 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
-from pathlib import Path
 import urllib.parse as urllib_parse
+import uuid
+from pathlib import Path
 from threading import Event
 from types import FrameType
 from types import ModuleType
-from typing import Optional, Dict
+from typing import Optional, Callable, Dict
 
 from .._osname import OSName
 from ..process._logging import _ADAPTOR_OUTPUT_LEVEL
+from .._utils._constants import _OPENJD_ENV_STDOUT_PREFIX, _OPENJD_ADAPTOR_SOCKET_ENV
+from .loaders import ConnectionSettingsFileLoader
 from .model import (
     AdaptorState,
     AdaptorStatus,
@@ -37,28 +41,39 @@ if OSName.is_windows():
 _logger = logging.getLogger(__name__)
 
 
+class ConnectionSettingsNotProvidedError(Exception):
+    """Raised when the connection settings are required but are missing"""
+
+    pass
+
+
 class FrontendRunner:
     """
     Class that runs the frontend logic in background mode.
     """
 
+    connection_settings: ConnectionSettings | None
+
     def __init__(
         self,
-        connection_file_path: str,
         *,
         timeout_s: float = 5.0,
         heartbeat_interval: float = 1.0,
+        connection_settings: ConnectionSettings | None = None,
     ) -> None:
         """
         Args:
-            connection_file_path (str): Absolute path to the connection file.
             timeout_s (float, optional): Timeout for HTTP requests, in seconds. Defaults to 5.
             heartbeat_interval (float, optional): Interval between heartbeats, in seconds.
                 Defaults to 1.
+            connection_settings (ConnectionSettings, optional): The connection settings to use.
+                This option is not required for the "init" command, but is required for everything
+                else. Defaults to None.
         """
         self._timeout_s = timeout_s
         self._heartbeat_interval = heartbeat_interval
-        self._connection_file_path = connection_file_path
+        self.connection_settings = connection_settings
+
         self._canceled = Event()
         signal.signal(signal.SIGINT, self._sigint_handler)
         if OSName.is_posix():  # pragma: is-windows
@@ -68,7 +83,9 @@ class FrontendRunner:
 
     def init(
         self,
+        *,
         adaptor_module: ModuleType,
+        connection_file_path: Path,
         init_data: dict | None = None,
         path_mapping_data: dict | None = None,
         reentry_exe: Path | None = None,
@@ -79,6 +96,8 @@ class FrontendRunner:
 
         Args:
             adaptor_module (ModuleType): The module of the adaptor running the runtime.
+            connection_file_path (Path): The path to the connection file to use for establishing
+                a connection with the backend process.
             init_data (dict): Data to pass to the adaptor during initialization.
             path_mapping_data (dict): Path mapping rules to make available to the adaptor while it's running.
             reentry_exe (Path): The path to the binary executable that for adaptor reentry.
@@ -86,10 +105,10 @@ class FrontendRunner:
         if adaptor_module.__package__ is None:
             raise Exception(f"Adaptor module is not a package: {adaptor_module}")
 
-        if os.path.exists(self._connection_file_path):
+        if connection_file_path.exists():
             raise FileExistsError(
                 "Cannot init a new backend process with an existing connection file at: "
-                + self._connection_file_path
+                + str(connection_file_path)
             )
 
         if init_data is None:
@@ -107,18 +126,32 @@ class FrontendRunner:
             ]
         else:
             args = [str(reentry_exe)]
+
         args.extend(
             [
                 "daemon",
                 "_serve",
-                "--connection-file",
-                self._connection_file_path,
                 "--init-data",
                 json.dumps(init_data),
                 "--path-mapping-rules",
                 json.dumps(path_mapping_data),
+                "--connection-file",
+                str(connection_file_path),
             ]
         )
+
+        bootstrap_id = uuid.uuid4()
+        bootstrap_log_dir = tempfile.gettempdir()
+        bootstrap_log_path = os.path.join(
+            bootstrap_log_dir, f"adaptor-runtime-background-bootstrap-{bootstrap_id}.log"
+        )
+        args.extend(["--bootstrap-log-file", bootstrap_log_path])
+
+        _logger.debug(f"Running process with args: {args}")
+        bootstrap_output_path = os.path.join(
+            bootstrap_log_dir, f"adaptor-runtime-background-bootstrap-output-{bootstrap_id}.log"
+        )
+        output_log_file = open(bootstrap_output_path, mode="w+")
         try:
             process = subprocess.Popen(
                 args,
@@ -126,8 +159,8 @@ class FrontendRunner:
                 close_fds=True,
                 start_new_session=True,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=output_log_file,
+                stderr=output_log_file,
             )
         except Exception as e:
             _logger.error(f"Failed to initialize backend process: {e}")
@@ -136,18 +169,60 @@ class FrontendRunner:
 
         # Wait for backend process to create connection file
         try:
-            _wait_for_file(self._connection_file_path, timeout_s=5)
+            _wait_for_connection_file(str(connection_file_path), max_retries=5, interval_s=1)
         except TimeoutError:
             _logger.error(
                 "Backend process failed to write connection file in time at: "
-                + self._connection_file_path
+                + str(connection_file_path)
             )
+
+            exit_code = process.poll()
+            if exit_code is not None:
+                _logger.info(f"Backend process exited with code: {exit_code}")
+            else:
+                _logger.info("Backend process is still running")
+
             raise
+        finally:
+            # Close file handle to prevent further writes
+            # At this point, we have all the logs/output we need from the bootstrap
+            output_log_file.close()
+            if process.stdout:
+                process.stdout.close()
+            if process.stderr:
+                process.stderr.close()
+
+            with open(bootstrap_output_path, mode="r") as f:
+                bootstrap_output = f.readlines()
+            _logger.info("========== BEGIN BOOTSTRAP OUTPUT CONTENTS ==========")
+            for line in bootstrap_output:
+                _logger.info(line.strip())
+            _logger.info("========== END BOOTSTRAP OUTPUT CONTENTS ==========")
+
+            _logger.info(f"Checking for bootstrap logs at '{bootstrap_log_path}'")
+            try:
+                with open(bootstrap_log_path, mode="r") as f:
+                    bootstrap_logs = f.readlines()
+            except Exception as e:
+                _logger.error(f"Failed to get bootstrap logs at '{bootstrap_log_path}': {e}")
+            else:
+                _logger.info("========== BEGIN BOOTSTRAP LOG CONTENTS ==========")
+                for line in bootstrap_logs:
+                    _logger.info(line.strip())
+                _logger.info("========== END BOOTSTRAP LOG CONTENTS ==========")
+
+        # Load up connection settings for the heartbeat requests
+        self.connection_settings = ConnectionSettingsFileLoader(connection_file_path).load()
 
         # Heartbeat to ensure backend process is listening for requests
         _logger.info("Verifying connection to backend...")
         self._heartbeat()
         _logger.info("Connected successfully")
+
+        # Output the socket path to the environment via OpenJD environments
+        _logger.info(
+            f"{_OPENJD_ENV_STDOUT_PREFIX}{_OPENJD_ADAPTOR_SOCKET_ENV}={self.connection_settings.socket}"
+        )
 
     def run(self, run_data: dict) -> None:
         """
@@ -248,6 +323,11 @@ class FrontendRunner:
         params: dict | None = None,
         json_body: dict | None = None,
     ) -> http_client.HTTPResponse | Dict:
+        if not self.connection_settings:
+            raise ConnectionSettingsNotProvidedError(
+                "Connection settings are required to send requests, but none were provided"
+            )
+
         if OSName.is_windows():  # pragma: is-posix
             if params:
                 # This is used for aligning to the Linux's behavior in order to reuse the code in handler.
@@ -287,6 +367,11 @@ class FrontendRunner:
         params: dict | None = None,
         json_body: dict | None = None,
     ) -> http_client.HTTPResponse:  # pragma: is-windows
+        if not self.connection_settings:
+            raise ConnectionSettingsNotProvidedError(
+                "Connection settings are required to send requests, but none were provided"
+            )
+
         conn = UnixHTTPConnection(self.connection_settings.socket, timeout=self._timeout_s)
 
         if params:
@@ -311,15 +396,6 @@ class FrontendRunner:
 
         return response
 
-    @property
-    def connection_settings(self) -> ConnectionSettings:
-        """
-        Gets the lazy-loaded connection settings.
-        """
-        if not hasattr(self, "_connection_settings"):
-            self._connection_settings = _load_connection_settings(self._connection_file_path)
-        return self._connection_settings
-
     def _sigint_handler(self, signum: int, frame: Optional[FrameType]) -> None:
         """
         Signal handler for interrupt signals.
@@ -338,51 +414,84 @@ class FrontendRunner:
         self.cancel()
 
 
-def _load_connection_settings(path: str) -> ConnectionSettings:
-    try:
-        with open(path) as conn_file:
-            loaded_settings = json.load(conn_file)
-    except OSError as e:
-        _logger.error(f"Failed to open connection file: {e}")
-        raise
-    except json.JSONDecodeError as e:
-        _logger.error(f"Failed to decode connection file: {e}")
-        raise
-    return DataclassMapper(ConnectionSettings).map(loaded_settings)
-
-
-def _wait_for_file(filepath: str, timeout_s: float, interval_s: float = 1) -> None:
+def _wait_for_connection_file(
+    filepath: str, max_retries: int, interval_s: float = 1
+) -> ConnectionSettings:
     """
-    Waits for a file at the specified path to exist and to be openable.
+    Waits for a connection file at the specified path to exist, be openable, and have connection settings.
 
     Args:
         filepath (str): The file path to check.
-        timeout_s (float): The max duration to wait before timing out, in seconds.
+        max_retries (int): The max number of retries before timing out.
         interval_s (float, optional): The interval between checks, in seconds. Default is 0.01s.
 
     Raises:
         TimeoutError: Raised when the file does not exist after timeout_s seconds.
     """
+    wait_for(
+        description=f"File '{filepath}' to exist",
+        predicate=lambda: os.path.exists(filepath),
+        interval_s=interval_s,
+        max_retries=max_retries,
+    )
 
-    def _wait():
-        if time.time() - start < timeout_s:
-            time.sleep(interval_s)
-        else:
-            raise TimeoutError(f"Timed out after {timeout_s}s waiting for file at {filepath}")
+    # Wait before opening to give the backend time to open it first
+    time.sleep(interval_s)
 
-    start = time.time()
-    while not os.path.exists(filepath):
-        _wait()
-
-    while True:
-        # Wait before opening to give the backend time to open it first
-        _wait()
+    def file_is_openable() -> bool:
         try:
             open(filepath, mode="r").close()
-            break
         except IOError:
             # File is not available yet
-            pass
+            return False
+        else:
+            return True
+
+    wait_for(
+        description=f"File '{filepath}' to be openable",
+        predicate=file_is_openable,
+        interval_s=interval_s,
+        max_retries=max_retries,
+    )
+
+    def connection_file_loadable() -> bool:
+        try:
+            ConnectionSettingsFileLoader(Path(filepath)).load()
+        except Exception:
+            return False
+        else:
+            return True
+
+    wait_for(
+        description=f"File '{filepath}' to have valid ConnectionSettings",
+        predicate=connection_file_loadable,
+        interval_s=interval_s,
+        max_retries=max_retries,
+    )
+
+    return ConnectionSettingsFileLoader(Path(filepath)).load()
+
+
+def wait_for(
+    *,
+    description: str,
+    predicate: Callable[[], bool],
+    interval_s: float,
+    max_retries: int | None = None,
+) -> None:
+    if max_retries is not None:
+        assert max_retries >= 0, "max_retries must be a non-negative integer"
+    assert interval_s > 0, "interval_s must be a positive number"
+
+    _logger.info(f"Waiting for {description}")
+    retry_count = 0
+    while not predicate():
+        if max_retries is not None and retry_count >= max_retries:
+            raise TimeoutError(f"Timed out waiting for {description}")
+
+        _logger.info(f"Retrying in {interval_s}s...")
+        retry_count += 1
+        time.sleep(interval_s)
 
 
 class AdaptorFailedException(Exception):

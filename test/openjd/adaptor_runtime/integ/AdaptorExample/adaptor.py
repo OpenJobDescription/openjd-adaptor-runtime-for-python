@@ -45,6 +45,7 @@ class AdaptorExample(Adaptor):
         # This example initializes a server thread to interact with a client application, showing command exchange and
         # execution.
         _logger.info("on_start")
+
         # Initialize the server thread to manage actions
         self.server = AdaptorServer(
             # actions_queue will be used for storing the actions. In the client application, it will keep polling the

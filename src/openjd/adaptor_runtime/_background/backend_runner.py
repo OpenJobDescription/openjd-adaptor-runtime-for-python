@@ -6,14 +6,16 @@ import json
 import logging
 import os
 import signal
+from pathlib import Path
 from threading import Thread, Event
+import traceback
 from types import FrameType
-from typing import Optional, Union
+from typing import Callable, List, Optional, Union
 
 from .server_response import ServerResponseGenerator
 from .._osname import OSName
 from ..adaptors import AdaptorRunner
-from .._http import SocketDirectories
+from .._http import SocketPaths
 from .._utils import secure_open
 
 if OSName.is_posix():
@@ -36,12 +38,13 @@ class BackendRunner:
     def __init__(
         self,
         adaptor_runner: AdaptorRunner,
-        connection_file_path: str,
         *,
+        connection_file_path: Path,
         log_buffer: LogBuffer | None = None,
     ) -> None:
         self._adaptor_runner = adaptor_runner
         self._connection_file_path = connection_file_path
+
         self._log_buffer = log_buffer
         self._server: Optional[Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer]] = None
         signal.signal(signal.SIGINT, self._sigint_handler)
@@ -68,7 +71,7 @@ class BackendRunner:
                 self._server, self._adaptor_runner._cancel, force_immediate=True
             )
 
-    def run(self) -> None:
+    def run(self, *, on_connection_file_written: List[Callable[[], None]] | None = None) -> None:
         """
         Runs the backend logic for background mode.
 
@@ -79,8 +82,9 @@ class BackendRunner:
         shutdown_event: Event = Event()
 
         if OSName.is_posix():  # pragma: is-windows
-            server_path = SocketDirectories.for_os().get_process_socket_path(
-                "runtime", create_dir=True
+            server_path = SocketPaths.for_os().get_process_socket_path(
+                ".openjd_adaptor_runtime",
+                create_dir=True,
             )
         else:  # pragma: is-posix
             server_path = NamedPipeHelper.generate_pipe_name("AdaptorNamedPipe")
@@ -123,6 +127,16 @@ class BackendRunner:
             _logger.info("Shutting down server...")
             shutdown_event.set()
             raise
+        except Exception as e:
+            _logger.critical(f"Unexpected error occurred when writing to connection file: {e}")
+            _logger.critical(traceback.format_exc())
+            _logger.info("Shutting down server")
+            shutdown_event.set()
+        else:
+            if on_connection_file_written:
+                callbacks = list(on_connection_file_written)
+                for cb in callbacks:
+                    cb()
         finally:
             # Block until the shutdown_event is set
             shutdown_event.wait()

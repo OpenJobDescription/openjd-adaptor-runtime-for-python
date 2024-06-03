@@ -13,6 +13,7 @@ from typing import Generic
 from typing import Type
 from typing import TypeVar
 
+from .._utils._constants import _OPENJD_PROGRESS_STDOUT_PREFIX, _OPENJD_STATUS_STDOUT_PREFIX
 from .configuration import AdaptorConfiguration, ConfigurationManager
 from .configuration._configuration_manager import (
     create_adaptor_configuration_manager as create_adaptor_configuration_manager,
@@ -54,8 +55,8 @@ class BaseAdaptor(AdaptorStates, Generic[_T]):
     Base class for adaptors.
     """
 
-    _OPENJD_PROGRESS_STDOUT_PREFIX: str = "openjd_progress: "
-    _OPENJD_STATUS_STDOUT_PREFIX: str = "openjd_status: "
+    _OPENJD_PROGRESS_STDOUT_PREFIX: str = _OPENJD_PROGRESS_STDOUT_PREFIX
+    _OPENJD_STATUS_STDOUT_PREFIX: str = _OPENJD_STATUS_STDOUT_PREFIX
 
     def __init__(
         self,
