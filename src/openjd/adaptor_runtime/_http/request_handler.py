@@ -98,7 +98,8 @@ class RequestHandler(server.BaseHTTPRequestHandler):
             self.send_response(response.status)
         else:
             self.send_error(response.status)
-        _logger.debug(f"Sending status code {response.status} for request to {self.path}")
+        path_to_log = self.path.replace("\r\n", "").replace("\n", "")
+        _logger.debug(f"Sending status code {response.status} for request to {path_to_log}")
 
         if response.body:
             body = response.body.encode("utf-8")
