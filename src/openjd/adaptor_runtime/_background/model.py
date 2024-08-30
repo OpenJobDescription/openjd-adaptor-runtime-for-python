@@ -38,7 +38,7 @@ class HeartbeatResponse:
 
 class DataclassJSONEncoder(json.JSONEncoder):  # pragma: no cover
     def default(self, o: Any) -> Dict:
-        if dataclasses.is_dataclass(o):
+        if dataclasses.is_dataclass(o) and not isinstance(o, type):
             return dataclasses.asdict(o)
         else:
             return super().default(o)

@@ -100,20 +100,22 @@ explicit_package_bases = true
 mypy_path = "src"
 
 [tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
 ignore = [
   "E501",
   # Double Check if this should be fixed
   "E731",
 ]
-line-length = 100
 
 
-[tool.ruff.pep8-naming]
+[tool.ruff.lint.pep8-naming]
 classmethod-decorators = [
   "classmethod",
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = [
   "openjd",
 ]
