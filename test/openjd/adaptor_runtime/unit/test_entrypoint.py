@@ -22,6 +22,7 @@ from openjd.adaptor_runtime.adaptors.configuration import (
 )
 from openjd.adaptor_runtime.adaptors import BaseAdaptor, SemanticVersion
 from openjd.adaptor_runtime._background import BackendRunner, FrontendRunner
+from openjd.adaptor_runtime._background.frontend_runner import _FRONTEND_RUNNER_REQUEST_TIMEOUT
 from openjd.adaptor_runtime._background.model import ConnectionSettings
 from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime._entrypoint import _load_data
@@ -564,7 +565,7 @@ class TestStart:
 
         # THEN
         assert raised_err.match(f"Adaptor module is not loaded: {FakeAdaptor.__module__}")
-        mock_magic_init.assert_called_once_with()
+        mock_magic_init.assert_called_once_with(timeout_s=_FRONTEND_RUNNER_REQUEST_TIMEOUT)
 
     @pytest.mark.parametrize(
         argnames="reentry_exe",
@@ -606,7 +607,7 @@ class TestStart:
                 entrypoint.start(reentry_exe=reentry_exe)
 
         # THEN
-        mock_magic_init.assert_called_once_with()
+        mock_magic_init.assert_called_once_with(timeout_s=_FRONTEND_RUNNER_REQUEST_TIMEOUT)
         mock_init.assert_called_once_with(
             adaptor_module=mock_adaptor_module,
             connection_file_path=conn_file.resolve(),
@@ -647,7 +648,9 @@ class TestStart:
             entrypoint.start()
 
         # THEN
-        mock_magic_init.assert_called_once_with(connection_settings=connection_settings)
+        mock_magic_init.assert_called_once_with(
+            connection_settings=connection_settings, timeout_s=_FRONTEND_RUNNER_REQUEST_TIMEOUT
+        )
         mock_end.assert_called_once()
         mock_shutdown.assert_called_once_with()
 
@@ -683,7 +686,9 @@ class TestStart:
             entrypoint.start()
 
         # THEN
-        mock_magic_init.assert_called_once_with(connection_settings=conn_settings)
+        mock_magic_init.assert_called_once_with(
+            connection_settings=conn_settings, timeout_s=_FRONTEND_RUNNER_REQUEST_TIMEOUT
+        )
         mock_run.assert_called_once_with(run_data)
         mock_connection_settings_load.assert_called_once()
 
@@ -721,6 +726,57 @@ class TestStart:
 
         # THEN
         signal_mock.assert_not_called()
+
+    @pytest.mark.parametrize(
+        argnames="reentry_exe",
+        argvalues=[
+            (None,),
+            (Path("reeentry_exe_value"),),
+        ],
+    )
+    @patch.object(FrontendRunner, "__init__", return_value=None)
+    @patch.object(FrontendRunner, "init")
+    @patch.object(FrontendRunner, "start")
+    def test_frontend_runner_timeout_override(
+        self,
+        mock_start: MagicMock,
+        mock_init: MagicMock,
+        mock_magic_init: MagicMock,
+        reentry_exe: Optional[Path],
+    ):
+        # GIVEN
+        test_timeout_override = 600
+        conn_file = Path(os.sep) / "path" / "to" / "conn_file"
+        with patch.object(
+            runtime_entrypoint.sys,
+            "argv",
+            [
+                "Adaptor",
+                "daemon",
+                "start",
+                "--connection-file",
+                str(conn_file),
+            ],
+        ):
+            mock_adaptor_module = Mock()
+            entrypoint = EntryPoint(FakeAdaptor)
+
+            # WHEN
+            with patch.dict(
+                runtime_entrypoint.sys.modules, {FakeAdaptor.__module__: mock_adaptor_module}
+            ):
+                entrypoint.start(reentry_exe=reentry_exe, timeout_in_seconds=test_timeout_override)
+
+        # THEN
+        mock_magic_init.assert_called_once_with(timeout_s=test_timeout_override)
+        mock_init.assert_called_once_with(
+            adaptor_module=mock_adaptor_module,
+            connection_file_path=conn_file.resolve(),
+            init_data={},
+            path_mapping_data={},
+            reentry_exe=reentry_exe,
+        )
+        mock_start.assert_called_once_with()
 
     @patch.object(runtime_entrypoint, "ConnectionSettingsFileLoader")
     @patch.object(runtime_entrypoint, "FrontendRunner")
@@ -761,7 +817,8 @@ class TestStart:
         mock_absolute.assert_any_call()
         mock_connection_settings_loader.assert_called_once_with(mock_absolute.return_value)
         mock_runner.assert_called_once_with(
-            connection_settings=mock_connection_settings_loader.return_value.load.return_value
+            connection_settings=mock_connection_settings_loader.return_value.load.return_value,
+            timeout_s=_FRONTEND_RUNNER_REQUEST_TIMEOUT,
         )
 
 
