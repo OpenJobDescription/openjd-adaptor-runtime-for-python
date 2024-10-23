@@ -257,7 +257,7 @@ class EntryPoint:
 
         Args:
             reentry_exe (Path): The path to the binary executable that for adaptor reentry.
-            timeout_in_seconds (Optional[float]): The maximum time in seconds to wait for data before
+            timeout_in_seconds (float): The maximum time in seconds to wait for data before
                 raising a TimeoutError. Defaults to 5 seconds. None means waiting indefinitely.
         """
         parser, parsed_args = self._parse_args()
