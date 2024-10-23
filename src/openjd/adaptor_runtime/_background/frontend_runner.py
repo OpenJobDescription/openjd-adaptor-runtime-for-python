@@ -34,6 +34,8 @@ from .model import (
     HeartbeatResponse,
 )
 
+_FRONTEND_RUNNER_REQUEST_TIMEOUT: float = 5.0
+
 if OSName.is_windows():
     from ...adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
     import pywintypes
@@ -57,7 +59,7 @@ class FrontendRunner:
     def __init__(
         self,
         *,
-        timeout_s: float = 5.0,
+        timeout_s: float = _FRONTEND_RUNNER_REQUEST_TIMEOUT,
         heartbeat_interval: float = 1.0,
         connection_settings: ConnectionSettings | None = None,
     ) -> None:

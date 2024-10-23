@@ -31,6 +31,7 @@ import yaml
 
 from .adaptors import AdaptorRunner, BaseAdaptor
 from ._background import BackendRunner, FrontendRunner, InMemoryLogBuffer, LogBufferHandler
+from ._background.frontend_runner import _FRONTEND_RUNNER_REQUEST_TIMEOUT
 from ._background.loaders import (
     ConnectionSettingsFileLoader,
     ConnectionSettingsEnvLoader,
@@ -246,12 +247,18 @@ class EntryPoint:
             ),
         )
 
-    def start(self, reentry_exe: Optional[Path] = None) -> None:
+    def start(
+        self,
+        reentry_exe: Optional[Path] = None,
+        timeout_in_seconds: float = _FRONTEND_RUNNER_REQUEST_TIMEOUT,
+    ) -> None:
         """
         Starts the run of the adaptor.
 
         Args:
             reentry_exe (Path): The path to the binary executable that for adaptor reentry.
+            timeout_in_seconds (float): The maximum time in seconds to wait for data before
+                raising a TimeoutError. Defaults to 5 seconds. None means waiting indefinitely.
         """
         parser, parsed_args = self._parse_args()
         log_config = self._init_loggers(
@@ -300,7 +307,7 @@ class EntryPoint:
             return self._handle_run(adaptor, integration_data)
         elif parsed_args.command == "daemon":  # pragma: no branch
             return self._handle_daemon(
-                adaptor, parsed_args, log_config, integration_data, reentry_exe
+                adaptor, parsed_args, log_config, integration_data, timeout_in_seconds, reentry_exe
             )
 
     def _handle_is_compatible(
@@ -367,6 +374,7 @@ class EntryPoint:
         parsed_args: _ParsedArgs,
         log_config: _LogConfig,
         integration_data: _IntegrationData,
+        timeout_in_seconds: float,
         reentry_exe: Optional[Path] = None,
     ):
         # Validate args
@@ -408,7 +416,7 @@ class EntryPoint:
             # This process is running in frontend mode. Create the frontend runner and send
             # the appropriate request to the backend.
             if subcommand == "start":
-                frontend = FrontendRunner()
+                frontend = FrontendRunner(timeout_s=timeout_in_seconds)
                 adaptor_module = sys.modules.get(self.adaptor_class.__module__)
                 if adaptor_module is None:
                     raise ModuleNotFoundError(
@@ -435,7 +443,9 @@ class EntryPoint:
                     else ConnectionSettingsEnvLoader()
                 )
                 conn_settings = conn_settings_loader.load()
-                frontend = FrontendRunner(connection_settings=conn_settings)
+                frontend = FrontendRunner(
+                    connection_settings=conn_settings, timeout_s=timeout_in_seconds
+                )
                 if subcommand == "run":
                     frontend.run(integration_data.run_data)
                 elif subcommand == "stop":
