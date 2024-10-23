@@ -250,7 +250,7 @@ class EntryPoint:
     def start(
         self,
         reentry_exe: Optional[Path] = None,
-        timeout_in_seconds: Optional[float] = _FRONTEND_RUNNER_REQUEST_TIMEOUT,
+        timeout_in_seconds: float = _FRONTEND_RUNNER_REQUEST_TIMEOUT,
     ) -> None:
         """
         Starts the run of the adaptor.
