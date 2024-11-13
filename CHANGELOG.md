@@ -1,3 +1,10 @@
+## 0.8.1 (2024-11-13)
+
+
+### Features
+* Adding optional override for adaptor request timeout default to EntryPoint start method (#149) ([`652164f`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/652164f672a8548ee1f89e430b90378d06bbea34))
+
+
 ## 0.8.0 (2024-06-03)
 
 ### BREAKING CHANGES
