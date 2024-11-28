@@ -30,7 +30,7 @@ classifiers = [
 dependencies = [
   "pyyaml ~= 6.0",
   "jsonschema >= 4.17.0, == 4.*",
-  "pywin32 == 308; platform_system == 'Windows'",
+  "pywin32 >= 307; platform_system == 'Windows'",
 ]
 
 [project.urls]
