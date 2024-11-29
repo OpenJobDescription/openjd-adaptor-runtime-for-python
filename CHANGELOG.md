@@ -1,3 +1,8 @@
+## 0.8.2 (2024-11-29)
+
+This release allows pywin32 version 307 and above to be used as a dependency for this package. Previously, only pywin32 version 308 was allowed.
+
+
 ## 0.8.1 (2024-11-13)
 
 
