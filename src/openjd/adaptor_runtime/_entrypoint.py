@@ -590,14 +590,14 @@ def _load_data(data: str) -> dict:
 
 def _load_yaml_json(data: str) -> Any:
     """
-    Loads a YAML/JSON file/string.
+    Loads a YAML/JSON file/string using the UTF-8 encoding.
 
     Note that yaml.safe_load() is capable of loading JSON documents.
     """
     loaded_yaml = None
     if data.startswith("file://"):
         filepath = data[len("file://") :]
-        with open(filepath) as yaml_file:
+        with open(filepath, encoding="utf-8") as yaml_file:
             loaded_yaml = yaml.safe_load(yaml_file)
     else:
         loaded_yaml = yaml.safe_load(data)
