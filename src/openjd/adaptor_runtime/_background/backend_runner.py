@@ -116,7 +116,9 @@ class BackendRunner:
             raise
 
         try:
-            with secure_open(self._connection_file_path, open_mode="w") as conn_file:
+            with secure_open(
+                self._connection_file_path, open_mode="w", encoding="utf-8"
+            ) as conn_file:
                 json.dump(
                     ConnectionSettings(server_path),
                     conn_file,

@@ -82,7 +82,8 @@ class Configuration:
         """
 
         try:
-            config = json.load(open(config_path))
+            with open(config_path, encoding="utf-8") as config_file:
+                config = json.load(config_file)
         except OSError as e:
             _logger.error(f"Failed to open configuration at {config_path}: {e}")
             raise
@@ -102,7 +103,8 @@ class Configuration:
         schema_paths = schema_path if isinstance(schema_path, list) else [schema_path]
         for path in schema_paths:
             try:
-                schema = json.load(open(path))
+                with open(path, encoding="utf-8") as schema_file:
+                    schema = json.load(schema_file)
             except OSError as e:
                 _logger.error(f"Failed to open configuration schema at {path}: {e}")
                 raise

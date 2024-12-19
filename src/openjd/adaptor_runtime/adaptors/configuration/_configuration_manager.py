@@ -95,7 +95,7 @@ def _ensure_config_file(filepath: str, *, create: bool = False) -> bool:
         _logger.info(f"Creating empty configuration at {filepath}")
         try:
             os.makedirs(os.path.dirname(filepath), mode=stat.S_IRWXU, exist_ok=True)
-            with secure_open(filepath, open_mode="w") as f:
+            with secure_open(filepath, open_mode="w", encoding="utf-8") as f:
                 json.dump({}, f)
         except OSError as e:
             _logger.warning(f"Could not write empty configuration to {filepath}: {e}")

@@ -33,7 +33,7 @@ def _check_file(filename: Path) -> None:
 def _is_version_file(filename: Path) -> bool:
     if filename.name != "_version.py":
         return False
-    with open(filename) as infile:
+    with open(filename, encoding="utf-8") as infile:
         lines_read = 0
         for line in infile:
             if _generated_by_scm.search(line):

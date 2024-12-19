@@ -153,7 +153,7 @@ class FrontendRunner:
         bootstrap_output_path = os.path.join(
             bootstrap_log_dir, f"adaptor-runtime-background-bootstrap-output-{bootstrap_id}.log"
         )
-        output_log_file = open(bootstrap_output_path, mode="w+")
+        output_log_file = open(bootstrap_output_path, mode="w+", encoding="utf-8")
         try:
             process = subprocess.Popen(
                 args,
@@ -194,7 +194,7 @@ class FrontendRunner:
             if process.stderr:
                 process.stderr.close()
 
-            with open(bootstrap_output_path, mode="r") as f:
+            with open(bootstrap_output_path, mode="r", encoding="utf-8") as f:
                 bootstrap_output = f.readlines()
             _logger.info("========== BEGIN BOOTSTRAP OUTPUT CONTENTS ==========")
             for line in bootstrap_output:
@@ -203,7 +203,7 @@ class FrontendRunner:
 
             _logger.info(f"Checking for bootstrap logs at '{bootstrap_log_path}'")
             try:
-                with open(bootstrap_log_path, mode="r") as f:
+                with open(bootstrap_log_path, mode="r", encoding="utf-8") as f:
                     bootstrap_logs = f.readlines()
             except Exception as e:
                 _logger.error(f"Failed to get bootstrap logs at '{bootstrap_log_path}': {e}")
@@ -442,7 +442,8 @@ def _wait_for_connection_file(
 
     def file_is_openable() -> bool:
         try:
-            open(filepath, mode="r").close()
+            with open(filepath, mode="r", encoding="utf-8"):
+                pass
         except IOError:
             # File is not available yet
             return False

@@ -5,7 +5,7 @@ from __future__ import annotations
 from json.decoder import JSONDecodeError
 from typing import Any
 from typing import List as _List
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, call, patch, ANY
 
 import jsonschema
 import pytest
@@ -55,7 +55,18 @@ class TestFromFile:
         result = Configuration.from_file(config_path, schema_path)
 
         # THEN
-        mock_open.assert_has_calls([call(config_path), call(schema_path)])
+        mock_open.assert_has_calls(
+            [
+                call(config_path, encoding="utf-8"),
+                # The __enter__ and __exit__ are context manager
+                # calls for opening files safely.
+                call().__enter__(),
+                call().__exit__(None, None, None),
+                call(schema_path, encoding="utf-8"),
+                call().__enter__(),
+                call().__exit__(None, None, None),
+            ]
+        )
         assert mock_load.call_count == 2
         mock_validate.assert_called_once_with(config, schema)
         assert result._config is config
@@ -77,7 +88,7 @@ class TestFromFile:
         result = Configuration.from_file(config_path)
 
         # THEN
-        mock_open.assert_called_once_with(config_path)
+        mock_open.assert_called_once_with(config_path, encoding="utf-8")
         mock_load.assert_called_once()
         assert (
             f"JSON Schema file path not provided. Configuration file {config_path} will not be "
@@ -107,7 +118,21 @@ class TestFromFile:
         result = Configuration.from_file(config_path, [schema_path, schema2_path])
 
         # THEN
-        mock_open.assert_has_calls([call(config_path), call(schema_path), call(schema2_path)])
+        mock_open.assert_has_calls(
+            [
+                call(config_path, encoding="utf-8"),
+                # The __enter__ and __exit__ are context manager
+                # calls for opening files safely.
+                call().__enter__(),
+                call().__exit__(None, None, None),
+                call(schema_path, encoding="utf-8"),
+                call().__enter__(),
+                call().__exit__(None, None, None),
+                call(schema2_path, encoding="utf-8"),
+                call().__enter__(),
+                call().__exit__(None, None, None),
+            ]
+        )
         assert mock_load.call_count == 3
         mock_validate.assert_has_calls([call(config, schema), call(config, schema2)])
         assert result._config is config
@@ -128,7 +153,7 @@ class TestFromFile:
 
         # THEN
         mock_load.assert_called_once()
-        mock_open.assert_called_once_with(config_path)
+        mock_open.assert_called_once_with(config_path, encoding="utf-8")
         assert raised_err.match(f"Schema path cannot be an empty {type(schema_path)}")
 
     @patch.object(configuration.json, "load")
@@ -148,7 +173,9 @@ class TestFromFile:
 
         # THEN
         mock_load.assert_called_once()
-        mock_open.assert_has_calls([call(config_path), call(schema_path)])
+        mock_open.assert_has_calls(
+            [call(config_path, encoding="utf-8"), call(schema_path, encoding="utf-8")]
+        )
         assert raised_err.value is err
         assert f"Failed to open configuration schema at {schema_path}: " in caplog.text
 
@@ -169,7 +196,18 @@ class TestFromFile:
 
         # THEN
         assert mock_load.call_count == 2
-        mock_open.assert_has_calls([call(config_path), call(schema_path)])
+        mock_open.assert_has_calls(
+            [
+                call(config_path, encoding="utf-8"),
+                # The __enter__ and __exit__ are context manager
+                # calls for opening files safely.
+                call().__enter__(),
+                call().__exit__(None, None, None),
+                call(schema_path, encoding="utf-8"),
+                call().__enter__(),
+                call().__exit__(JSONDecodeError, ANY, ANY),
+            ]
+        )
         assert raised_err.value is err
         assert f"Failed to decode configuration schema at {schema_path}: " in caplog.text
 
@@ -187,7 +225,7 @@ class TestFromFile:
             Configuration.from_file(config_path, "")
 
         # THEN
-        mock_open.assert_called_once_with(config_path)
+        mock_open.assert_called_once_with(config_path, encoding="utf-8")
         assert raised_err.value is err
         assert f"Failed to open configuration at {config_path}: " in caplog.text
 
@@ -206,7 +244,7 @@ class TestFromFile:
             Configuration.from_file(config_path, "")
 
         # THEN
-        mock_open.assert_called_once_with(config_path)
+        mock_open.assert_called_once_with(config_path, encoding="utf-8")
         mock_load.assert_called_once()
         assert raised_err.value is err
         assert f"Failed to decode configuration at {config_path}: " in caplog.text
@@ -234,7 +272,18 @@ class TestFromFile:
             Configuration.from_file(config_path, schema_path)
 
         # THEN
-        mock_open.assert_has_calls([call(config_path), call(schema_path)])
+        mock_open.assert_has_calls(
+            [
+                call(config_path, encoding="utf-8"),
+                # The __enter__ and __exit__ are context manager
+                # calls for opening files safely.
+                call().__enter__(),
+                call().__exit__(None, None, None),
+                call(schema_path, encoding="utf-8"),
+                call().__enter__(),
+                call().__exit__(None, None, None),
+            ]
+        )
         assert mock_load.call_count == 2
         mock_validate.assert_called_once_with(config, schema)
         assert raised_err.value is mock_validate.side_effect
