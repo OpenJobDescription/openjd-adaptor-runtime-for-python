@@ -963,7 +963,7 @@ class TestWaitForConnectionFile:
         # THEN
         mock_exists.assert_has_calls([call(filepath)] * 2)
         mock_sleep.assert_has_calls([call(interval)] * 3)
-        open_mock.assert_has_calls([call(filepath, mode="r")] * 2)
+        open_mock.assert_has_calls([call(filepath, mode="r", encoding="utf-8")] * 2)
 
     @patch.object(frontend_runner.time, "sleep")
     @patch.object(frontend_runner.os.path, "exists")

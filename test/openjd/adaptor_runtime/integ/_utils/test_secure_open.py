@@ -24,7 +24,7 @@ def create_file():
         f"secure_open_test_{''.join(random.choice(string.ascii_letters) for _ in range(10))}.txt"
     )
     test_file_path = os.path.join(tempfile.gettempdir(), test_file_name)
-    with secure_open(test_file_path, open_mode="w") as test_file:
+    with secure_open(test_file_path, open_mode="w", encoding="utf-8") as test_file:
         test_file.write(file_content)
     yield test_file_path, file_content
     os.remove(test_file_path)
@@ -36,7 +36,7 @@ class TestSecureOpen:
         Test if the file owner can write and read the file
         """
         test_file_path, file_content = create_file
-        with secure_open(test_file_path, open_mode="r") as test_file:
+        with secure_open(test_file_path, open_mode="r", encoding="utf-8") as test_file:
             result = test_file.read()
         assert result == file_content
 
@@ -61,7 +61,7 @@ class TestSecureOpen:
 
         try:
             with pytest.raises(PermissionError):
-                with open(test_file_path, "r") as f:
+                with open(test_file_path, "r", encoding="utf-8") as f:
                     f.read()
         finally:
             # Revert the impersonation

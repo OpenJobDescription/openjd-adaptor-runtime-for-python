@@ -865,7 +865,7 @@ class TestLoadData:
 
         # THEN
         assert output == expected
-        open_mock.assert_called_once_with(filepath)
+        open_mock.assert_called_once_with(filepath, encoding="utf-8")
 
     @patch.object(runtime_entrypoint, "open")
     def test_raises_on_os_error(self, mock_open: MagicMock, caplog: pytest.LogCaptureFixture):
@@ -880,7 +880,7 @@ class TestLoadData:
 
         # THEN
         assert raised_err.value is mock_open.side_effect
-        mock_open.assert_called_once_with(filepath)
+        mock_open.assert_called_once_with(filepath, encoding="utf-8")
         assert "Failed to open data file: " in caplog.text
 
     def test_raises_when_parsing_fails(self, caplog: pytest.LogCaptureFixture):

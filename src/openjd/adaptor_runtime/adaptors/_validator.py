@@ -74,7 +74,7 @@ class AdaptorDataValidator:
             schema_path (str): The path to the JSON schema file to use.
         """
         try:
-            with open(schema_path) as schema_file:
+            with open(schema_path, encoding="utf-8") as schema_file:
                 schema = json.load(schema_file)
         except json.JSONDecodeError as e:
             _logger.error(f"Failed to decode JSON schema file: {e}")
@@ -148,7 +148,7 @@ def _load_yaml_json(data: str) -> Any:
     loaded_yaml = None
     if data.startswith("file://"):
         filepath = data[len("file://") :]
-        with open(filepath) as yaml_file:
+        with open(filepath, encoding="utf-8") as yaml_file:
             loaded_yaml = yaml.safe_load(yaml_file)
     else:
         loaded_yaml = yaml.safe_load(data)

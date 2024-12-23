@@ -96,7 +96,7 @@ class TestBackendRunner:
         )
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
-        open_mock.assert_called_once_with(conn_file, open_mode="w")
+        open_mock.assert_called_once_with(conn_file, open_mode="w", encoding="utf-8")
         mock_json_dump.assert_called_once_with(
             ConnectionSettings(socket_path),
             open_mock.return_value,
@@ -170,7 +170,7 @@ class TestBackendRunner:
         ]
         mock_thread.assert_called_once()
         mock_thread.return_value.start.assert_called_once()
-        open_mock.assert_called_once_with(conn_file, open_mode="w")
+        open_mock.assert_called_once_with(conn_file, open_mode="w", encoding="utf-8")
         mock_thread.return_value.join.assert_called_once()
         if OSName.is_posix():
             mock_os_remove.assert_has_calls([call(conn_file), call(socket_path)])

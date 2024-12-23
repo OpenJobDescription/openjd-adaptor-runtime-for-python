@@ -35,7 +35,7 @@ class ConnectionSettingsFileLoader(ConnectionSettingsLoader):
 
     def load(self) -> ConnectionSettings:
         try:
-            with open(self.file_path) as conn_file:
+            with open(self.file_path, encoding="utf-8") as conn_file:
                 loaded_settings = json.load(conn_file)
         except OSError as e:
             errmsg = f"Failed to open connection file '{self.file_path}': {e}"
