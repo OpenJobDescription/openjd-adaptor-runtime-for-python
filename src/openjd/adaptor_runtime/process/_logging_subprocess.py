@@ -69,7 +69,6 @@ class LoggingSubprocess(object):
             # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
             # Without this one, current process will also get the SIGBREAK and may react incorrectly.
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
-
         try:
             self._process = subprocess.Popen(**popen_params)
 
