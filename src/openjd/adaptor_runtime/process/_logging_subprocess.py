@@ -79,7 +79,7 @@ class LoggingSubprocess(object):
             exe_path = shutil.which(executable)
 
             # If we didn't find the executable found by which
-            if type(exe_path) is not None:
+            if exe_path is not None:
                 raise FileNotFoundError(
                     f"Could not find adaptor executable at: {exe_path} using alias {executable}\n"
                     f"Error:{fnf_error}"
@@ -90,9 +90,6 @@ class LoggingSubprocess(object):
                 f"Is the executable on the PATH or in the startup directory?\n"
                 f"Error:{fnf_error}"
             )
-
-        except Exception as error:
-            raise error
 
         if not self._process.stdout:  # pragma: no cover
             raise RuntimeError("process stdout not set")
