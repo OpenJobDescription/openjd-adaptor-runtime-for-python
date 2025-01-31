@@ -149,7 +149,7 @@ class FrontendRunner:
         )
         args.extend(["--bootstrap-log-file", bootstrap_log_path])
 
-        _logger.debug(f"Running process with args: {args}")
+        _logger.info(f"Running process with args: {args}")
         bootstrap_output_path = os.path.join(
             bootstrap_log_dir, f"adaptor-runtime-background-bootstrap-output-{bootstrap_id}.log"
         )
