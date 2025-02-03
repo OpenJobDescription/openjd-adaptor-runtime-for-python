@@ -113,9 +113,9 @@ class TestIntegrationLoggingSubprocess(object):
     def test_startup_directory_empty_posix(self):
         """When calling LoggingSubprocess with an empty cwd, FileNotFoundError will be raised."""
         args = ["pwd"]
-        with pytest.raises(FileNotFoundError) as excinfo:
+        with pytest.raises(FileNotFoundError) as exc_info:
             LoggingSubprocess(args=args, startup_directory="")
-        assert "[Errno 2] No such file or directory: ''" in str(excinfo.value)
+        assert "[Errno 2] No such file or directory: ''" in str(exc_info.value)
 
     @pytest.mark.skipif(not OSName.is_windows(), reason="Only run this test in Windows.")
     def test_startup_directory_empty_windows(self):
@@ -151,6 +151,12 @@ class TestIntegrationLoggingSubprocess(object):
 
         assert any(r.message == message and r.levelno == _STDERR_LEVEL for r in records)
 
+    def test_executable_not_found(self):
+        """When calling LoggingSubprocess with a missing executable, FileNotFoundError will be raised"""
+        args = ["missing_executable"]
+        with pytest.raises(FileNotFoundError) as exc_info:
+            LoggingSubprocess(args=args)
+        assert "Could not find the executable associated with the adaptor" in str(exc_info.value)
 
 class TestIntegrationRegexHandler(object):
     """Integration tests for LoggingSubprocess"""
