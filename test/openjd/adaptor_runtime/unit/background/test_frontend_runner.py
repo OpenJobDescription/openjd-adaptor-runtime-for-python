@@ -219,6 +219,34 @@ class TestFrontendRunner:
             )
             mock_heartbeat.assert_called_once()
 
+        def test_arguments_to_daemon_serve_are_logged_at_info_level(
+            self,
+            mock_path_exists: MagicMock,
+            mock_Popen: MagicMock,
+            caplog: pytest.LogCaptureFixture,
+        ):
+            # GIVEN
+            caplog.set_level("INFO")
+            mock_path_exists.return_value = False
+            adaptor_module = ModuleType("")
+            adaptor_module.__package__ = "package"
+            conn_file_path = Path("/path")
+            runner = FrontendRunner()
+
+            # WHEN
+            runner.init(
+                adaptor_module=adaptor_module,
+                connection_file_path=conn_file_path,
+            )
+
+            # THEN
+            assert any(
+                "Running process with args" in captured_message
+                for captured_message in caplog.messages
+            )
+            mock_path_exists.assert_called_once_with()
+            mock_Popen.assert_called_once()
+
         def test_raises_when_adaptor_module_not_package(self):
             # GIVEN
             adaptor_module = ModuleType("")
