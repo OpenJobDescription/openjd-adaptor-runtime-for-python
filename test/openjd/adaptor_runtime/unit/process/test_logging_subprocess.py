@@ -462,7 +462,7 @@ class TestLoggingSubprocess(object):
         args = ["cat", "foo.txt"]
         LoggingSubprocess(args=args)
 
-        assert "Running command: cat foo.txt" in caplog.text
+        assert "Running command: /usr/bin/cat foo.txt" in caplog.text
 
     @mock.patch.object(logging_subprocess.subprocess, "Popen", autospec=True)
     def test_startup_directory_default(self, mock_popen_autospec: mock.Mock):

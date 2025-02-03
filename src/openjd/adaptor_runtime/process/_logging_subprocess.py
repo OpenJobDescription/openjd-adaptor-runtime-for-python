@@ -9,7 +9,7 @@ import signal
 import subprocess
 import uuid
 from types import TracebackType
-from typing import Any, Sequence, TypeVar, Dict
+from typing import Any, MutableSequence, TypeVar, Dict
 
 from .._osname import OSName
 from ..app_handlers import RegexHandler
@@ -38,7 +38,7 @@ class LoggingSubprocess(object):
         self,
         *,
         # Required keyword-only arguments
-        args: Sequence[str],
+        args: MutableSequence[str],  # Using a MutableSequence so we can update it
         # Optional keyword-only arguments
         startup_directory: str | None = None,  # This is None, because Popen's default is None
         logger: logging.Logger = _logger,
@@ -53,6 +53,17 @@ class LoggingSubprocess(object):
 
         self._terminate_threads = False
         self._logger = logger
+
+        # Fetch the fully qualified executable name from the system PATH and use that
+        # If shutil.which is passed a full path, it'll return the same
+        executable_path = shutil.which(args[0])
+
+        if executable_path is None:
+            raise FileNotFoundError(
+                f"Could not find the executable associated with the adaptor: {executable_path}\n"
+                f"Is the executable on the PATH or in the startup directory?\n"
+            )
+        args[0] = executable_path
 
         self._logger.info("Running command: %s", subprocess.list2cmdline(args))
 
@@ -69,26 +80,8 @@ class LoggingSubprocess(object):
             # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
             # Without this one, current process will also get the SIGBREAK and may react incorrectly.
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
-        try:
-            self._process = subprocess.Popen(**popen_params)
 
-        except FileNotFoundError as fnf_error:
-            # In ManagedProcess we prepend the executable to the list of arguments before creating a LoggingSubprocess
-            executable = args[0]
-            exe_path = shutil.which(executable)
-
-            # If we didn't find the executable found by which
-            if exe_path is not None:
-                raise FileNotFoundError(
-                    f"Could not find adaptor executable at: {exe_path} using alias {executable}\n"
-                    f"Error:{fnf_error}"
-                )
-
-            raise FileNotFoundError(
-                f"Could not find the executable associated with the adaptor: {executable}\n"
-                f"Is the executable on the PATH or in the startup directory?\n"
-                f"Error:{fnf_error}"
-            )
+        self._process = subprocess.Popen(**popen_params)
 
         if not self._process.stdout:  # pragma: no cover
             raise RuntimeError("process stdout not set")
