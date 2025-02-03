@@ -35,6 +35,7 @@ class TestIntegrationClientInterface:
 
         # To avoid a race condition, giving some extra time for the logging subprocess to start.
         _sleep(0.5 if OSName.is_posix() else 4)
+        signal_type: signal.Signals
         if OSName.is_windows():
             signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]
         else:
@@ -77,6 +78,7 @@ class TestIntegrationClientInterface:
 
         # To avoid a race condition, giving some extra time for the logging subprocess to start.
         _sleep(0.5 if OSName.is_posix() else 4)
+        signal_type: signal.Signals
         if OSName.is_windows():
             signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]
         else:

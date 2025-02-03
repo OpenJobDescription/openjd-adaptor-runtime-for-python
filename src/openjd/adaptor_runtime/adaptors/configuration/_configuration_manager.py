@@ -23,10 +23,11 @@ _DIR = os.path.dirname(os.path.realpath(__file__))
 
 _ConfigType = TypeVar("_ConfigType", bound=Configuration)
 _AdaptorConfigType = TypeVar("_AdaptorConfigType", bound=AdaptorConfiguration)
+_AdaptorConfigClassType = Type[_AdaptorConfigType]
 
 
 def create_adaptor_configuration_manager(
-    config_cls: Type[_AdaptorConfigType],
+    config_cls: _AdaptorConfigClassType,
     adaptor_name: str,
     default_config_path: str,
     schema_path: str | List[str] | None = None,
