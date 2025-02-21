@@ -46,7 +46,7 @@ class TestDaemonMode:
         # Set up a config file for the backend process
         config = {"log_level": "DEBUG"}
         config_path = os.path.join(tmpdir, "configuration.json")
-        with open(config_path, mode="w") as f:
+        with open(config_path, mode="w", encoding="utf-8") as f:
             json.dump(config, f)
 
         # Override the default config path to the one we just created

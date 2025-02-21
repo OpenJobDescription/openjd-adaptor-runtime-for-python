@@ -32,7 +32,7 @@ Running this script on the above CHANGELOG.md should return the following conten
 import re
 
 h2 = r"^##\s.*$"
-with open("CHANGELOG.md") as f:
+with open("CHANGELOG.md", encoding="utf-8") as f:
     contents = f.read()
 matches = re.findall(h2, contents, re.MULTILINE)
 changelog = contents[: contents.find(matches[1]) - 1] if len(matches) > 1 else contents

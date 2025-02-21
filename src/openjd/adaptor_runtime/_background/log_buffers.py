@@ -132,7 +132,7 @@ class FileLogBuffer(LogBuffer):
     def buffer(self, record: logging.LogRecord) -> None:
         with (
             self._file_lock,
-            secure_open(self._filepath, open_mode="a") as f,
+            secure_open(self._filepath, open_mode="a", encoding="utf-8") as f,
         ):
             f.write(self._format(record))
 
@@ -142,7 +142,7 @@ class FileLogBuffer(LogBuffer):
         with (
             self._chunk_lock,
             self._file_lock,
-            open(self._filepath, mode="r") as f,
+            open(self._filepath, mode="r", encoding="utf-8") as f,
         ):
             self._chunk.id = id
             f.seek(self._chunk.start)
