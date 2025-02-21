@@ -60,7 +60,7 @@ class LoggingSubprocess(object):
 
         if executable_path is None:
             raise FileNotFoundError(
-                f"Could not find the executable associated with the adaptor: {executable_path}\n"
+                f"Could not find the executable associated with the adaptor: {args[0]}\n"
                 f"Is the executable on the PATH or in the startup directory?\n"
             )
         args[0] = executable_path
