@@ -112,8 +112,8 @@ class TestCommandAdaptorDaemon:
             assert "Connected successfully" in caplog.text
             assert "Running in background daemon mode." in caplog.text
             assert "Daemon background process stopped." in caplog.text
-            assert "on_prerun" not in caplog.text
-            assert "on_postrun" not in caplog.text
+            assert "on_prerun" in caplog.text
+            assert "on_postrun" in caplog.text
 
         def test_run(self, caplog: pytest.LogCaptureFixture, tmp_path: Path):
             # GIVEN

@@ -120,7 +120,7 @@ class TestFileLogBuffer:
             buffer.buffer(mock_record)
 
         # THEN
-        open_mock.assert_called_once_with(filepath, open_mode="a")
+        open_mock.assert_called_once_with(filepath, open_mode="a", encoding="utf-8")
         handle = open_mock.return_value
         handle.write.assert_called_once_with(mock_record.msg)
 
@@ -140,7 +140,7 @@ class TestFileLogBuffer:
 
         # THEN
         mock_create_id.assert_called_once()
-        open_mock.assert_called_once_with(filepath, mode="r")
+        open_mock.assert_called_once_with(filepath, mode="r", encoding="utf-8")
         handle = open_mock.return_value
         handle.seek.assert_called_once_with(buffer._chunk.start)
         handle.read.assert_called_once()

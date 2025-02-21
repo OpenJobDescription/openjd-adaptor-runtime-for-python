@@ -1,3 +1,22 @@
+## 0.9.0 (2025-01-02)
+
+
+
+### Bug Fixes
+* Ensure all open uses UTF-8 instead of default encoding. (#171) ([`74fe730`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/74fe7304d8f1033414cda1b0d4a14fec3ee80fa0))
+
+## 0.8.2 (2024-11-29)
+
+This release allows pywin32 version 307 and above to be used as a dependency for this package. Previously, only pywin32 version 308 was allowed.
+
+
+## 0.8.1 (2024-11-13)
+
+
+### Features
+* Adding optional override for adaptor request timeout default to EntryPoint start method (#149) ([`652164f`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/652164f672a8548ee1f89e430b90378d06bbea34))
+
+
 ## 0.8.0 (2024-06-03)
 
 ### BREAKING CHANGES

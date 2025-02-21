@@ -119,7 +119,7 @@ class TestEnsureConfigFile:
         # THEN
         assert result == created
         mock_exists.assert_called_once_with(path)
-        open_mock.assert_called_once_with(path, open_mode="w")
+        open_mock.assert_called_once_with(path, open_mode="w", encoding="utf-8")
         assert f'Configuration file at "{path}" does not exist.' in caplog.text
         assert f"Creating empty configuration at {path}" in caplog.text
         if created:
