@@ -4,7 +4,7 @@ pytest == 7.4.*
 pytest-cov == 6.0.*
 pytest-timeout == 2.3.*
 pytest-xdist == 3.6.*
-black == 24.*
+black == 25.*
 ruff == 0.9.*
 mypy == 1.11.*
 psutil == 7.0.*
