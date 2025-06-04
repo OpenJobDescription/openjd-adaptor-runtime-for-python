@@ -66,11 +66,9 @@ destinations = [
 ]
 
 [tool.hatch.build.targets.sdist]
-packages = [
+include = [
   "src/openjd",
-]
-only-include = [
-  "src/openjd",
+  "hatch_version_hook.py",
 ]
 
 [tool.hatch.build.targets.wheel]
