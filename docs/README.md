@@ -19,6 +19,10 @@ You can also find many more examples within the [AWS Deadline Cloud Organization
 [AdaptorExample]: https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/tree/mainline/test/openjd/adaptor_runtime/integ/AdaptorExample
 [AWS Deadline Cloud Organization]: https://github.com/aws-deadline
 
+We have some ideas for better ways to structure adaptors. See
+[this Blender worked example](blender_worked_example.md)
+for a proposed new application interface for Blender.
+
 ### Adaptor Lifecycle
 
 All Adaptors undergo a lifecycle consisting of the following stages:
