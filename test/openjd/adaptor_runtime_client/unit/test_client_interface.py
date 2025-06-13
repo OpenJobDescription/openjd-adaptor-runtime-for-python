@@ -2,6 +2,7 @@
 
 from http import HTTPStatus
 import json
+import os
 from signal import Signals
 from types import FrameType as _FrameType
 from typing import (
@@ -20,7 +21,6 @@ from urllib.parse import urlencode
 import pytest
 from _pytest.capture import CaptureFixture as _CaptureFixture
 
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime_client import (
     Action as _Action,
     ClientInterface as _ClientInterface,
@@ -35,8 +35,8 @@ class FakeClient(_ClientInterface):
     We are going to use this FakeClient for our testing.
     """
 
-    def __init__(self, socket_path: str) -> None:
-        super().__init__(socket_path)
+    def __init__(self, server_path: str) -> None:
+        super().__init__(server_path)
         self.actions.update({"hello_world": self.hello_world})
 
     def hello_world(self, args: _Optional[_Dict[str, _Any]]) -> None:
@@ -50,7 +50,7 @@ class FakeClient(_ClientInterface):
         pass
 
 
-@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+@pytest.mark.skipif(os.name == "nt", reason="Posix-specific tests")
 class TestPosixClientInterface:
     @pytest.mark.parametrize(
         argnames=("original_path", "new_path"),
@@ -77,7 +77,7 @@ class TestPosixClientInterface:
         mocked_response.length = len(mocked_response.read.return_value)
         mocked_HTTPConnection_getresponse.return_value = mocked_response
 
-        dcc_client = FakeClient(socket_path="socket_path")
+        dcc_client = FakeClient(server_path="socket_path")
 
         # WHEN
         mapped = dcc_client.map_path(original_path)
@@ -133,7 +133,7 @@ class TestPosixClientInterface:
         mocked_response.length = len(mocked_response.read.return_value)
         mocked_HTTPConnection_getresponse.return_value = mocked_response
 
-        dcc_client = FakeClient(socket_path="socket_path")
+        dcc_client = FakeClient(server_path="socket_path")
 
         # WHEN
         expected = dcc_client.path_mapping_rules()
@@ -172,7 +172,7 @@ class TestPosixClientInterface:
         mock_response.status = HTTPStatus.OK
         mock_response.read.return_value = "bad json".encode("utf-8")
         mock_getresponse.return_value = mock_response
-        client = FakeClient(socket_path="socket_path")
+        client = FakeClient(server_path="socket_path")
 
         # WHEN
         with pytest.raises(RuntimeError) as raised_err:
@@ -203,7 +203,7 @@ class TestPosixClientInterface:
         mock_response.status = HTTPStatus.OK
         mock_response.read.return_value = json.dumps(response_val).encode("utf-8")
         mock_getresponse.return_value = mock_response
-        client = FakeClient(socket_path="socket_path")
+        client = FakeClient(server_path="socket_path")
 
         # WHEN
         with pytest.raises(RuntimeError) as raised_err:
@@ -235,7 +235,7 @@ class TestPosixClientInterface:
         mock_response.status = HTTPStatus.OK
         mock_response.read.return_value = json.dumps(response_val).encode("utf-8")
         mock_getresponse.return_value = mock_response
-        client = FakeClient(socket_path="socket_path")
+        client = FakeClient(server_path="socket_path")
 
         # WHEN
         with pytest.raises(RuntimeError) as raised_err:
@@ -270,7 +270,7 @@ class TestPosixClientInterface:
         mocked_response.length = len(mocked_response.read.return_value)
         mocked_HTTPConnection_getresponse.return_value = mocked_response
 
-        dcc_client = FakeClient(socket_path="socket_path")
+        dcc_client = FakeClient(server_path="socket_path")
 
         # WHEN
         with pytest.raises(RuntimeError) as exc_info:
@@ -314,7 +314,7 @@ class TestPosixClientInterface:
 
         socket_path = "socket_path"
         dcc_client = FakeClient(socket_path)
-        assert dcc_client.socket_path == socket_path
+        assert dcc_client.server_path == socket_path
         status, reason, action = dcc_client._request_next_action()
 
         assert action is None
@@ -383,7 +383,7 @@ class TestWindowsClientInterface:
         # GIVEN
         body = json.dumps({"status": 200, "body": json.dumps({"path": new_path})})
         mock_read_from_pipe.return_value = body
-        dcc_client = FakeClient(socket_path="socket_path")
+        dcc_client = FakeClient(server_path="socket_path")
         # WHEN
         mapped = dcc_client.map_path(original_path)
 
@@ -433,7 +433,7 @@ class TestWindowsClientInterface:
         body = json.dumps({"status": 200, "body": json.dumps({"path_mapping_rules": rules})})
         mock_read_from_pipe.return_value = body
 
-        dcc_client = FakeClient(socket_path="socket_path")
+        dcc_client = FakeClient(server_path="socket_path")
 
         # WHEN
         expected = dcc_client.path_mapping_rules()
@@ -472,7 +472,7 @@ class TestWindowsClientInterface:
         body = json.dumps({"status": 200, "body": "bad json"})
         mock_read_from_pipe.return_value = body
 
-        client = FakeClient(socket_path="socket_path")
+        client = FakeClient(server_path="socket_path")
 
         # WHEN
         with pytest.raises(RuntimeError) as raised_err:
@@ -527,7 +527,7 @@ class TestWindowsClientInterface:
         # GIVEN
         body = json.dumps({"status": 200, "body": json.dumps(response_val)})
         mock_read_from_pipe.return_value = body
-        client = FakeClient(socket_path="socket_path")
+        client = FakeClient(server_path="socket_path")
 
         # WHEN
         with pytest.raises(RuntimeError) as raised_err:
@@ -566,7 +566,7 @@ class TestWindowsClientInterface:
         body = json.dumps({"status": 500, "body": REASON})
         mock_read_from_pipe.return_value = body
 
-        dcc_client = FakeClient(socket_path="socket_path")
+        dcc_client = FakeClient(server_path="socket_path")
 
         # WHEN
         with pytest.raises(RuntimeError) as exc_info:
@@ -666,7 +666,7 @@ class TestPerformAction:
                 (200, "OK", a2),
             ],
         ):
-            dcc_client = FakeClient(socket_path="socket_path")
+            dcc_client = FakeClient(server_path="socket_path")
             dcc_client.poll()
 
             mocked_perform_action.assert_has_calls([mock.call(a1), mock.call(a2)])
@@ -680,14 +680,14 @@ class TestPerformAction:
         a1 = _Action("hello_world", {"arg1": "Hello!", "arg2": "How are you?"})
 
         with mock.patch.object(FakeClient, "hello_world") as mocked_hello_world:
-            dcc_client = FakeClient(socket_path="socket_path")
+            dcc_client = FakeClient(server_path="socket_path")
             dcc_client._perform_action(a1)
 
         mocked_hello_world.assert_called_once_with(a1.args)
 
     def test_perform_nonvalid_action(self, capsys: _CaptureFixture) -> None:
         a2 = _Action("nonvalid")
-        dcc_client = FakeClient(socket_path="socket_path")
+        dcc_client = FakeClient(server_path="socket_path")
         dcc_client._perform_action(a2)
 
         assert (

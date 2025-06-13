@@ -176,8 +176,8 @@ source = [
 ]
 
 [tool.coverage.coverage_conditional_plugin.rules]
-is-windows = "sys_platform == 'win32'"
-is-posix = "sys_platform != 'win32'"
+skip-coverage-windows = "sys_platform == 'win32'"
+skip-coverage-posix = "sys_platform != 'win32'"
 
 [tool.coverage.report]
 show_missing = true

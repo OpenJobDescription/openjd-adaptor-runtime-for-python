@@ -1,8 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 from __future__ import annotations
-import logging
 
+import logging
+import os
+import platform
 import threading
 from threading import Event
 
@@ -20,7 +22,6 @@ from ...adaptor_runtime_client.named_pipe.named_pipe_helper import (
 
 if TYPE_CHECKING:
     from .._named_pipe import ResourceRequestHandler
-from .._osname import OSName
 
 import win32pipe
 import win32file
@@ -83,10 +84,10 @@ class NamedPipeServer(ABC):
             shutdown_event (Event): An Event used for signaling server shutdown.
         """
         self._server_type_name = self.__class__.__name__
-        if not OSName.is_windows():
+        if os.name != "nt":  # pragma: skip-coverage-windows
             raise OSError(
                 f"{self._server_type_name} can be only used on Windows Operating Systems. "
-                f"Current Operating System is {OSName._get_os_name()}"
+                f"Current Operating System is {platform.platform()}"
             )
         self._named_pipe_instances: List[HANDLE] = []
         self._pipe_name = pipe_name

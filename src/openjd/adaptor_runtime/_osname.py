@@ -2,11 +2,19 @@
 
 import platform
 from typing import Optional
+import warnings
 
 
 class OSName(str):
     """
-    OS Name Utility Class.
+    OS Name Utility Class. (DEPRECATED)
+
+    This class is deprecated, all code should use Python idioms:
+     1. For Windows: os.name == "nt"
+     2. For POSIX: os.name != "nt"
+     3. For MacOS: sys.platform == "darwin"
+     4. For a human-readable OS description: platform.platform()
+
 
     Calling the constructor without any parameters will create an OSName object initialized with the
     OS python is running on (one of Linux, macOS, Windows).
@@ -28,6 +36,7 @@ class OSName(str):
 
     def __init__(self, *args, **kw):
         super().__init__()
+        warnings.warn("The OSName class is deprecated.", DeprecationWarning)
 
     def __new__(cls, *args, **kw):
         if len(args) > 0:

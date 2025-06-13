@@ -16,7 +16,6 @@ import pytest
 
 import openjd.adaptor_runtime._entrypoint as runtime_entrypoint
 from openjd.adaptor_runtime import EntryPoint
-from openjd.adaptor_runtime._osname import OSName
 
 mod_path = Path(__file__).parent.resolve()
 sys.path.append(str(mod_path))
@@ -53,9 +52,7 @@ class TestCommandAdaptorRun:
                 }
             ),
             "--run-data",
-            json.dumps(
-                {"args": ["echo", "hello world"] if OSName.is_windows() else ["hello world"]}
-            ),
+            json.dumps({"args": ["hello world"]}),
         ]
         entrypoint = EntryPoint(CommandAdaptorExample)
 
@@ -131,9 +128,7 @@ class TestCommandAdaptorDaemon:
                 "--connection-file",
                 str(connection_file),
                 "--run-data",
-                json.dumps(
-                    {"args": ["echo", "hello world"] if OSName.is_windows() else ["hello world"]}
-                ),
+                json.dumps({"args": ["hello world"]}),
             ]
             entrypoint = EntryPoint(CommandAdaptorExample)
 
@@ -262,9 +257,7 @@ class TestCommandAdaptorDaemon:
             "run",
             *(["--connection-file", str(connection_file)] if connection_file else []),
             "--run-data",
-            json.dumps(
-                {"args": ["echo", "hello world"] if OSName.is_windows() else ["hello world"]}
-            ),
+            json.dumps({"args": ["hello world"]}),
         ]
 
     @staticmethod

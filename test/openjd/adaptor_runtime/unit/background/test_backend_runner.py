@@ -13,7 +13,6 @@ import pytest
 import openjd.adaptor_runtime._background.backend_runner as backend_runner
 from openjd.adaptor_runtime._background.backend_runner import BackendRunner
 from openjd.adaptor_runtime._background.model import ConnectionSettings, DataclassJSONEncoder
-from openjd.adaptor_runtime._osname import OSName
 
 
 class TestBackendRunner:
@@ -23,7 +22,13 @@ class TestBackendRunner:
 
     @pytest.fixture(autouse=True)
     def socket_path(self, tmp_path: pathlib.Path) -> Generator[str, None, None]:
-        if OSName.is_posix():
+        if os.name == "nt":
+            with patch.object(backend_runner.NamedPipeHelper, "generate_pipe_name") as mock:
+                path = "\\\\.\\pipe\\AdaptorNamedPipe_1234"
+                mock.return_value = path
+
+                yield path
+        else:
             with patch.object(backend_runner.SocketPaths, "get_process_socket_path") as mock:
                 path = os.path.join(tmp_path, "socket", "1234")
                 mock.return_value = path
@@ -34,22 +39,16 @@ class TestBackendRunner:
                     os.remove(path)
                 except FileNotFoundError:
                     pass
-        else:
-            with patch.object(backend_runner.NamedPipeHelper, "generate_pipe_name") as mock:
-                path = "\\\\.\\pipe\\AdaptorNamedPipe_1234"
-                mock.return_value = path
-
-                yield path
 
     @pytest.fixture(autouse=True)
     def mock_server_cls(self) -> Generator[MagicMock, None, None]:
-        if OSName.is_posix():
-            with patch.object(backend_runner, "BackgroundHTTPServer", autospec=True) as mock:
-                yield mock
-        else:
+        if os.name == "nt":
             with patch.object(
                 backend_runner, "WinBackgroundNamedPipeServer", autospec=True
             ) as mock:
+                yield mock
+        else:
+            with patch.object(backend_runner, "BackgroundHTTPServer", autospec=True) as mock:
                 yield mock
 
     @patch.object(backend_runner.json, "dump")
@@ -103,10 +102,10 @@ class TestBackendRunner:
             cls=DataclassJSONEncoder,
         )
         mock_thread.return_value.join.assert_called_once()
-        if OSName.is_posix():
-            mock_os_remove.assert_has_calls([call(conn_file), call(socket_path)])
-        else:
+        if os.name == "nt":
             mock_os_remove.assert_has_calls([call(conn_file)])
+        else:
+            mock_os_remove.assert_has_calls([call(conn_file), call(socket_path)])
 
     def test_run_raises_when_http_server_fails_to_start(
         self,
@@ -172,10 +171,10 @@ class TestBackendRunner:
         mock_thread.return_value.start.assert_called_once()
         open_mock.assert_called_once_with(conn_file, open_mode="w", encoding="utf-8")
         mock_thread.return_value.join.assert_called_once()
-        if OSName.is_posix():
-            mock_os_remove.assert_has_calls([call(conn_file), call(socket_path)])
-        else:
+        if os.name == "nt":
             mock_os_remove.assert_has_calls([call(conn_file)])
+        else:
+            mock_os_remove.assert_has_calls([call(conn_file), call(socket_path)])
 
     @patch.object(backend_runner.signal, "signal")
     @patch.object(backend_runner.ServerResponseGenerator, "submit_task")
@@ -197,8 +196,8 @@ class TestBackendRunner:
 
         # THEN
         signal_mock.assert_any_call(signal.SIGINT, runner._sigint_handler)
-        if OSName.is_posix():
-            signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
-        else:
+        if os.name == "nt":
             signal_mock.assert_any_call(signal.SIGBREAK, runner._sigint_handler)  # type: ignore[attr-defined]
+        else:
+            signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
         mock_submit.assert_called_with(server_mock, adaptor_runner._cancel, force_immediate=True)

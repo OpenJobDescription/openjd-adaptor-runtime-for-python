@@ -39,9 +39,9 @@ class TestGetPathMappingRules:
         # GIVEN
         path_mapping_rules = [
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         ]
@@ -64,15 +64,15 @@ class TestGetPathMappingRules:
         # GIVEN
         path_mapping_rules = [
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage0",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage0",
             },
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             },
         ]
@@ -89,15 +89,15 @@ class TestGetPathMappingRules:
     def test_get_order_is_preserved(self) -> None:
         # GIVEN
         rule1 = {
-            "source_path_format": "linux",
+            "source_path_format": "POSIX",
             "source_path": "/mnt/shared/asset_storage1",
-            "destination_os": "windows",
+            "destination_os": "WINDOWS",
             "destination_path": "Z:\\asset_storage1",
         }
         rule2 = {
             "source_path_format": "windows",
             "source_path": "Z:\\asset_storage1",
-            "destination_os": "windows",
+            "destination_os": "WINDOWS",
             "destination_path": "Z:\\should\\not\\reach\\this",
         }
         path_mapping_rules = [rule1, rule2]
@@ -125,7 +125,7 @@ class TestGetPathMappingRules:
         adaptor = FakeCommandAdaptor(expected)
         rules = adaptor.path_mapping_rules
         new_rule = PathMappingRule(
-            source_path_format="linux",
+            source_path_format="POSIX",
             source_path="/mnt/shared/asset_storage1",
             destination_os="windows",
             destination_path="Z:\\asset_storage1",
@@ -159,9 +159,9 @@ class TestApplyPathMapping:
         # GIVEN
         path_mapping_rules = [
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         ]
@@ -181,7 +181,7 @@ class TestApplyPathMapping:
             {
                 "source_path_format": "windows",
                 "source_path": "Z:\\asset_storage1",
-                "destination_os": "linux",
+                "destination_os": "POSIX",
                 "destination_path": "/mnt/shared/asset_storage1",
             }
         ]
@@ -199,9 +199,9 @@ class TestApplyPathMapping:
         # GIVEN
         path_mapping_rules = [
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/my_custom_path/asset_storage1",
-                "destination_os": "linux",
+                "destination_os": "POSIX",
                 "destination_path": "/mnt/shared/asset_storage1",
             }
         ]
@@ -222,7 +222,7 @@ class TestApplyPathMapping:
             {
                 "source_path_format": "windows",
                 "source_path": "Z:\\my_custom_asset_path\\asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         ]
@@ -242,7 +242,7 @@ class TestApplyPathMapping:
             {
                 "source_path_format": "windows",
                 "source_path": "Z:\\my_custom_asset_path\\asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         ]
@@ -262,7 +262,7 @@ class TestApplyPathMapping:
             {
                 "source_path_format": "windows",
                 "source_path": "Z:\\my_custom_asset_path\\asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         ]
@@ -280,15 +280,15 @@ class TestApplyPathMapping:
         # GIVEN
         path_mapping_rules = [
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage0",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage0",
             },
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             },
         ]
@@ -306,15 +306,15 @@ class TestApplyPathMapping:
         # GIVEN
         path_mapping_rules = [
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             },
             {
                 "source_path_format": "windows",
                 "source_path": "Z:\\asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\should\\not\\reach\\this",
             },
         ]
@@ -332,15 +332,15 @@ class TestApplyPathMapping:
         # GIVEN
         path_mapping_rules = [
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             },
             {
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\should\\not\\reach\\this",
             },
         ]

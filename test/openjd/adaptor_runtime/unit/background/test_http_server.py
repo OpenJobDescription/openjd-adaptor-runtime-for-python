@@ -1,9 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-from openjd.adaptor_runtime._osname import OSName
+import os
 import pytest
 
-if OSName.is_windows():
+if os.name == "nt":
     pytest.skip("Posix-specific tests", allow_module_level=True)
 
 import json

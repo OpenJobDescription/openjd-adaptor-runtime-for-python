@@ -3,6 +3,7 @@
 """Tests for StreamLogger"""
 from __future__ import annotations
 
+import os
 import signal
 import subprocess
 from logging import INFO
@@ -12,7 +13,6 @@ from unittest import mock
 import pytest
 
 import openjd.adaptor_runtime.process._logging_subprocess as logging_subprocess
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.process import LoggingSubprocess
 
 
@@ -73,7 +73,7 @@ class TestLoggingSubprocess(object):
             stderr=subprocess.PIPE,
             cwd=None,
         )
-        if OSName.is_windows():
+        if os.name == "nt":
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
         mock_popen.assert_called_with(**popen_params)
 
@@ -187,7 +187,7 @@ class TestLoggingSubprocess(object):
         subject.terminate()
 
         # THEN
-        if OSName.is_windows():
+        if os.name == "nt":
             proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
         else:
             proc.send_signal.assert_called_once_with(signal.SIGTERM)
@@ -226,7 +226,7 @@ class TestLoggingSubprocess(object):
         subject.terminate(timeout)
 
         # THEN
-        if OSName.is_windows():
+        if os.name == "nt":
             proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
         else:
             proc.send_signal.assert_called_once_with(signal.SIGTERM)
@@ -296,7 +296,7 @@ class TestLoggingSubprocess(object):
 
         subject.terminate()
 
-        if OSName.is_windows():
+        if os.name == "nt":
             proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
         else:
             proc.send_signal.assert_called_once_with(signal.SIGTERM)
@@ -349,7 +349,7 @@ class TestLoggingSubprocess(object):
 
         subject.terminate(timeout)
 
-        if OSName.is_windows():
+        if os.name == "nt":
             proc.send_signal.assert_called_once_with(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
         else:
             proc.send_signal.assert_called_once_with(signal.SIGTERM)
@@ -387,7 +387,7 @@ class TestLoggingSubprocess(object):
 
     def test_context_manager(self):
         # GIVEN
-        if OSName.is_windows():
+        if os.name == "nt":
             args = ["powershell", "echo", "foo"]
         else:
             args = ["echo", "foo"]
@@ -483,7 +483,7 @@ class TestLoggingSubprocess(object):
             encoding="utf-8",
             cwd=None,
         )
-        if OSName.is_windows():
+        if os.name == "nt":
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
 
         mock_popen_autospec.assert_called_once_with(**popen_params)
@@ -505,7 +505,7 @@ class TestLoggingSubprocess(object):
             encoding="utf-8",
             cwd="startup_dir",
         )
-        if OSName.is_windows():
+        if os.name == "nt":
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
 
         mock_popen_autospec.assert_called_once_with(**popen_params)

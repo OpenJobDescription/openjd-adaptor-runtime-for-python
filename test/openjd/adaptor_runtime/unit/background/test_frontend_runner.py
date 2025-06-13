@@ -18,7 +18,6 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from openjd.adaptor_runtime._background import frontend_runner
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.adaptors import AdaptorState
 from openjd.adaptor_runtime._background.frontend_runner import (
     AdaptorFailedException,
@@ -41,7 +40,7 @@ class TestFrontendRunner:
 
     @pytest.fixture
     def server_name(self) -> str:
-        return "/path/to/socket" if OSName.is_posix() else r"\\.\pipe\TestPipe"
+        return r"\\.\pipe\TestPipe" if os.name == "nt" else "/path/to/socket"
 
     @pytest.fixture
     def connection_settings(self, server_name: str) -> ConnectionSettings:
@@ -395,7 +394,7 @@ class TestFrontendRunner:
             mock_json_load: MagicMock,
         ):
             # GIVEN
-            if OSName.is_windows():
+            if os.name == "nt":
                 mock_send_request.return_value = {"body": '{"key1": "value1"}'}
             mock_response = mock_send_request.return_value
             runner = FrontendRunner()
@@ -405,11 +404,11 @@ class TestFrontendRunner:
 
             # THEN
             assert response is mock_dataclass_mapper_map.return_value
-            if OSName.is_posix():
+            if os.name == "nt":
+                mock_dataclass_mapper_map.assert_called_once_with({"key1": "value1"})
+            else:
                 mock_json_load.assert_called_once_with(mock_response.fp)
                 mock_dataclass_mapper_map.assert_called_once_with(mock_json_load.return_value)
-            else:
-                mock_dataclass_mapper_map.assert_called_once_with({"key1": "value1"})
             mock_send_request.assert_called_once_with("GET", "/heartbeat", params=None)
 
         def test_sends_heartbeat_with_ack_id(
@@ -420,7 +419,7 @@ class TestFrontendRunner:
         ):
             # GIVEN
             ack_id = "ack_id"
-            if OSName.is_windows():
+            if os.name == "nt":
                 mock_send_request.return_value = {"body": '{"key1": "value1"}'}
             mock_response = mock_send_request.return_value
             runner = FrontendRunner()
@@ -430,11 +429,11 @@ class TestFrontendRunner:
 
             # THEN
             assert response is mock_dataclass_mapper_map.return_value
-            if OSName.is_posix():
+            if os.name == "nt":
+                mock_dataclass_mapper_map.assert_called_once_with({"key1": "value1"})
+            else:
                 mock_json_load.assert_called_once_with(mock_response.fp)
                 mock_dataclass_mapper_map.assert_called_once_with(mock_json_load.return_value)
-            else:
-                mock_dataclass_mapper_map.assert_called_once_with({"key1": "value1"})
             mock_send_request.assert_called_once_with(
                 "GET", "/heartbeat", params={"ack_id": ack_id}
             )
@@ -607,7 +606,7 @@ class TestFrontendRunner:
             # THEN
             mock_send_request.assert_called_once_with("PUT", "/cancel")
 
-    @pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+    @pytest.mark.skipif(os.name == "nt", reason="Posix-specific tests")
     class TestSendRequestInLinux:
         """
         Tests for the FrontendRunner._send_request method
@@ -760,7 +759,7 @@ class TestFrontendRunner:
             mock_getresponse.assert_called_once()
             assert response is mock_getresponse.return_value
 
-    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+    @pytest.mark.skipif(os.name != "nt", reason="Windows-specific tests")
     class TestSendRequestInWindows:
         """
         Tests for the FrontendRunner._send_request method in Windows
@@ -953,10 +952,10 @@ class TestFrontendRunner:
 
             # THEN
             signal_mock.assert_any_call(signal.SIGINT, runner._sigint_handler)
-            if OSName.is_posix():
-                signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
-            else:
+            if os.name == "nt":
                 signal_mock.assert_any_call(signal.SIGBREAK, runner._sigint_handler)  # type: ignore[attr-defined]
+            else:
+                signal_mock.assert_any_call(signal.SIGTERM, runner._sigint_handler)
             cancel_mock.assert_called_once()
 
 

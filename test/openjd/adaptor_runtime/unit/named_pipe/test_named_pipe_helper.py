@@ -1,6 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-from openjd.adaptor_runtime._osname import OSName
 from unittest.mock import patch, MagicMock
 import pytest
 import os
@@ -22,7 +21,7 @@ class MockReadFile:
         return winerror.NO_ERROR, bytes("fake_data", "utf-8")
 
 
-@pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+@pytest.mark.skipif(os.name != "nt", reason="Windows-specific tests")
 class TestNamedPipeHelper:
     def test_named_pipe_read_timeout_exception(self):
         with pytest.raises(

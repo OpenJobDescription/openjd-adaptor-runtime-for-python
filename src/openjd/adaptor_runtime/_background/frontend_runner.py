@@ -20,7 +20,6 @@ from types import FrameType
 from types import ModuleType
 from typing import Optional, Callable, Dict
 
-from .._osname import OSName
 from ..process._logging import _ADAPTOR_OUTPUT_LEVEL
 from .._utils._constants import _OPENJD_ENV_STDOUT_PREFIX, _OPENJD_ADAPTOR_SOCKET_ENV
 from .loaders import ConnectionSettingsFileLoader
@@ -36,7 +35,7 @@ from .model import (
 
 _FRONTEND_RUNNER_REQUEST_TIMEOUT: float = 5.0
 
-if OSName.is_windows():
+if os.name == "nt":  # pragma: skip-coverage-posix
     from ...adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
     import pywintypes
 
@@ -78,10 +77,10 @@ class FrontendRunner:
 
         self._canceled = Event()
         signal.signal(signal.SIGINT, self._sigint_handler)
-        if OSName.is_posix():  # pragma: is-windows
-            signal.signal(signal.SIGTERM, self._sigint_handler)
-        else:  # pragma: is-posix
+        if os.name == "nt":  # pragma: skip-coverage-posix
             signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
+        else:  # pragma: skip-coverage-windows
+            signal.signal(signal.SIGTERM, self._sigint_handler)
 
     def init(
         self,
@@ -270,7 +269,7 @@ class FrontendRunner:
         """
         params: dict[str, str] | None = {"ack_id": ack_id} if ack_id else None
         response = self._send_request("GET", "/heartbeat", params=params)
-        body = json.load(response.fp) if OSName.is_posix() else json.loads(response["body"])  # type: ignore
+        body = json.loads(response["body"]) if os.name == "nt" else json.load(response.fp)  # type: ignore
         return DataclassMapper(HeartbeatResponse).map(body)
 
     def _heartbeat_until_state_complete(self, state: AdaptorState) -> None:
@@ -330,7 +329,7 @@ class FrontendRunner:
                 "Connection settings are required to send requests, but none were provided"
             )
 
-        if OSName.is_windows():  # pragma: is-posix
+        if os.name == "nt":  # pragma: skip-coverage-posix
             if params:
                 # This is used for aligning to the Linux's behavior in order to reuse the code in handler.
                 # In linux, query string params will always be put in a list.
@@ -353,7 +352,7 @@ class FrontendRunner:
                 _logger.error(f"Failed to send {path} request: {e}")
                 raise
             return response
-        else:  # pragma: is-windows
+        else:  # pragma: skip-coverage-windows
             return self._send_linux_request(
                 method,
                 path,
@@ -368,7 +367,7 @@ class FrontendRunner:
         *,
         params: dict | None = None,
         json_body: dict | None = None,
-    ) -> http_client.HTTPResponse:  # pragma: is-windows
+    ) -> http_client.HTTPResponse:  # pragma: skip-coverage-windows
         if not self.connection_settings:
             raise ConnectionSettingsNotProvidedError(
                 "Connection settings are required to send requests, but none were provided"

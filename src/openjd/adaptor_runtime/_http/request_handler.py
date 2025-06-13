@@ -12,8 +12,8 @@ import urllib.parse as urllib_parse
 from dataclasses import dataclass
 from http import HTTPStatus, server
 from typing import Any, Callable, Type
+import sys
 
-from .._osname import OSName
 from .exceptions import UnsupportedPlatformException
 
 _logger = logging.getLogger(__name__)
@@ -125,8 +125,8 @@ class RequestHandler(server.BaseHTTPRequestHandler):
         peercred_opt_level: Any
         peercred_opt: Any
         cred_cls: Any
-        if OSName.is_macos():  # pragma: no cover
-            # SOL_LOCAL is not defined in Python's socket module, need to hardcode it
+        if sys.platform == "darwin":
+            # On MacOS, SOL_LOCAL is not defined in Python's socket module, need to hardcode it
             # source: https://github.com/apple-oss-distributions/xnu/blob/1031c584a5e37aff177559b9f69dbd3c8c3fd30a/bsd/sys/un.h#L85
             peercred_opt_level = 0  # type: ignore[attr-defined]
             peercred_opt = socket.LOCAL_PEERCRED  # type: ignore[attr-defined]

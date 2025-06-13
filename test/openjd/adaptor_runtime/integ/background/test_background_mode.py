@@ -25,7 +25,6 @@ from openjd.adaptor_runtime._background.loaders import (
     ConnectionSettingsLoadingError,
     ConnectionSettingsFileLoader,
 )
-from openjd.adaptor_runtime._osname import OSName
 
 mod_path = (Path(__file__).parent.parent).resolve()
 sys.path.append(str(mod_path))
@@ -62,7 +61,7 @@ class TestDaemonMode:
     def connection_file_path(self, tmp_path: pathlib.Path) -> pathlib.Path:
         connection_dir = os.path.join(tmp_path.absolute(), "connection_dir")
         os.mkdir(connection_dir)
-        if OSName.is_windows():
+        if os.name == "nt":
             # In Windows, to prevent false positives in tests, it's crucial to remove the "Delete subfolders and files"
             # permission from the parent folder. This step ensures that files cannot be deleted without explicit delete
             # permissions, addressing an edge case where the same user owns both the parent folder and the file,
@@ -101,7 +100,7 @@ class TestDaemonMode:
         # We don't need to call the `remove` for the NamedPipe server.
         # NamedPipe servers are managed by Named Pipe File System it is not a regular file.
         # Once all handles are closed, the system automatically cleans up the named pipe.
-        if OSName.is_posix():
+        if os.name != "nt":  # pragma: skip-coverage-windows
             try:
                 conn_settings = ConnectionSettingsFileLoader(connection_file_path).load()
             except ConnectionSettingsLoadingError as e:
@@ -127,7 +126,7 @@ class TestDaemonMode:
 
         connection_settings = ConnectionSettingsFileLoader(connection_file_path).load()
 
-        if OSName.is_windows():
+        if os.name == "nt":
             import pywintypes
             import win32file
 
@@ -192,7 +191,7 @@ class TestDaemonMode:
         # THEN
         assert "on_start" in caplog.text
 
-    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
+    @pytest.mark.skipif(os.name != "nt", reason="Windows named pipe test")
     def test_incorrect_request_path_in_windows(
         self,
         initialized_setup: tuple[FrontendRunner, psutil.Process],
@@ -208,7 +207,7 @@ class TestDaemonMode:
         ):
             frontend._send_request("GET", "None")
 
-    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
+    @pytest.mark.skipif(os.name != "nt", reason="Windows named pipe test")
     def test_incorrect_request_method_in_windows(
         self,
         initialized_setup: tuple[FrontendRunner, psutil.Process],
@@ -274,7 +273,7 @@ class TestDaemonMode:
         new_response = frontend._heartbeat(response.output.id)
         # In Windows, we need to shut down the namedpipe client,
         # or the connection of the NamedPipe server remains open
-        if OSName.is_windows():
+        if os.name == "nt":
             frontend.shutdown()
         # THEN
         assert f"Received ACK for chunk: {response.output.id}" in new_response.output.output

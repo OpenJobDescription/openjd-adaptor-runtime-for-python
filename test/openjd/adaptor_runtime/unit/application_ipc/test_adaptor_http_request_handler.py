@@ -73,7 +73,7 @@ class TestPathMappingEndpoint:
                     {
                         "source_path_format": "windows",
                         "source_path": SOURCE_PATH,
-                        "destination_os": "linux",
+                        "destination_os": "POSIX",
                         "destination_path": DEST_PATH,
                     }
                 ]
@@ -104,9 +104,9 @@ class TestPathMappingRulesEndpoint:
         SOURCE_PATH = "Z:\\asset_storage1"
         DEST_PATH = "/mnt/shared/asset_storage1"
         rules = {
-            "source_path_format": "Windows",
+            "source_path_format": "WINDOWS",
             "source_path": SOURCE_PATH,
-            "destination_os": "Linux",
+            "destination_os": "POSIX",
             "destination_path": DEST_PATH,
         }
         adaptor = FakeAdaptor(

@@ -9,7 +9,6 @@ import stat
 from typing import Generic, List, Type, TypeVar
 
 from ..._utils import secure_open
-from ..._osname import OSName
 from ._configuration import AdaptorConfiguration, Configuration
 
 __all__ = [
@@ -55,7 +54,7 @@ def create_adaptor_configuration_manager(
     elif isinstance(schema_path, list):
         schema_paths.extend(schema_path)
 
-    system_config_path_prefix = "/etc" if OSName.is_posix() else os.environ["PROGRAMDATA"]
+    system_config_path_prefix = os.environ["PROGRAMDATA"] if os.name == "nt" else "/etc"
     system_config_path = os.path.join(
         system_config_path_prefix,
         "openjd",

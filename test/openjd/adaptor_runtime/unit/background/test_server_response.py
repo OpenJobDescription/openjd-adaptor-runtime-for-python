@@ -1,10 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
+import os
 from unittest.mock import MagicMock
 import pytest
-from openjd.adaptor_runtime._osname import OSName
 
-if OSName.is_windows():
+if os.name == "nt":
     from openjd.adaptor_runtime._background.backend_named_pipe_server import (
         WinBackgroundNamedPipeServer,
     )
@@ -25,7 +25,7 @@ class TestServerResponseGenerator:
         kwargs = {"three": 3, "four": 4}
 
         mock_future_runner = MagicMock()
-        if OSName.is_windows():
+        if os.name == "nt":
             mock_server = MagicMock(spec=WinBackgroundNamedPipeServer)
         else:
             mock_server = MagicMock(spec=BackgroundHTTPServer)
@@ -52,7 +52,7 @@ class TestServerResponseGenerator:
         args = ("one", "two")
         kwargs = {"three": 3, "four": 4}
 
-        if OSName.is_windows():
+        if os.name == "nt":
             mock_server = MagicMock(spec=WinBackgroundNamedPipeServer)
         else:
             mock_server = MagicMock(spec=BackgroundHTTPServer)

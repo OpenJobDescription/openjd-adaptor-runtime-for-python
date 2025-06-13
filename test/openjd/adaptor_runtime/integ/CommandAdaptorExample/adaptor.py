@@ -4,7 +4,6 @@ import os
 from typing import List
 from logging import getLogger
 
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.adaptors import CommandAdaptor, SemanticVersion
 from openjd.adaptor_runtime.process import ManagedProcess
 
@@ -22,7 +21,7 @@ class IntegManagedProcess(ManagedProcess):
         ManagedProcess. In this example, it returns 'powershell.exe' for Windows to run PowerShell scripts,
         and '/bin/echo' for other operating systems.
         """
-        if OSName.is_windows():
+        if os.name == "nt":
             # In Windows, we cannot directly run the powershell script.
             # Need to use PowerShell.exe to run the command.
             return "powershell.exe"

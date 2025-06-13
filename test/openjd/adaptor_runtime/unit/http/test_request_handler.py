@@ -1,9 +1,11 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-from openjd.adaptor_runtime._osname import OSName
+import os
+import sys
+
 import pytest
 
-if OSName.is_windows():
+if os.name == "nt":
     pytest.skip("Posix-specific tests", allow_module_level=True)
 
 import socket
@@ -17,7 +19,6 @@ from openjd.adaptor_runtime._http.request_handler import (
     RequestHandler,
     UnsupportedPlatformException,
 )
-from openjd.adaptor_runtime._osname import OSName
 
 
 @pytest.fixture
@@ -137,7 +138,7 @@ class TestRequestHandler:
         mock_wfile.write.assert_called_once_with(body.encode("utf-8"))
 
 
-@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+@pytest.mark.skipif(os.name == "nt", reason="Posix-specific tests")
 class TestAuthentication:
     """
     Tests for the RequestHandler authentication
@@ -148,7 +149,7 @@ class TestAuthentication:
         Tests for the RequestHandler._authenticate() method
         """
 
-        cred_cls = request_handler.XUCred if OSName.is_macos() else request_handler.UCred
+        cred_cls = request_handler.XUCred if sys.platform == "darwin" else request_handler.UCred
 
         @pytest.fixture
         def mock_handler(self) -> MagicMock:

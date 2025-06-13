@@ -10,7 +10,6 @@ import platform
 
 import pytest
 
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.adaptors.configuration import (
     AdaptorConfiguration as _AdaptorConfiguration,
     Configuration as _Configuration,
@@ -128,7 +127,7 @@ class TestEnsureConfigFile:
             assert f"Could not write empty configuration to {path}: " in caplog.text
 
 
-@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+@pytest.mark.skipif(os.name == "nt", reason="Posix-specific tests")
 class TestCreateAdaptorConfigurationManagerPosix:
     def test_creates_config_manager(self):
         """
@@ -161,7 +160,7 @@ class TestCreateAdaptorConfigurationManagerPosix:
         )
 
 
-@pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+@pytest.mark.skipif(os.name != "nt", reason="Windows-specific tests")
 class TestCreateAdaptorConfigurationManagerWindows:
     def test_creates_config_manager(self):
         """
@@ -248,7 +247,7 @@ class TestCreateAdaptorConfigurationManager:
         assert result._schema_path[1:] == schema_paths
 
 
-@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+@pytest.mark.skipif(os.name == "nt", reason="Posix-specific tests")
 class TestConfigurationManagerPosix:
     """
     Posix-specific tests for the base ConfigurationManager class
@@ -269,7 +268,7 @@ class TestConfigurationManagerPosix:
             assert result == expected
 
 
-@pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+@pytest.mark.skipif(os.name != "nt", reason="Windows-specific tests")
 class TestConfigurationManagerWindows:
     """
     Windows-specific tests for the base ConfigurationManager class

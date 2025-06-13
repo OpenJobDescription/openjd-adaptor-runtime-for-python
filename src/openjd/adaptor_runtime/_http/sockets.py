@@ -5,11 +5,11 @@ from __future__ import annotations
 import abc
 import os
 import stat
+import sys
 import tempfile
+from typing import Type
 
-from .._osname import OSName
 from .exceptions import (
-    UnsupportedPlatformException,
     NonvalidSocketPathException,
     NoSocketPathFoundException,
 )
@@ -18,28 +18,10 @@ from .exceptions import (
 _PID_MAX_LENGTH = 7
 
 
-class SocketPaths(abc.ABC):
+class SocketPathsBase(abc.ABC):
     """
     Base class for determining the paths for sockets used in the Adaptor Runtime.
     """
-
-    @staticmethod
-    def for_os(osname: OSName = OSName()):  # pragma: no cover
-        """
-        Gets the SocketPaths class for a specific OS.
-
-        Args:
-            osname (OSName, optional): The OS to get socket paths for.
-                Defaults to the current OS.
-
-        Raises:
-            UnsupportedPlatformException: Raised when this class is requested for an unsupported
-                platform.
-        """
-        klass = _get_socket_paths_cls(osname)
-        if not klass:
-            raise UnsupportedPlatformException(osname)
-        return klass()
 
     def get_process_socket_path(
         self,
@@ -143,7 +125,7 @@ class SocketPaths(abc.ABC):
         pass
 
 
-class WindowsSocketPaths(SocketPaths):
+class WindowsSocketPaths(SocketPathsBase):
     """
     Specialization for verifying socket paths on Windows systems.
     """
@@ -153,7 +135,7 @@ class WindowsSocketPaths(SocketPaths):
         pass
 
 
-class UnixSocketPaths(SocketPaths):
+class UnixSocketPaths(SocketPathsBase):
     """
     Specialization for verifying socket paths on Unix systems.
     """
@@ -215,14 +197,12 @@ class MacOSSocketPaths(UnixSocketPaths):
             )
 
 
-_os_map: dict[str, type[SocketPaths]] = {
-    OSName.LINUX: LinuxSocketPaths,
-    OSName.MACOS: MacOSSocketPaths,
-    OSName.WINDOWS: WindowsSocketPaths,
-}
+SocketPaths: Type
 
-
-def _get_socket_paths_cls(
-    osname: OSName,
-) -> type[SocketPaths] | None:  # pragma: no cover
-    return _os_map.get(osname, None)
+# Make SocketPaths the correct operating-specific subclass of SocketPathsBase
+if sys.platform == "darwin":  # pragma: skip-coverage-windows
+    SocketPaths = MacOSSocketPaths
+elif os.name == "nt":  # pragma: skip-coverage-posix
+    SocketPaths = WindowsSocketPaths
+else:  # pragma: skip-coverage-windows
+    SocketPaths = LinuxSocketPaths

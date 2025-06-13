@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import signal
 import sys
 import subprocess as _subprocess
 from os.path import dirname as _dirname, join as _join, realpath as _realpath
 from time import sleep as _sleep
 from typing import Dict, Any
-
-from openjd.adaptor_runtime._osname import OSName
 
 
 class TestIntegrationClientInterface:
@@ -27,16 +26,16 @@ class TestIntegrationClientInterface:
             stdout=_subprocess.PIPE,
             encoding="utf-8",
         )
-        if OSName.is_windows():
+        if os.name == "nt":
             # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
             # Without this one, current process will also get the SIGBREAK and may react incorrectly.
             popen_params.update(creationflags=_subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
         client_subprocess = _subprocess.Popen(**popen_params)
 
         # To avoid a race condition, giving some extra time for the logging subprocess to start.
-        _sleep(0.5 if OSName.is_posix() else 4)
+        _sleep(4 if os.name == "nt" else 0.5)
         signal_type: signal.Signals
-        if OSName.is_windows():
+        if os.name == "nt":
             signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]
         else:
             signal_type = signal.SIGTERM
@@ -46,11 +45,11 @@ class TestIntegrationClientInterface:
 
         # To avoid a race condition, giving some extra time for the log to be updated after
         # receiving the signal.
-        _sleep(0.5 if OSName.is_posix() else 4)
+        _sleep(4 if os.name == "nt" else 0.5)
 
         out, _ = client_subprocess.communicate()
 
-        assert f"Received {'SIGBREAK' if OSName.is_windows() else 'SIGTERM'} signal." in out
+        assert f"Received {'SIGBREAK' if os.name == 'nt' else 'SIGTERM'} signal." in out
         # Ensure the process actually shutdown
         assert client_subprocess.returncode is not None
 
@@ -70,16 +69,16 @@ class TestIntegrationClientInterface:
             stdout=_subprocess.PIPE,
             encoding="utf-8",
         )
-        if OSName.is_windows():
+        if os.name == "nt":
             # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
             # Without this one, current process will also get the SIGBREAK and may react incorrectly.
             popen_params.update(creationflags=_subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
         client_subprocess = _subprocess.Popen(**popen_params)
 
         # To avoid a race condition, giving some extra time for the logging subprocess to start.
-        _sleep(0.5 if OSName.is_posix() else 4)
+        _sleep(4 if os.name == "nt" else 0.5)
         signal_type: signal.Signals
-        if OSName.is_windows():
+        if os.name == "nt":
             signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]
         else:
             signal_type = signal.SIGTERM
@@ -90,7 +89,7 @@ class TestIntegrationClientInterface:
         assert client_subprocess.returncode is None
         out, err = client_subprocess.communicate()
         assert "ValueError: signal only works in main thread of the main interpreter" not in err
-        assert f"Received {'SIGBREAK' if OSName.is_windows() else 'SIGTERM'} signal." not in out
+        assert f"Received {'SIGBREAK' if os.name == 'nt' else 'SIGTERM'} signal." not in out
 
         # Ensure the process stops
         client_subprocess.kill()

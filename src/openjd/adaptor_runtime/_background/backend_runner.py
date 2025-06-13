@@ -10,19 +10,21 @@ from pathlib import Path
 from threading import Thread, Event
 import traceback
 from types import FrameType
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional
 
 from .server_response import ServerResponseGenerator
-from .._osname import OSName
 from ..adaptors import AdaptorRunner
-from .._http import SocketPaths
 from .._utils import secure_open
 
-if OSName.is_posix():
-    from .http_server import BackgroundHTTPServer
-if OSName.is_windows():
+if os.name == "nt":  # pragma: skip-coverage-posix
     from ...adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
-    from .backend_named_pipe_server import WinBackgroundNamedPipeServer
+    from .backend_named_pipe_server import (
+        WinBackgroundNamedPipeServer,
+        WinBackgroundNamedPipeServer as BackgroundServerType,
+    )
+else:  # pragma: skip-coverage-windows
+    from .._http import SocketPaths
+    from .http_server import BackgroundHTTPServer, BackgroundHTTPServer as BackgroundServerType  # type: ignore
 from .log_buffers import LogBuffer
 from .model import ConnectionSettings
 from .model import DataclassJSONEncoder
@@ -46,12 +48,12 @@ class BackendRunner:
         self._connection_file_path = connection_file_path
 
         self._log_buffer = log_buffer
-        self._server: Optional[Union[BackgroundHTTPServer, WinBackgroundNamedPipeServer]] = None
+        self._server: Optional[BackgroundServerType] = None
         signal.signal(signal.SIGINT, self._sigint_handler)
-        if OSName.is_posix():  # pragma: is-windows
-            signal.signal(signal.SIGTERM, self._sigint_handler)
-        else:  # pragma: is-posix
+        if os.name == "nt":  # pragma: skip-coverage-posix
             signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
+        else:  # pragma: skip-coverage-windows
+            signal.signal(signal.SIGTERM, self._sigint_handler)
 
     def _sigint_handler(self, signum: int, frame: Optional[FrameType]) -> None:
         """
@@ -81,24 +83,24 @@ class BackendRunner:
         _logger.info("Running in background daemon mode.")
         shutdown_event: Event = Event()
 
-        if OSName.is_posix():  # pragma: is-windows
-            server_path = SocketPaths.for_os().get_process_socket_path(
+        if os.name == "nt":  # pragma: skip-coverage-posix
+            server_path = NamedPipeHelper.generate_pipe_name("AdaptorNamedPipe")
+        else:  # pragma: skip-coverage-windows
+            server_path = SocketPaths().get_process_socket_path(
                 ".openjd_adaptor_runtime",
                 create_dir=True,
             )
-        else:  # pragma: is-posix
-            server_path = NamedPipeHelper.generate_pipe_name("AdaptorNamedPipe")
 
         try:
-            if OSName.is_windows():  # pragma: is-posix
+            if os.name == "nt":  # pragma: skip-coverage-posix
                 self._server = WinBackgroundNamedPipeServer(
                     server_path,
                     self._adaptor_runner,
                     shutdown_event=shutdown_event,
                     log_buffer=self._log_buffer,
                 )
-            else:  # pragma: is-windows
-                self._server = BackgroundHTTPServer(
+            else:  # pragma: skip-coverage-windows
+                self._server = BackgroundHTTPServer(  # type: ignore
                     server_path,
                     self._adaptor_runner,
                     shutdown_event=shutdown_event,
@@ -153,8 +155,8 @@ class BackendRunner:
             # NamedPipe servers are managed by Named Pipe File System it is not a regular file.
             # Once all handles are closed, the system automatically cleans up the named pipe.
             files_for_deletion = [self._connection_file_path]
-            if OSName.is_posix():  # pragma: is-windows
-                files_for_deletion.append(server_path)
+            if os.name != "nt":  # pragma: skip-coverage-windows
+                files_for_deletion.append(server_path)  # type: ignore
             for path in files_for_deletion:
                 try:
                     os.remove(path)

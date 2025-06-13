@@ -1,6 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 import json
+import os
+import platform
 from typing import TYPE_CHECKING, Dict, List
 
 if TYPE_CHECKING:  # pragma: no cover because pytest will think we should test for this.
@@ -17,8 +19,6 @@ from http import HTTPStatus
 import logging
 import traceback
 from abc import ABC, abstractmethod
-
-from openjd.adaptor_runtime._osname import OSName
 
 
 _logger = logging.getLogger(__name__)
@@ -42,10 +42,10 @@ class ResourceRequestHandler(ABC):
                 Utilized for message read/write operations.
         """
         self._handler_type_name = self.__class__.__name__
-        if not OSName.is_windows():
+        if os.name != "nt":  # pragma: skip-coverage-windows
             raise OSError(
                 f"{self._handler_type_name} can be only used on Windows Operating Systems. "
-                f"Current Operating System is {OSName._get_os_name()}"
+                f"Current Operating System is {platform.platform()}"
             )
         self.server = server
         self.pipe_handle = pipe_handle

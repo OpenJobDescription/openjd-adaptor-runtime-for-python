@@ -6,7 +6,6 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime._utils import secure_open
 
 READ_FLAGS = os.O_RDONLY
@@ -44,7 +43,7 @@ FLAG_DICT = {
     ],
 )
 @patch.object(os, "open")
-@pytest.mark.skipif(not OSName.is_posix(), reason="Posix-specific tests")
+@pytest.mark.skipif(os.name == "nt", reason="Posix-specific tests")
 def test_secure_open_in_posix(mock_os_open, path, open_mode, mask, expected_os_open_kwargs):
     # WHEN
     with patch("builtins.open", mock_open()) as mocked_open:
@@ -76,7 +75,7 @@ def test_secure_open_in_posix(mock_os_open, path, open_mode, mask, expected_os_o
 )
 @patch.object(os, "open")
 @patch("openjd.adaptor_runtime._utils._secure_open.set_file_permissions_in_windows")
-@pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+@pytest.mark.skipif(os.name != "nt", reason="Windows-specific tests")
 def test_secure_open_in_windows(
     mock_file_permission_setting, mock_os_open, path, open_mode, expected_os_open_kwargs
 ):

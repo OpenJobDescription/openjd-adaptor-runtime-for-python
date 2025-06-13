@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import subprocess
 import uuid
 from types import TracebackType
 from typing import Any, Sequence, TypeVar, Dict
 
-from .._osname import OSName
 from ..app_handlers import RegexHandler
 from ._logging import _STDERR_LEVEL, _STDOUT_LEVEL
 from ._stream_logger import StreamLogger
@@ -60,7 +60,7 @@ class LoggingSubprocess(object):
             encoding=encoding,
             cwd=startup_directory,
         )
-        if OSName.is_windows():  # pragma: is-posix
+        if os.name == "nt":  # pragma: skip-coverage-posix
             # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
             # Without this one, current process will also get the SIGBREAK and may react incorrectly.
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
@@ -178,12 +178,12 @@ class LoggingSubprocess(object):
             self._process.wait()
         else:
             signal_type: signal.Signals
-            if OSName.is_windows():  # pragma: is-posix
+            if os.name == "nt":  # pragma: skip-coverage-posix
                 # We use `CREATE_NEW_PROCESS_GROUP` to create the process,
                 # so pid here is also the process group id and SIGBREAK can be only sent to the process group.
                 # Any processes in the process group will receive the SIGBREAK signal.
                 signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]
-            else:  # pragma: is-windows
+            else:  # pragma: skip-coverage-windows
                 signal_type = signal.SIGTERM
 
             self._logger.info(
@@ -198,7 +198,7 @@ class LoggingSubprocess(object):
             except subprocess.TimeoutExpired:
                 self._logger.info(
                     f"Process (pid={self._process.pid}) did not complete in the allotted time "
-                    f"after the {'SIGTERM' if OSName.is_posix() else 'SIGBREAK'} signal, "
+                    f"after the {'SIGBREAK' if os.name == 'nt' else 'SIGTERM'} signal, "
                     f"now sending the SIGKILL signal."
                 )
                 self._process.kill()  # SIGKILL, on Windows, this is an alias for terminate

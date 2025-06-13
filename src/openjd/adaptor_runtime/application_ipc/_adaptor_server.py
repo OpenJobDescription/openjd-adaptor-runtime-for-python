@@ -33,7 +33,7 @@ class AdaptorServer(UnixStreamServer):
         actions_queue: ActionsQueue,
         adaptor: BaseAdaptor,
     ) -> None:  # pragma: no cover
-        socket_path = SocketPaths.for_os().get_process_socket_path(
+        socket_path = SocketPaths().get_process_socket_path(
             ".openjd_adaptor_server",
             create_dir=True,
         )
@@ -57,6 +57,6 @@ class AdaptorServer(UnixStreamServer):
         super().shutdown()
 
         try:
-            os.remove(self.socket_path)
+            os.remove(self.server_path)
         except FileNotFoundError:
             pass

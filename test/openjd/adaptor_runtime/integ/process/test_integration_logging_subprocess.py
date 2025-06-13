@@ -12,7 +12,6 @@ from unittest import mock
 
 import pytest
 
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.app_handlers import RegexCallback, RegexHandler
 from openjd.adaptor_runtime.process import LoggingSubprocess
 from openjd.adaptor_runtime.process._logging_subprocess import _STDERR_LEVEL, _STDOUT_LEVEL
@@ -26,7 +25,7 @@ class TestIntegrationLoggingSubprocess(object):
         pytest.param(
             2,
             [
-                f"Sending the {'SIGTERM' if OSName.is_posix() else 'CTRL_BREAK_EVENT'} signal to pid=",
+                f"Sending the {'CTRL_BREAK_EVENT' if os.name == 'nt' else 'SIGTERM'} signal to pid=",
                 "now sending the SIGKILL signal.",
             ],
             id="StopProcessWhenSIGTERMFails",
@@ -73,11 +72,11 @@ class TestIntegrationLoggingSubprocess(object):
 
         p.terminate(5)  # Sometimes, when this is 1 second the process doesn't terminate in time.
         assert (
-            f"Sending the {'SIGTERM' if OSName.is_posix() else 'CTRL_BREAK_EVENT'} signal to pid="
+            f"Sending the {'CTRL_BREAK_EVENT' if os.name == 'nt' else 'SIGTERM'} signal to pid="
             in caplog.text
         )  # Asserting the SIGTERM signal was sent to the subprocess
         assert (
-            f"Trapped: {'SIGTERM' if OSName.is_posix() else 'SIGBREAK'}" in caplog.text
+            f"Trapped: {'SIGBREAK' if os.name == 'nt' else 'SIGTERM'}" in caplog.text
         )  # Asserting the SIGTERM was received by the subprocess.
         assert (
             "now sending the SIGKILL signal." not in caplog.text
@@ -91,7 +90,7 @@ class TestIntegrationLoggingSubprocess(object):
     @pytest.mark.parametrize("startup_dir", startup_dir_params)
     def test_startup_directory(self, startup_dir: str | None, caplog):
         caplog.set_level(logging.INFO)
-        if OSName.is_windows():
+        if os.name == "nt":
             args = ["powershell.exe", "pwd"]
         else:
             args = ["pwd"]
@@ -109,7 +108,7 @@ class TestIntegrationLoggingSubprocess(object):
         if startup_dir is not None:
             assert startup_dir in caplog.text
 
-    @pytest.mark.skipif(not OSName.is_posix(), reason="Only run this test in Linux.")
+    @pytest.mark.skipif(os.name == "nt", reason="Only run this test in Linux.")
     def test_startup_directory_empty_posix(self):
         """When calling LoggingSubprocess with an empty cwd, FileNotFoundError will be raised."""
         args = ["pwd"]
@@ -117,7 +116,7 @@ class TestIntegrationLoggingSubprocess(object):
             LoggingSubprocess(args=args, startup_directory="")
         assert "[Errno 2] No such file or directory: ''" in str(excinfo.value)
 
-    @pytest.mark.skipif(not OSName.is_windows(), reason="Only run this test in Windows.")
+    @pytest.mark.skipif(os.name != "nt", reason="Only run this test in Windows.")
     def test_startup_directory_empty_windows(self):
         """When calling LoggingSubprocess with an empty cwd, OSError will be raised."""
         args = ["powershell.exe", "pwd"]

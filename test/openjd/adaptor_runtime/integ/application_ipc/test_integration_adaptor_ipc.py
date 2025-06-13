@@ -1,5 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
+import os
 import threading as _threading
 import time
 from time import sleep as _sleep
@@ -12,10 +13,9 @@ from openjd.adaptor_runtime_client import Action as _Action
 from openjd.adaptor_runtime.adaptors import Adaptor, SemanticVersion
 from openjd.adaptor_runtime.application_ipc import ActionsQueue as _ActionsQueue
 from .fake_app_client import FakeAppClient as _FakeAppClient
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime.application_ipc import AdaptorServer as _AdaptorServer
 
-if OSName.is_windows():
+if os.name == "nt":
     from openjd.adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
 
 
@@ -36,13 +36,13 @@ def adaptor():
         {
             "source_path_format": "windows",
             "source_path": "Z:\\asset_storage1",
-            "destination_os": "linux",
+            "destination_os": "POSIX",
             "destination_path": "/mnt/shared/asset_storage1",
         },
         {
             "source_path_format": "windows",
             "source_path": "🌚\\🌒\\🌓\\🌔\\🌝\\🌖\\🌗\\🌘\\🌚",
-            "destination_os": "linux",
+            "destination_os": "POSIX",
             "destination_path": "🌝/🌖/🌗/🌘/🌚/🌒/🌓/🌔/🌝",
         },
     ]
@@ -196,7 +196,7 @@ class TestAdaptorIPC:
         # Verifying the test was successful.
         mocked_close.assert_called_once()
 
-    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
+    @pytest.mark.skipif(os.name != "nt", reason="Windows named pipe test")
     def test_adaptor_ipc_with_incorrect_request_path(self, adaptor: Adaptor):
         # GIVEN
         # Create a server and pass the actions queue.
@@ -216,7 +216,7 @@ class TestAdaptorIPC:
         assert "Incorrect request path none." == result["body"]
         assert 404 == result["status"]
 
-    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows named pipe test")
+    @pytest.mark.skipif(os.name != "nt", reason="Windows named pipe test")
     def test_adaptor_ipc_with_incorrect_request_method(self, adaptor: Adaptor):
         # GIVEN
         # Create a server and pass the actions queue.

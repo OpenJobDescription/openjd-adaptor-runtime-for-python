@@ -1,13 +1,12 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 import time
 
-from openjd.adaptor_runtime._osname import OSName
 import json
 import os
 import pytest
 import threading
 
-if OSName.is_windows():
+if os.name == "nt":
     import pywintypes
     import win32file
     import win32pipe
@@ -52,7 +51,7 @@ def start_pipe_server():
     server_thread.join()
 
 
-@pytest.mark.skipif(not OSName.is_windows(), reason="NamedPipe is only implemented in Windows.")
+@pytest.mark.skipif(os.name != "nt", reason="NamedPipe is only implemented in Windows.")
 class TestNamedPipeHelper:
     def test_named_pipe_communication(self, start_pipe_server):
         """

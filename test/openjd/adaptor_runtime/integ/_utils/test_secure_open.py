@@ -1,6 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-from openjd.adaptor_runtime._osname import OSName
 import pytest
 import os
 import tempfile
@@ -9,7 +8,7 @@ import string
 
 from openjd.adaptor_runtime._utils import secure_open
 
-if OSName.is_windows():
+if os.name == "nt":
     import win32security
 
 
@@ -40,7 +39,7 @@ class TestSecureOpen:
             result = test_file.read()
         assert result == file_content
 
-    @pytest.mark.skipif(not OSName.is_windows(), reason="Windows-specific tests")
+    @pytest.mark.skipif(os.name != "nt", reason="Windows-specific tests")
     @pytest.mark.skipif(
         os.getenv("GITHUB_ACTIONS") != "true",
         reason="Skip this test in local env to avoid user creation with elevated privilege.",

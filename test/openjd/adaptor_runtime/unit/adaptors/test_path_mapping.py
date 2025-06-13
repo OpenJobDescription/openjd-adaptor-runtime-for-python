@@ -15,17 +15,17 @@ from openjd.adaptor_runtime.adaptors import PathMappingRule
         pytest.param({"source_path_format": "", "source_path": None, "destination_path": ""}),
         pytest.param({"source_path_format": "", "source_path": "C:/", "destination_path": "/mnt/"}),
         pytest.param(
-            {"source_path_format": "windows", "source_path": "", "destination_path": "/mnt/"}
+            {"source_path_format": "WINDOWS", "source_path": "", "destination_path": "/mnt/"}
         ),
         pytest.param(
-            {"source_path_format": "windows", "source_path": "C:/", "destination_path": ""}
+            {"source_path_format": "WINDOWS", "source_path": "C:/", "destination_path": ""}
         ),
         pytest.param(
             {"source_path_format": "nonvalid", "source_path": "C:/", "destination_path": "/mnt/"}
         ),
         pytest.param(
             {
-                "source_path_format": "windows",
+                "source_path_format": "WINDOWS",
                 "destination_os": "nonvalid",
                 "source_path": "C:/",
                 "destination_path": "/mnt/",
@@ -61,8 +61,8 @@ def test_no_args(rule):
 def test_good_args():
     # GIVEN
     rule = {
-        "source_path_format": "windows",
-        "destination_os": "windows",
+        "source_path_format": "WINDOWS",
+        "destination_os": "WINDOWS",
         "source_path": "Y:/movie1",
         "destination_path": "Z:/movie2",
     }
@@ -86,7 +86,7 @@ def test_good_args():
 def test_path_mapping_linux_is_match(path):
     # GIVEN
     rule = PathMappingRule(
-        source_path_format="linux", source_path="/usr", destination_path="/mnt/shared"
+        source_path_format="POSIX", source_path="/usr", destination_path="/mnt/shared"
     )
     pure_path = PurePosixPath(path)
 
@@ -112,7 +112,7 @@ def test_path_mapping_linux_is_match(path):
 def test_path_mapping_linux_is_not_match(path):
     # GIVEN
     rule = PathMappingRule(
-        source_path_format="linux", source_path="/usr/Movie1", destination_path="/mnt/shared/Movie1"
+        source_path_format="POSIX", source_path="/usr/Movie1", destination_path="/mnt/shared/Movie1"
     )
     pure_path = PurePosixPath(path)
 
@@ -138,7 +138,7 @@ def test_path_mapping_linux_is_not_match(path):
 def test_path_mapping_windows_is_match(path):
     # GIVEN
     rule = PathMappingRule(
-        source_path_format="windows", source_path="Z:\\Movie1", destination_path="/mnt/shared"
+        source_path_format="WINDOWS", source_path="Z:\\Movie1", destination_path="/mnt/shared"
     )
     pure_path = PureWindowsPath(path)
 
@@ -160,7 +160,7 @@ def test_path_mapping_windows_is_match(path):
 def test_path_mapping_windows_is_not_match(path):
     # GIVEN
     rule = PathMappingRule(
-        source_path_format="windows", source_path="Z:\\Movie1", destination_path="/mnt/shared"
+        source_path_format="WINDOWS", source_path="Z:\\Movie1", destination_path="/mnt/shared"
     )
     pure_path = PureWindowsPath(path)
 
@@ -176,9 +176,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage2",
-                "destination_os": "linux",
+                "destination_os": "POSIX",
                 "destination_path": "/mnt/shared/movie2",
             }
         )
@@ -195,9 +195,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         )
@@ -214,9 +214,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "windows",
+                "source_path_format": "WINDOWS",
                 "source_path": "Z:\\asset_storage1",
-                "destination_os": "linux",
+                "destination_os": "POSIX",
                 "destination_path": "/mnt/shared/asset_storage1",
             }
         )
@@ -233,9 +233,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/mnt/shared/my_custom_path/asset_storage1",
-                "destination_os": "linux",
+                "destination_os": "POSIX",
                 "destination_path": "/mnt/shared/asset_storage1",
             }
         )
@@ -253,9 +253,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "windows",
+                "source_path_format": "WINDOWS",
                 "source_path": "Z:\\my_custom_asset_path\\asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         )
@@ -272,9 +272,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "windows",
+                "source_path_format": "WINDOWS",
                 "source_path": "Z:\\my_custom_asset_path\\asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         )
@@ -291,9 +291,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "windows",
+                "source_path_format": "WINDOWS",
                 "source_path": "Z:\\my_custom_asset_path\\asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         )
@@ -310,9 +310,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "windows",
+                "source_path_format": "WINDOWS",
                 "source_path": "Z:/my_custom_asset_path/asset_storage1",
-                "destination_os": "windows",
+                "destination_os": "WINDOWS",
                 "destination_path": "Z:\\asset_storage1",
             }
         )
@@ -329,9 +329,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "a/b",
-                "destination_os": "linux",
+                "destination_os": "POSIX",
                 "destination_path": "/c",
             }
         )
@@ -348,9 +348,9 @@ class TestApplyPathMapping:
         # GIVEN
         rule = PathMappingRule.from_dict(
             rule={
-                "source_path_format": "linux",
+                "source_path_format": "POSIX",
                 "source_path": "/bar/baz",
-                "destination_os": "linux",
+                "destination_os": "POSIX",
                 "destination_path": "/bla",
             }
         )
@@ -366,9 +366,9 @@ class TestApplyPathMapping:
     def test_to_dict(self):
         # GIVEN
         rule_dict = {
-            "source_path_format": "linux",
+            "source_path_format": "POSIX",
             "source_path": "/bar/baz",
-            "destination_os": "linux",
+            "destination_os": "POSIX",
             "destination_path": "/bla",
         }
         rule = PathMappingRule.from_dict(rule=rule_dict)

@@ -74,7 +74,7 @@ class HTTPClientInterface(BaseClientInterface):
         headers = {
             "Content-type": "application/json",
         }
-        connection = _UnixHTTPConnection(self.socket_path, timeout=_REQUEST_TIMEOUT)
+        connection = _UnixHTTPConnection(self.server_path, timeout=_REQUEST_TIMEOUT)
         if query_string_params:
             request_path += "?" + _urlencode(query_string_params)
         connection.request(method, request_path, headers=headers)

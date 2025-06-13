@@ -6,14 +6,11 @@ import stat
 import os
 from contextlib import contextmanager
 from typing import IO, TYPE_CHECKING, Generator
-from .._osname import OSName
 
-if OSName.is_windows():
+if os.name == "nt":  # pragma: skip-coverage-posix
     import ntsecuritycon as con
     import win32security
     import win32con
-
-from openjd.adaptor_runtime._osname import OSName
 
 if TYPE_CHECKING:
     from _typeshed import StrOrBytesPath
@@ -52,13 +49,13 @@ def secure_open(
         "flags": _get_flags_from_mode_str(open_mode),
     }
     # not O_RDONLY
-    if flags != 0 and OSName.is_posix():  # pragma: is-windows
+    if flags != 0 and os.name != "nt":  # pragma: skip-coverage-windows
         os_open_kwargs["mode"] = stat.S_IWUSR | stat.S_IRUSR | mask
 
     fd = os.open(**os_open_kwargs)  # type: ignore
 
     # not O_RDONLY. Use ACL to set the permission for the file owner.
-    if flags != 0 and OSName.is_windows():  # pragma: is-posix
+    if flags != 0 and os.name == "nt":  # pragma: skip-coverage-posix
         if mask != 0:
             raise NotImplementedError("Additional masks are not supported in Windows.")
         set_file_permissions_in_windows(path)

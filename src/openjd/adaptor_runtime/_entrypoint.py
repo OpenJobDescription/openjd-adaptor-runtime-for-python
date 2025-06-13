@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import platform
 import signal
 import sys
 import tempfile
@@ -40,7 +41,6 @@ from .adaptors.configuration import (
     RuntimeConfiguration,
     ConfigurationManager,
 )
-from ._osname import OSName
 from ._utils._constants import _OPENJD_ADAPTOR_SOCKET_ENV, _OPENJD_LOG_REGEX
 from ._utils._logging import (
     ConditionalFormatter,
@@ -84,7 +84,7 @@ _CLI_HELP_TEXT = {
 _DIR = os.path.dirname(os.path.realpath(__file__))
 # Keyword args to init the ConfigurationManager for the runtime.
 _ENV_CONFIG_PATH_PREFIX = "RUNTIME_CONFIG_PATH"
-_system_config_path_prefix = "/etc" if OSName.is_posix() else os.environ["PROGRAMDATA"]
+_system_config_path_prefix = os.environ["PROGRAMDATA"] if os.name == "nt" else "/etc"
 _system_config_path = os.path.abspath(
     os.path.join(
         _system_config_path_prefix,
@@ -226,7 +226,7 @@ class EntryPoint:
             raise
         except NotImplementedError as e:
             _logger.warning(
-                f"The current system ({OSName()}) is not supported for runtime "
+                f"The current system ({platform.platform()}) is not supported for runtime "
                 f"configuration. Only the default configuration will be loaded. Full error: {e}"
             )
             # The above call to build_config() would have already successfully retrieved the
@@ -354,10 +354,10 @@ class EntryPoint:
         self._adaptor_runner = AdaptorRunner(adaptor=adaptor)
         # To be able to handle cancelation via signals
         signal.signal(signal.SIGINT, self._sigint_handler)
-        if OSName.is_posix():  # pragma: is-windows
-            signal.signal(signal.SIGTERM, self._sigint_handler)
-        else:  # pragma: is-posix
+        if os.name == "nt":  # pragma: skip-coverage-posix
             signal.signal(signal.SIGBREAK, self._sigint_handler)  # type: ignore[attr-defined]
+        else:  # pragma: skip-coverage-windows
+            signal.signal(signal.SIGTERM, self._sigint_handler)
         try:
             self._adaptor_runner._start()
             self._adaptor_runner._run(integration_data.run_data)

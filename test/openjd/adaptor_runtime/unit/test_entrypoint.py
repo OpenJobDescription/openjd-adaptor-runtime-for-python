@@ -24,7 +24,6 @@ from openjd.adaptor_runtime.adaptors import BaseAdaptor, SemanticVersion
 from openjd.adaptor_runtime._background import BackendRunner, FrontendRunner
 from openjd.adaptor_runtime._background.frontend_runner import _FRONTEND_RUNNER_REQUEST_TIMEOUT
 from openjd.adaptor_runtime._background.model import ConnectionSettings
-from openjd.adaptor_runtime._osname import OSName
 from openjd.adaptor_runtime._entrypoint import _load_data
 
 from .adaptors.fake_adaptor import FakeAdaptor
@@ -361,7 +360,7 @@ class TestStart:
         mock_build_config.assert_called_once()
         mock_get_default_config.assert_called_once()
         assert entrypoint.config is mock_get_default_config.return_value
-        assert f"The current system ({OSName()}) is not supported for runtime "
+        assert " is not supported for runtime " in caplog.text
         assert (
             "configuration. Only the default configuration will be loaded. Full error: "
             in caplog.text
@@ -451,10 +450,10 @@ class TestStart:
 
         # THEN
         signal_mock.assert_any_call(signal.SIGINT, entrypoint._sigint_handler)
-        if OSName.is_posix():
-            signal_mock.assert_any_call(signal.SIGTERM, entrypoint._sigint_handler)
-        else:
+        if os.name == "nt":
             signal_mock.assert_any_call(signal.SIGBREAK, entrypoint._sigint_handler)  # type: ignore[attr-defined]
+        else:
+            signal_mock.assert_any_call(signal.SIGTERM, entrypoint._sigint_handler)
         mock_adaptor_runner.return_value._cancel.assert_called_once()
 
     @patch.object(runtime_entrypoint, "InMemoryLogBuffer")

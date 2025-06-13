@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
-
-from .._osname import OSName
 
 __all__ = [
     "PathMappingRule",
@@ -14,6 +13,8 @@ __all__ = [
 class PathMappingRule:
     """A PathMappingRule represents how to transform a valid rooted path to another
     valid rooted path within or across different platforms.
+
+    See https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#path-mapping
 
     This is useful for consolidating environments that refer to physical storage with
     different paths. Consider the following example:
@@ -47,8 +48,8 @@ class PathMappingRule:
         *,
         source_path_format: str,
         source_path: str,
+        destination_os: str = "WINDOWS" if os.name == "nt" else "POSIX",
         destination_path: str,
-        destination_os: str = OSName(),
     ):
         for label, value in (
             ("source_path_format", source_path_format),
@@ -60,20 +61,26 @@ class PathMappingRule:
 
         self.source_path: str = source_path
         self.destination_path: str = destination_path
-        self._source_path_format: str = OSName(
-            source_path_format
-        )  # Raises ValueError if not valid OS
-        self._is_windows_source: bool = OSName.is_windows(self._source_path_format)
+        source_path_format = source_path_format.upper()
+        if source_path_format not in ("WINDOWS", "POSIX"):
+            raise ValueError(
+                f"The source path format '{source_path_format}' must be 'WINDOWS' or 'POSIX'."
+            )
+        self._source_path_format: str = source_path_format
 
-        self._destination_os: str = OSName(destination_os)  # Raises ValueError if not valid OS
-        self._is_windows_destination: bool = OSName.is_windows(self._destination_os)
+        destination_os = destination_os.upper()
+        if destination_os not in ("WINDOWS", "POSIX"):
+            raise ValueError(
+                f"The destination path format '{destination_os}' must be 'WINDOWS' or 'POSIX'."
+            )
+        self._destination_os: str = destination_os
 
-        if self._is_windows_source:
+        if self._source_path_format == "WINDOWS":
             self._pure_source_path = PureWindowsPath(self.source_path)
         else:
             self._pure_source_path = PurePosixPath(self.source_path)
 
-        if self._is_windows_destination:
+        if self._destination_os == "WINDOWS":
             self._pure_destination_path = PureWindowsPath(self.destination_path)
         else:
             self._pure_destination_path = PurePosixPath(self.destination_path)
@@ -82,8 +89,6 @@ class PathMappingRule:
         return (
             self.source_path == other.source_path
             and self.destination_path == other.destination_path
-            and self._is_windows_source == other._is_windows_source
-            and self._is_windows_destination == other._is_windows_destination
         )
 
     @staticmethod
@@ -124,7 +129,7 @@ class PathMappingRule:
 
     def _get_pure_path(self, path: str) -> PurePath:
         """Assumes that the path received matches the source os of the rule"""
-        if self._is_windows_source:
+        if self._source_path_format == "WINDOWS":
             return PureWindowsPath(path)
         else:
             return PurePosixPath(path)
@@ -135,7 +140,7 @@ class PathMappingRule:
         new_parts = (
             self._pure_destination_path.parts + pure_path.parts[len(self._pure_source_path.parts) :]
         )
-        if self._is_windows_destination:
+        if self._destination_os == "WINDOWS":
             return PureWindowsPath(*new_parts)
         else:
             return PurePosixPath(*new_parts)

@@ -15,12 +15,12 @@ from openjd.adaptor_runtime._http.sockets import (
     MacOSSocketPaths,
     NonvalidSocketPathException,
     NoSocketPathFoundException,
-    SocketPaths,
+    SocketPathsBase,
     UnixSocketPaths,
 )
 
 
-class SocketPathsStub(SocketPaths):
+class SocketPathsStub(SocketPathsBase):
     def verify_socket_path(self, path: str) -> None:
         pass
 
@@ -28,7 +28,7 @@ class SocketPathsStub(SocketPaths):
 class TestSocketPaths:
     class TestGetProcessSocketPath:
         """
-        Tests for SocketPaths.get_process_socket_path()
+        Tests for SocketPaths().get_process_socket_path()
         """
 
         @patch.object(sockets.os, "getpid", return_value=1234)
@@ -64,7 +64,7 @@ class TestSocketPaths:
 
     class TestGetSocketPath:
         """
-        Tests for SocketPaths.get_socket_path()
+        Tests for SocketPaths().get_socket_path()
         """
 
         @pytest.fixture(autouse=True)
