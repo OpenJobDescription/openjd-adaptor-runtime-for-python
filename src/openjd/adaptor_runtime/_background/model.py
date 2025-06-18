@@ -3,7 +3,8 @@
 import dataclasses as dataclasses
 import json as json
 from enum import Enum as Enum
-from typing import Any, ClassVar, Dict, Generic, Iterable, Type, TypeVar, cast
+from enum import EnumMeta
+from typing import Any, ClassVar, Dict, Type, TypeVar, cast, Generic
 
 from ..adaptors import AdaptorState
 
@@ -100,14 +101,12 @@ class DataclassMapper(Generic[_T]):
 
             value = o[field.name]
             if dataclasses.is_dataclass(field.type):
-                value = DataclassMapper(field.type).map(value)
-            elif issubclass(field.type, Enum):
-                [value] = [
-                    enum
-                    # Need to cast here for mypy
-                    for enum in cast(Iterable[Enum], list(field.type))
-                    if enum.value == value
-                ]
+                # The init function expects a type, so any dataclasses in cls
+                # will be a type.
+                value = DataclassMapper(cast(type, field.type)).map(value)
+            elif isinstance(field.type, EnumMeta):
+                value = field.type(value)
+
             args[field.name] = value
 
         return self._cls(**args)

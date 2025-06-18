@@ -194,6 +194,7 @@ class LoggingSubprocess(object):
             self._process.kill()
             self._process.wait()
         else:
+            signal_type: signal.Signals
             if OSName.is_windows():  # pragma: is-posix
                 # We use `CREATE_NEW_PROCESS_GROUP` to create the process,
                 # so pid here is also the process group id and SIGBREAK can be only sent to the process group.

@@ -20,10 +20,15 @@ from openjd.adaptor_runtime._osname import OSName
 
 mod_path = Path(__file__).parent.resolve()
 sys.path.append(str(mod_path))
+
 if (_pypath := os.environ.get("PYTHONPATH")) is not None:
-    os.environ["PYTHONPATH"] = ":".join((_pypath, str(mod_path)))
+    os.environ["PYTHONPATH"] = os.pathsep.join([_pypath, str(mod_path)])
 else:
     os.environ["PYTHONPATH"] = str(mod_path)
+
+# Add the module path to PYTHONPATH for subprocesses
+os.environ["PYTEST_XDIST_WORKER_PYTHONPATH"] = str(mod_path)
+
 from CommandAdaptorExample import CommandAdaptorExample  # noqa: E402
 
 
