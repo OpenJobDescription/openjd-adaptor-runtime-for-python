@@ -1,3 +1,10 @@
+## 0.9.1 (2025-07-09)
+
+
+
+### Bug Fixes
+* sdist failed to install (#199) ([`71f192b`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/71f192b5f2d70ef89480d7da4c4a52857795c2a1))
+
 ## 0.9.0 (2025-01-02)
 
 
