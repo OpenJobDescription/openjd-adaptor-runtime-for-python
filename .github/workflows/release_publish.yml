@@ -66,16 +66,16 @@ jobs:
   # PyPI does not support reusable workflows yet
   # # See https://github.com/pypi/warehouse/issues/11096
   PublishToPyPI:
-    needs: Publish
+    needs: [TagRelease, Publish]
     runs-on: ubuntu-latest
     environment: release
     permissions:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
-          ref: release
+          ref: ${{ needs.TagRelease.outputs.tag }}
           fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
