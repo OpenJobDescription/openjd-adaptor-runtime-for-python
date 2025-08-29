@@ -86,8 +86,8 @@ class LoggingSubprocess(object):
                 )
 
             raise FileNotFoundError(
-                f"Could not find the executable associated with the adaptor: {executable}\n"
-                f"Is the executable on the PATH or in the startup directory?\n"
+                f"Could not find the specified command: {executable}\n"
+                f"Ensure the command is available from the PATH environment variable.\n"
                 f"Error:{fnf_error}"
             )
 
