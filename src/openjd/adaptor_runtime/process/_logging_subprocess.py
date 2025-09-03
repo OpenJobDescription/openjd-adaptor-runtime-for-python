@@ -81,7 +81,7 @@ class LoggingSubprocess(object):
             # If we didn't find the executable found by which
             if exe_path is not None:
                 raise FileNotFoundError(
-                    f"Could not find adaptor executable at: {exe_path} using alias {executable}\n"
+                    f"Could not find executable at: {exe_path} using alias {executable}\n"
                     f"Error:{fnf_error}"
                 )
 

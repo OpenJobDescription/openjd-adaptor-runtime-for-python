@@ -156,7 +156,7 @@ class TestIntegrationLoggingSubprocess(object):
         args = ["missing_executable"]
         with pytest.raises(FileNotFoundError) as exc_info:
             LoggingSubprocess(args=args)
-        assert "Could not find the executable associated with the adaptor" in str(exc_info.value)
+        assert "Could not find the specified command" in str(exc_info.value)
 
 
 class TestIntegrationRegexHandler(object):
