@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import signal
 import subprocess
 import uuid
@@ -21,7 +22,11 @@ _logger = logging.getLogger(__name__)
 
 
 class LoggingSubprocess(object):
-    """A process whose stdout/stderr lines are sent to a configurable logger"""
+    """A process whose stdout/stderr lines are sent to a configurable logger
+
+    Raises:
+         FileNotFoundError: When the executable the adaptor is set to run cannot be found.
+    """
 
     _logger: logging.Logger
     _process: subprocess.Popen
@@ -64,7 +69,27 @@ class LoggingSubprocess(object):
             # In Windows, this is required for signal. SIGBREAK will be sent to the entire process group.
             # Without this one, current process will also get the SIGBREAK and may react incorrectly.
             popen_params.update(creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
-        self._process = subprocess.Popen(**popen_params)
+
+        try:
+            self._process = subprocess.Popen(**popen_params)
+
+        except FileNotFoundError as fnf_error:
+            # In ManagedProcess we prepend the executable to the list of arguments before creating a LoggingSubprocess
+            executable = args[0]
+            exe_path = shutil.which(executable)
+
+            # If we didn't find the executable found by which
+            if exe_path is not None:
+                raise FileNotFoundError(
+                    f"Could not find executable at: {exe_path} using alias {executable}\n"
+                    f"Error:{fnf_error}"
+                )
+
+            raise FileNotFoundError(
+                f"Could not find the specified command: {executable}\n"
+                f"Ensure the command is available from the PATH environment variable.\n"
+                f"Error:{fnf_error}"
+            )
 
         if not self._process.stdout:  # pragma: no cover
             raise RuntimeError("process stdout not set")
