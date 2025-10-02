@@ -1,3 +1,10 @@
+## 0.9.2 (2025-10-02)
+
+
+### Features
+* Add user friendly message when the exectuable isn't found (#219) ([`e908f47`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/e908f47de2fcd7a250065da9815c9ec00350bdd8))
+
+
 ## 0.9.1 (2025-07-09)
 
 
