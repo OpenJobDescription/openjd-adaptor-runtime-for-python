@@ -141,6 +141,7 @@ addopts = [
 branch = true
 parallel = true
 plugins = ["coverage_conditional_plugin"]
+patch = ["subprocess"]
 
 
 [tool.coverage.paths]
