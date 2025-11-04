@@ -122,7 +122,7 @@ class BaseClientInterface(_ABC):
             action = _Action(response_body["name"], response_body["args"])
         return response.status, response.reason, action
 
-    @_lru_cache(maxsize=None)
+    @_lru_cache(maxsize=100000)
     def map_path(self, path: str) -> str:
         """Sending a get request to the server on the /path_mapping endpoint.
         This will be used to get the Adaptor to map a given path.
@@ -149,7 +149,7 @@ class BaseClientInterface(_ABC):
             f"Server response: Status: {int(response.status)}, Response: '{reason}'",
         )
 
-    @_lru_cache(maxsize=None)
+    @_lru_cache(maxsize=100000)
     def path_mapping_rules(self) -> _List[PathMappingRule]:
         """Sending a get request to the server on the /path_mapping_rules endpoint.
         This will be used to get the Adaptor to map a given path.
