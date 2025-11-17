@@ -1,3 +1,11 @@
+## 0.9.3 (2025-11-17)
+
+
+
+### Bug Fixes
+* path mapping lru cache grows indefinitely (#239) ([`8937f21`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/8937f210a7f268146d12ff20924f7842ffa070c7))
+
+
 ## 0.9.2 (2025-10-02)
 
 
