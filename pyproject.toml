@@ -21,6 +21,8 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Operating System :: POSIX :: Linux",
   "Operating System :: Microsoft :: Windows",
   "Operating System :: MacOS",
@@ -88,7 +90,6 @@ disallow_incomplete_defs = false
 disallow_untyped_calls = false
 show_error_context = true
 strict_equality = false
-python_version = 3.9
 warn_redundant_casts = true
 warn_unused_configs = true
 warn_unused_ignores = false
