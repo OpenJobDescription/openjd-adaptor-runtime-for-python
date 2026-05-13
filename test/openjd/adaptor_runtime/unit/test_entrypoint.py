@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import signal
+import sys
 from pathlib import Path
 from typing import Optional
 from unittest.mock import ANY, MagicMock, Mock, PropertyMock, mock_open, patch
@@ -116,6 +117,25 @@ class TestStart:
             "OpenJD Adaptor CLI Version": str(runtime_entrypoint._ADAPTOR_CLI_VERSION),
             "MockAdaptor Data Interface Version": "1.5",
         }
+
+    def test_logs_versions_at_startup(self):
+        """Verifies that both the runtime and adaptor versions are logged during start()."""
+        # GIVEN
+        entrypoint = EntryPoint(FakeAdaptor)
+
+        with (
+            patch.object(entrypoint, "_get_adaptor_package_version", return_value="1.2.3"),
+            patch.object(runtime_entrypoint.sys, "argv", ["Adaptor", "run"]),
+            patch.object(runtime_entrypoint, "_logger") as mock_logger,
+        ):
+            # WHEN
+            entrypoint.start()
+
+        # THEN
+        mock_logger.info.assert_any_call(
+            f"openjd-adaptor-runtime version: {runtime_entrypoint._RUNTIME_VERSION}"
+        )
+        mock_logger.info.assert_any_call("FakeAdaptor version: 1.2.3")
 
     @pytest.mark.parametrize("integration_version", ["1.4", "1.5"])
     def test_is_compatible(
@@ -904,3 +924,166 @@ class TestLoadData:
 
         # THEN
         assert raised_err.match(f"Expected loaded data to be a dict, but got {type(input)}")
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="packages_distributions requires Python 3.10+",
+)
+class TestGetAdaptorPackageVersion:
+    """
+    Tests for the EntryPoint._get_adaptor_package_version method
+    """
+
+    def test_returns_version_from_distribution_file_match(self, mock_adaptor_cls: MagicMock):
+        """When the adaptor module file is found in a distribution's recorded files, return its version."""
+        # GIVEN
+        mock_adaptor_cls.__module__ = "deadline.max_adaptor.MaxAdaptor.adaptor"
+        entrypoint = EntryPoint(mock_adaptor_cls)
+
+        mock_dist = MagicMock()
+        mock_dist.version = "0.3.3"
+        mock_dist.files = [
+            MagicMock(__str__=lambda self: "deadline/max_adaptor/MaxAdaptor/adaptor.py"),
+            MagicMock(__str__=lambda self: "deadline/max_adaptor/__init__.py"),
+        ]
+
+        def fake_distribution(name):
+            if name == "deadline-cloud-for-3ds-max":
+                return mock_dist
+            raise runtime_entrypoint.importlib.metadata.PackageNotFoundError(name)
+
+        with (
+            patch(
+                "openjd.adaptor_runtime._entrypoint.importlib.metadata.packages_distributions",
+                return_value={"deadline": ["deadline-cloud-for-3ds-max", "deadline"]},
+            ),
+            patch(
+                "openjd.adaptor_runtime._entrypoint.importlib.metadata.distribution",
+                side_effect=fake_distribution,
+            ),
+        ):
+            # WHEN
+            result = entrypoint._get_adaptor_package_version()
+
+        # THEN
+        assert result == "0.3.3"
+
+    def test_does_not_match_wrong_distribution(self, mock_adaptor_cls: MagicMock):
+        """When the top-level package has multiple distributions, only match the correct one."""
+        # GIVEN
+        mock_adaptor_cls.__module__ = "deadline.max_adaptor.MaxAdaptor.adaptor"
+        entrypoint = EntryPoint(mock_adaptor_cls)
+
+        # deadline-cloud dist does NOT contain the adaptor module file
+        deadline_cloud_dist = MagicMock()
+        deadline_cloud_dist.version = "0.57.3"
+        deadline_cloud_dist.files = [
+            MagicMock(__str__=lambda self: "deadline/client/__init__.py"),
+            MagicMock(__str__=lambda self: "deadline/client/cli.py"),
+        ]
+
+        # deadline-cloud-for-3ds-max dist DOES contain the adaptor module file
+        max_adaptor_dist = MagicMock()
+        max_adaptor_dist.version = "0.3.3"
+        max_adaptor_dist.files = [
+            MagicMock(__str__=lambda self: "deadline/max_adaptor/MaxAdaptor/adaptor.py"),
+            MagicMock(__str__=lambda self: "deadline/max_adaptor/__init__.py"),
+        ]
+
+        def fake_distribution(name):
+            if name == "deadline":
+                return deadline_cloud_dist
+            if name == "deadline-cloud-for-3ds-max":
+                return max_adaptor_dist
+            raise runtime_entrypoint.importlib.metadata.PackageNotFoundError(name)
+
+        with (
+            patch(
+                "openjd.adaptor_runtime._entrypoint.importlib.metadata.packages_distributions",
+                return_value={"deadline": ["deadline", "deadline-cloud-for-3ds-max"]},
+            ),
+            patch(
+                "openjd.adaptor_runtime._entrypoint.importlib.metadata.distribution",
+                side_effect=fake_distribution,
+            ),
+        ):
+            # WHEN
+            result = entrypoint._get_adaptor_package_version()
+
+        # THEN
+        assert result == "0.3.3"
+
+    def test_falls_back_to_version_module(self, mock_adaptor_cls: MagicMock):
+        """When no distribution file match is found, fall back to _version module in sys.modules."""
+        # GIVEN
+        mock_adaptor_cls.__module__ = "deadline.max_adaptor.MaxAdaptor.adaptor"
+        entrypoint = EntryPoint(mock_adaptor_cls)
+
+        mock_version_module = MagicMock()
+        mock_version_module.version = "3.5.1"
+
+        with (
+            patch(
+                "openjd.adaptor_runtime._entrypoint.importlib.metadata.packages_distributions",
+                return_value={"deadline": []},
+            ),
+            patch.dict(
+                runtime_entrypoint.sys.modules,
+                {"deadline.max_adaptor._version": mock_version_module},
+            ),
+        ):
+            # WHEN
+            result = entrypoint._get_adaptor_package_version()
+
+        # THEN
+        assert result == "3.5.1"
+
+    def test_fallback_walks_up_module_path(self, mock_adaptor_cls: MagicMock):
+        """The _version fallback walks up the module path to find the correct _version module."""
+        # GIVEN
+        mock_adaptor_cls.__module__ = "deadline.max_adaptor.MaxAdaptor.adaptor"
+        entrypoint = EntryPoint(mock_adaptor_cls)
+
+        mock_version_module = MagicMock()
+        mock_version_module.version = "0.3.2"
+
+        with (
+            patch(
+                "openjd.adaptor_runtime._entrypoint.importlib.metadata.packages_distributions",
+                return_value={"deadline": []},
+            ),
+            patch.dict(
+                runtime_entrypoint.sys.modules,
+                {"deadline.max_adaptor._version": mock_version_module},
+            ),
+        ):
+            # WHEN
+            result = entrypoint._get_adaptor_package_version()
+
+        # THEN
+        assert result == "0.3.2"
+
+    def test_returns_unknown_when_version_not_found(self, mock_adaptor_cls: MagicMock):
+        """When no version can be determined, return 'UNKNOWN' and log a warning."""
+        # GIVEN
+        mock_adaptor_cls.__module__ = "deadline.max_adaptor.MaxAdaptor.adaptor"
+        mock_adaptor_cls.__name__ = "MaxAdaptor"
+        entrypoint = EntryPoint(mock_adaptor_cls)
+
+        with (
+            patch(
+                "openjd.adaptor_runtime._entrypoint.importlib.metadata.packages_distributions",
+                return_value={"deadline": []},
+            ),
+            patch.dict(runtime_entrypoint.sys.modules, {}, clear=False),
+        ):
+            runtime_entrypoint.sys.modules.pop("deadline.max_adaptor.MaxAdaptor._version", None)
+            runtime_entrypoint.sys.modules.pop("deadline.max_adaptor._version", None)
+            runtime_entrypoint.sys.modules.pop("deadline._version", None)
+
+            # WHEN
+            result = entrypoint._get_adaptor_package_version()
+
+        # THEN
+        assert result == "UNKNOWN"
