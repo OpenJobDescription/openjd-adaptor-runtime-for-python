@@ -109,7 +109,7 @@ class TestEnsureConfigFile:
         mock_exists.return_value = False
 
         open_mock: MagicMock
-        with patch.object(configuration_manager, "secure_open", mock_open()) as open_mock:
+        with patch("builtins.open", mock_open()) as open_mock:
             if not created:
                 open_mock.side_effect = OSError()
 
@@ -119,7 +119,7 @@ class TestEnsureConfigFile:
         # THEN
         assert result == created
         mock_exists.assert_called_once_with(path)
-        open_mock.assert_called_once_with(path, open_mode="w", encoding="utf-8")
+        open_mock.assert_called_once_with(path, mode="w", encoding="utf-8")
         assert f'Configuration file at "{path}" does not exist.' in caplog.text
         assert f"Creating empty configuration at {path}" in caplog.text
         if created:
