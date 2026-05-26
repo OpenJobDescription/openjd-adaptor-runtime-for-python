@@ -1,3 +1,11 @@
+## 0.9.4 (2026-05-26)
+
+
+
+### Bug Fixes
+* use plain open() when creating empty config files (#260) ([`2d42366`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/2d42366f4312a88928bf9d59ef699ffd810b8708))
+
+
 ## 0.9.3 (2025-11-17)
 
 
