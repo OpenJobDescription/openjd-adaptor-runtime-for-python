@@ -128,13 +128,23 @@ class NamedPipeHelper:
         # Get the username of the current user
         username = getpass.getuser()
 
-        # Get the SID for the current user
-        user_sid, _, _ = win32security.LookupAccountName(
-            "",  # systemName: The name of the system or server where the account resides.
-            # Search for the account on the local computer.
-            # If Domain/User Format is used here, it will fetch the Name from the AD.
-            username,
-        )
+        # Retry with exponential backoff to handle ERROR_NONE_MAPPED (1332) which occurs
+        # when the LSA service hasn't finished initializing on freshly started EC2 instances.
+        _LOOKUP_MAX_RETRIES = 3
+        for attempt in range(_LOOKUP_MAX_RETRIES):
+            try:
+                user_sid, _, _ = win32security.LookupAccountName(
+                    "",  # systemName: The name of the system or server where the account resides.
+                    # Search for the account on the local computer.
+                    # If Domain/User Format is used here, it will fetch the Name from the AD.
+                    username,
+                )
+                break
+            except pywintypes.error as e:
+                if e.winerror == 1332 and attempt < _LOOKUP_MAX_RETRIES - 1:
+                    time.sleep(2**attempt)
+                    continue
+                raise
 
         # Users who log on across a network. "S-1-5-2" is a group identifier added to the token of a process
         # when it was logged on across a network.

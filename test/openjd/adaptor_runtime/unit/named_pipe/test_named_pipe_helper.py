@@ -100,3 +100,35 @@ class TestNamedPipeHelper:
             match="Cannot find an available pipe name.",
         ):
             named_pipe_helper.NamedPipeHelper.generate_pipe_name("AdaptorTest")
+
+    @patch("getpass.getuser", return_value="regularuser")
+    def test_create_security_attributes_uses_lookup(self, mock_getuser):
+        win32security = pytest.importorskip("win32security")
+        with patch.object(win32security, "LookupAccountName", return_value=("fake_sid", None, None)) as mock_lookup:
+            named_pipe_helper.NamedPipeHelper.create_security_attributes()
+            mock_lookup.assert_called_once_with("", "regularuser")
+
+    @patch("time.sleep")
+    @patch("getpass.getuser", return_value="regularuser")
+    def test_create_security_attributes_retries_on_lsa_not_ready(self, mock_getuser, mock_sleep):
+        # ERROR_NONE_MAPPED (1332) is raised when LSA hasn't finished initializing on a
+        # fresh EC2 instance. The lookup should retry with exponential backoff and succeed.
+        win32security = pytest.importorskip("win32security")
+        lsa_error = pywintypes.error(1332, "LookupAccountName", "No mapping between account names and security IDs was done.")
+        with patch.object(
+            win32security, "LookupAccountName", side_effect=[lsa_error, ("fake_sid", None, None)]
+        ) as mock_lookup:
+            named_pipe_helper.NamedPipeHelper.create_security_attributes()
+            assert mock_lookup.call_count == 2
+            mock_sleep.assert_called_once_with(1)  # 2**0 = 1s after first failure
+
+    @patch("time.sleep")
+    @patch("getpass.getuser", return_value="regularuser")
+    def test_create_security_attributes_raises_after_max_retries(self, mock_getuser, mock_sleep):
+        # After exhausting all retries, the original error should be re-raised.
+        win32security = pytest.importorskip("win32security")
+        lsa_error = pywintypes.error(1332, "LookupAccountName", "No mapping between account names and security IDs was done.")
+        with patch.object(win32security, "LookupAccountName", side_effect=lsa_error):
+            with pytest.raises(pywintypes.error) as exc_info:
+                named_pipe_helper.NamedPipeHelper.create_security_attributes()
+            assert exc_info.value.winerror == 1332
