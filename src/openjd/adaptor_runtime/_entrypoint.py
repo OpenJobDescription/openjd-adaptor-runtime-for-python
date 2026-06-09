@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib.metadata
 import logging
 import os
 import signal
@@ -46,6 +47,7 @@ from ._utils._logging import (
     ConditionalFormatter,
 )
 from .adaptors import SemanticVersion
+from ._version import version as _RUNTIME_VERSION
 
 if TYPE_CHECKING:  # pragma: no cover
     from .adaptors.configuration import AdaptorConfiguration
@@ -242,6 +244,53 @@ class EntryPoint:
             ).integration_data_interface_version,
         )
 
+    def _get_adaptor_package_version(self) -> str:
+        """
+        Attempts to determine the package version of the adaptor using the runtime.
+
+        Uses importlib.metadata to find the distribution that owns the adaptor's module
+        file. Returns "UNKNOWN" if the version cannot be determined.
+        """
+        adaptor_module_name = self.adaptor_class.__module__
+
+        # Convert module path to a file path to match against distribution records.
+        # e.g. "deadline.max_adaptor.MaxAdaptor.adaptor" -> "deadline/max_adaptor/MaxAdaptor/adaptor.py"
+        module_file_path = adaptor_module_name.replace(".", "/") + ".py"
+
+        # Find distributions that provide the top-level package, then check which one
+        # owns the adaptor's module file. packages_distributions() requires Python 3.11+.
+        _packages_distributions = getattr(importlib.metadata, "packages_distributions", None)
+        if _packages_distributions is not None:
+            top_level_package = adaptor_module_name.split(".")[0]
+            pkg_to_dists = _packages_distributions()
+            candidate_dists = []
+            for name in pkg_to_dists.get(top_level_package, []):
+                try:
+                    candidate_dists.append(importlib.metadata.distribution(name))
+                except importlib.metadata.PackageNotFoundError:
+                    continue
+
+            for dist in candidate_dists:
+                if dist.files:
+                    for f in dist.files:
+                        if str(f) == module_file_path or str(f).endswith("/" + module_file_path):
+                            return dist.version
+
+        # Fallback: walk up module path looking for a _version module in sys.modules
+        parts = adaptor_module_name.split(".")
+        for i in range(len(parts) - 1, 0, -1):
+            candidate_package = ".".join(parts[:i])
+            version_module_name = f"{candidate_package}._version"
+            version_module = sys.modules.get(version_module_name)
+            if version_module and hasattr(version_module, "version"):
+                return version_module.version
+
+        _logger.warning(
+            f"Could not determine package version for adaptor '{self.adaptor_class.__name__}'. "
+            f"Looked up module: '{adaptor_module_name}'"
+        )
+        return "UNKNOWN"
+
     def _get_integration_data(self, parsed_args: Namespace) -> _IntegrationData:
         return _IntegrationData(
             init_data=parsed_args.init_data if hasattr(parsed_args, "init_data") else {},
@@ -272,6 +321,11 @@ class EntryPoint:
                 else None
             )
         )
+
+        # Log package versions at startup
+        _logger.info(f"openjd-adaptor-runtime version: {_RUNTIME_VERSION}")
+        adaptor_version = self._get_adaptor_package_version()
+        _logger.info(f"{self.adaptor_class.__name__} version: {adaptor_version}")
 
         interface_version_info = self._get_version_info()
 
