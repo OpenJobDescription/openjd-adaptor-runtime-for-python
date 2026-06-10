@@ -104,8 +104,9 @@ class TestNamedPipeHelper:
     @patch("getpass.getuser", return_value="regularuser")
     def test_create_security_attributes_uses_lookup(self, mock_getuser):
         win32security = pytest.importorskip("win32security")
+        fake_sid = win32security.ConvertStringSidToSid("S-1-1-0")
         with patch.object(
-            win32security, "LookupAccountName", return_value=("fake_sid", None, None)
+            win32security, "LookupAccountName", return_value=(fake_sid, None, None)
         ) as mock_lookup:
             named_pipe_helper.NamedPipeHelper.create_security_attributes()
             mock_lookup.assert_called_once_with("", "regularuser")
@@ -116,11 +117,12 @@ class TestNamedPipeHelper:
         # ERROR_NONE_MAPPED (1332) is raised when LSA hasn't finished initializing on a
         # fresh EC2 instance. The lookup should retry with exponential backoff and succeed.
         win32security = pytest.importorskip("win32security")
+        fake_sid = win32security.ConvertStringSidToSid("S-1-1-0")
         lsa_error = pywintypes.error(
             1332, "LookupAccountName", "No mapping between account names and security IDs was done."
         )
         with patch.object(
-            win32security, "LookupAccountName", side_effect=[lsa_error, ("fake_sid", None, None)]
+            win32security, "LookupAccountName", side_effect=[lsa_error, (fake_sid, None, None)]
         ) as mock_lookup:
             named_pipe_helper.NamedPipeHelper.create_security_attributes()
             assert mock_lookup.call_count == 2
