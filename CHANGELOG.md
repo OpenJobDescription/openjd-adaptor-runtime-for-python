@@ -1,8 +1,3 @@
-## Unreleased
-
-### Bug Fixes
-* fix: retry LookupAccountName with exponential backoff to prevent ERROR_NONE_MAPPED (1332) on freshly started EC2 instances
-
 ## 0.9.4 (2026-05-26)
 
 
