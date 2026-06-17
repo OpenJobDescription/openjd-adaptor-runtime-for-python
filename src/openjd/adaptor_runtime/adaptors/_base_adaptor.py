@@ -13,6 +13,7 @@ from typing import Generic
 from typing import Type
 from typing import TypeVar
 
+from ..process._logging import _ADAPTOR_OUTPUT_LEVEL
 from .._utils._constants import _OPENJD_PROGRESS_STDOUT_PREFIX, _OPENJD_STATUS_STDOUT_PREFIX
 from .configuration import AdaptorConfiguration, ConfigurationManager
 from .configuration._configuration_manager import (
@@ -194,16 +195,20 @@ class BaseAdaptor(AdaptorStates, Generic[_T]):
 
         if progress is not None:
             if math.isfinite(progress):
-                sys.stdout.write(f"{cls._OPENJD_PROGRESS_STDOUT_PREFIX}{progress}{os.linesep}")
-                sys.stdout.flush()
+                _logger.log(
+                    _ADAPTOR_OUTPUT_LEVEL,
+                    f"{cls._OPENJD_PROGRESS_STDOUT_PREFIX}{progress}",
+                )
             else:
                 _logger.warning(
                     f"Attempted to set progress to something non-finite: {progress}. "
                     "Ignoring progress update."
                 )
         if status_message is not None:
-            sys.stdout.write(f"{cls._OPENJD_STATUS_STDOUT_PREFIX}{status_message}{os.linesep}")
-            sys.stdout.flush()
+            _logger.log(
+                _ADAPTOR_OUTPUT_LEVEL,
+                f"{cls._OPENJD_STATUS_STDOUT_PREFIX}{status_message}",
+            )
 
     @property
     def path_mapping_rules(self) -> list[PathMappingRule]:

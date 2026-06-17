@@ -316,16 +316,17 @@ class TestStatusUpdate:
             param(1e-5),
         ],
     )
-    def test_progress_update(self, capsys, progress: float):
+    def test_progress_update(self, caplog, progress: float):
         """Tests just updating the progress"""
         # GIVEN
         expected = f"{self._OPENJD_PROGRESS_STDOUT_PREFIX}{progress}"
 
         # WHEN
-        BaseAdaptor.update_status(progress=progress)
+        with caplog.at_level(0):
+            BaseAdaptor.update_status(progress=progress)
 
         # THEN
-        assert expected in capsys.readouterr().out
+        assert expected in caplog.text
 
     @pytest.mark.parametrize(
         "status_message",
@@ -335,16 +336,17 @@ class TestStatusUpdate:
             param(""),
         ],
     )
-    def test_status_message_update(self, capsys, status_message: str):
+    def test_status_message_update(self, caplog, status_message: str):
         """Tests just updating the status message"""
         # GIVEN
         expected = f"{self._OPENJD_STATUS_STDOUT_PREFIX}{status_message}"
 
         # WHEN
-        BaseAdaptor.update_status(status_message=status_message)
+        with caplog.at_level(0):
+            BaseAdaptor.update_status(status_message=status_message)
 
         # THEN
-        assert expected in capsys.readouterr().out
+        assert expected in caplog.text
 
     @pytest.mark.parametrize(
         "progress,status_message",
@@ -360,30 +362,29 @@ class TestStatusUpdate:
             ),
         ],
     )
-    def test_status_update(self, capsys, progress: float, status_message: str):
+    def test_status_update(self, caplog, progress: float, status_message: str):
         """Tests updating both progress and status messages"""
         # GIVEN
         expected_progress = f"{self._OPENJD_PROGRESS_STDOUT_PREFIX}{progress}"
         expected_status_message = f"{self._OPENJD_STATUS_STDOUT_PREFIX}{status_message}"
 
         # WHEN
-        BaseAdaptor.update_status(progress=progress, status_message=status_message)
+        with caplog.at_level(0):
+            BaseAdaptor.update_status(progress=progress, status_message=status_message)
 
         # THEN
-        result = capsys.readouterr().out
-        assert expected_progress in result
-        assert expected_status_message in result
+        assert expected_progress in caplog.text
+        assert expected_status_message in caplog.text
 
-    def test_ignore_status_update(self, capsys):
+    def test_ignore_status_update(self, caplog):
         """Tests we don't send any message if there's nothing to report"""
-        # GIVEN
-        expected = ""  # nothing was captured in stdout
-
         # WHEN
-        BaseAdaptor.update_status(progress=None, status_message=None)
-        BaseAdaptor.update_status(progress=float("NaN"))
-        BaseAdaptor.update_status(progress=float("inf"))
+        with caplog.at_level(0):
+            BaseAdaptor.update_status(progress=None, status_message=None)
+            BaseAdaptor.update_status(progress=float("NaN"))
+            BaseAdaptor.update_status(progress=float("inf"))
 
         # THEN
-        result = capsys.readouterr().out
-        assert expected == result
+        # Only warning messages should be logged, no progress/status messages
+        assert self._OPENJD_PROGRESS_STDOUT_PREFIX not in caplog.text
+        assert self._OPENJD_STATUS_STDOUT_PREFIX not in caplog.text

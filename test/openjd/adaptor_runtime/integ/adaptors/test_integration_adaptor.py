@@ -17,7 +17,7 @@ class TestRun:
     _OPENJD_PROGRESS_STDOUT_PREFIX: str = "openjd_progress: "
     _OPENJD_STATUS_STDOUT_PREFIX: str = "openjd_status: "
 
-    def test_run(self, capsys) -> None:
+    def test_run(self, capsys, caplog) -> None:
         first_progress = 0.0
         first_status_message = "Starting the printing of run_data"
         second_progress = 100.0
@@ -46,14 +46,15 @@ class TestRun:
         adaptor = PrintAdaptor(init_data)
 
         # WHEN
-        adaptor._run(run_data)
+        with caplog.at_level(0):
+            adaptor._run(run_data)
         result = capsys.readouterr().out.strip()
 
         # THEN
-        assert f"{self._OPENJD_PROGRESS_STDOUT_PREFIX}{first_progress}" in result
-        assert f"{self._OPENJD_STATUS_STDOUT_PREFIX}{first_status_message}" in result
-        assert f"{self._OPENJD_PROGRESS_STDOUT_PREFIX}{second_progress}" in result
-        assert f"{self._OPENJD_STATUS_STDOUT_PREFIX}{second_status_message}" in result
+        assert f"{self._OPENJD_PROGRESS_STDOUT_PREFIX}{first_progress}" in caplog.text
+        assert f"{self._OPENJD_STATUS_STDOUT_PREFIX}{first_status_message}" in caplog.text
+        assert f"{self._OPENJD_PROGRESS_STDOUT_PREFIX}{second_progress}" in caplog.text
+        assert f"{self._OPENJD_STATUS_STDOUT_PREFIX}{second_status_message}" in caplog.text
         assert "run_data:\n\tkey1 = value1\n\tkey2 = value2\n\tkey3 = value3" in result
 
     def test_start_end_cleanup(self, tmpdir, capsys) -> None:
