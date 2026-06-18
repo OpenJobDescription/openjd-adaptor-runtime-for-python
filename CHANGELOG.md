@@ -1,3 +1,16 @@
+## 0.9.5 (2026-06-18)
+
+
+### Features
+* print adaptor and runtime version on start (#259) ([`cd2178c`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/cd2178ca5a88320cf0245d2dce018e39e42db59a))
+
+### Bug Fixes
+* daemon mode wasn't reporting progress (#264) ([`ceff17f`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/ceff17f82fcfc19768c7ec13e7ab8d482094c653))
+* retry LookupAccountName with exponential backoff to prevent ERROR_NONE_MAPPED on fresh EC2 instances (#262) ([`0c85c36`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/0c85c3685fa1e52450cc8a8b9b1c107bad403794))
+* avoid LookupAccountName for SYSTEM user in named pipe security attributes ([`0c85c36`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/0c85c3685fa1e52450cc8a8b9b1c107bad403794))
+* use real PySID in tests to prevent TypeError on Windows ([`0c85c36`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/0c85c3685fa1e52450cc8a8b9b1c107bad403794))
+
+
 ## 0.9.4 (2026-05-26)
 
 
