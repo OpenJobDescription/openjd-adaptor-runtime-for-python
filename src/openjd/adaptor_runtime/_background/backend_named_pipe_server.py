@@ -17,7 +17,6 @@ from .._named_pipe import NamedPipeServer
 from ..adaptors import AdaptorRunner
 from .log_buffers import LogBuffer
 
-
 _logger = logging.getLogger(__name__)
 
 

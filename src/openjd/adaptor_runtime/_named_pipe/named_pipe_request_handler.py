@@ -20,7 +20,6 @@ from abc import ABC, abstractmethod
 
 from openjd.adaptor_runtime._osname import OSName
 
-
 _logger = logging.getLogger(__name__)
 
 

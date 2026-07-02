@@ -54,7 +54,11 @@ def mock_logging():
 
 @pytest.fixture(autouse=True)
 def mock_getLogger():
-    with patch.object(runtime_entrypoint.logging, "getLogger"):
+    # Patch EntryPoint._init_loggers (rather than the global logging.getLogger)
+    # so EntryPoint does not attach real handlers during tests. Patching
+    # logging.getLogger globally breaks pytest's caplog fixture on pytest >= 9.1,
+    # which relies on logging.getLogger to install its log-capture handler.
+    with patch.object(runtime_entrypoint.EntryPoint, "_init_loggers"):
         yield
 
 

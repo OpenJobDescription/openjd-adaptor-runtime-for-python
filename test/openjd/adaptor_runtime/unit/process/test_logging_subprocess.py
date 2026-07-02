@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 """Tests for StreamLogger"""
+
 from __future__ import annotations
 
 import signal

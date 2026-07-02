@@ -13,7 +13,6 @@ from .base_client_interface import BaseClientInterface
 from .connection import UnixHTTPConnection as _UnixHTTPConnection
 from urllib.parse import urlencode as _urlencode
 
-
 # Set timeout to None so our requests are blocking calls with no timeout.
 # See socket.settimeout
 _REQUEST_TIMEOUT = None
