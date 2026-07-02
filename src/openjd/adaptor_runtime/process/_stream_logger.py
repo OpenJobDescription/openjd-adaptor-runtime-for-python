@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 """Module for the StreamLogger class"""
+
 from __future__ import annotations
 
 import logging

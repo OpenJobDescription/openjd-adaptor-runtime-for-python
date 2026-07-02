@@ -32,7 +32,6 @@ from pywintypes import HANDLE
 
 from abc import ABC, abstractmethod
 
-
 _logger = logging.getLogger(__name__)
 
 

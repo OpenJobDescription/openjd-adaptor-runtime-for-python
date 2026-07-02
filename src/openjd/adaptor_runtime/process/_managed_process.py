@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 """Module for the ManagedProcess class"""
+
 from __future__ import annotations
 
 from abc import ABC as ABC, abstractmethod
