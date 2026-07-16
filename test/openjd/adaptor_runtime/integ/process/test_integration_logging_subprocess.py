@@ -151,6 +151,37 @@ class TestIntegrationLoggingSubprocess(object):
 
         assert any(r.message == message and r.levelno == _STDERR_LEVEL for r in records)
 
+    @pytest.mark.timeout(10)
+    def test_non_utf8_output_does_not_kill_reader(self, caplog):
+        """
+        A subprocess that writes a non-UTF-8 (locale-encoded) byte to stdout must not kill the
+        stream-reader thread. If the reader thread dies, lines emitted after the undecodable byte
+        are never logged and the stdout pipe stops being drained, which can deadlock the subprocess.
+        This is a regression test for that failure mode; the undecodable byte must be tolerated and
+        subsequent output must still be logged.
+        """
+        # GIVEN
+        caplog.set_level(_STDOUT_LEVEL)
+        # 0xc7 is "Ç" in cp1252 and is not a valid standalone UTF-8 byte.
+        script = (
+            "import sys; "
+            "sys.stdout.buffer.write(b'before\\n'); "
+            "sys.stdout.buffer.write(b'bad \\xc7 byte\\n'); "
+            "sys.stdout.buffer.write(b'after\\n'); "
+            "sys.stdout.buffer.flush()"
+        )
+
+        # WHEN
+        p = LoggingSubprocess(args=[sys.executable, "-c", script])
+        p.wait()
+        p._cleanup_io_threads()
+
+        # THEN
+        # "after" is only logged if the reader thread survived the undecodable byte.
+        assert "after" in caplog.text
+        # The undecodable byte is replaced rather than raising.
+        assert "�" in caplog.text
+
     def test_executable_not_found(self):
         """When calling LoggingSubprocess with a missing executable, FileNotFoundError will be raised"""
         args = ["missing_executable"]
