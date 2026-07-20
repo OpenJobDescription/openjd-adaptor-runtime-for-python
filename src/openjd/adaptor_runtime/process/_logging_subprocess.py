@@ -64,6 +64,13 @@ class LoggingSubprocess(object):
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
             encoding=encoding,
+            # Decode the subprocess output leniently. DCC batch processes may emit
+            # locale-encoded (non-UTF-8) bytes on stdout/stderr; with the default strict
+            # error handling a single undecodable byte raises UnicodeDecodeError in the
+            # stream-reader thread, killing it. Once the reader thread is gone the pipe is
+            # no longer drained, the subprocess blocks on a full stdout pipe, and the job
+            # deadlocks. Replacing undecodable bytes keeps the reader alive.
+            errors="replace",
             cwd=startup_directory,
         )
         if OSName.is_windows():  # pragma: is-posix

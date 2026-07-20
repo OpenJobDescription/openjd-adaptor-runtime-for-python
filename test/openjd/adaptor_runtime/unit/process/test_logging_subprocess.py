@@ -69,6 +69,7 @@ class TestLoggingSubprocess(object):
         popen_params = dict(
             args=args,
             encoding="utf-8",
+            errors="replace",
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -482,6 +483,7 @@ class TestLoggingSubprocess(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
+            errors="replace",
             cwd=None,
         )
         if OSName.is_windows():
@@ -504,6 +506,7 @@ class TestLoggingSubprocess(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
+            errors="replace",
             cwd="startup_dir",
         )
         if OSName.is_windows():
