@@ -37,6 +37,9 @@ class FakeClient(_ClientInterface):
 
 def run_client():
     test_client = FakeClient("1234")
+    # Signal handler registration (in the main thread) happens in the constructor above.
+    # Tests wait for this line before sending signals to avoid a startup race.
+    print("client ready", flush=True)
     test_client.run()
 
 

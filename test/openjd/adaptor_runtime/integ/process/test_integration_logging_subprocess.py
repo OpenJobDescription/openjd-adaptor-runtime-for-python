@@ -174,13 +174,77 @@ class TestIntegrationLoggingSubprocess(object):
         # WHEN
         p = LoggingSubprocess(args=[sys.executable, "-c", script])
         p.wait()
-        p._cleanup_io_threads()
 
         # THEN
         # "after" is only logged if the reader thread survived the undecodable byte.
         assert "after" in caplog.text
-        # The undecodable byte is replaced rather than raising.
-        assert "�" in caplog.text
+        # The undecodable byte is escaped rather than raising.
+        assert "bad \\xc7 byte" in caplog.text
+
+    @pytest.mark.timeout(10)
+    @pytest.mark.parametrize(
+        argnames=("raw_bytes", "expected_escaped"),
+        argvalues=[
+            # 0xc7 is "Ç" in cp1252 (observed from 3dsmaxbatch.exe on stdout).
+            (b"bad \xc7 byte", "bad \\xc7 byte"),
+            # 0xff is never valid anywhere in UTF-8.
+            (b"bad \xff byte", "bad \\xff byte"),
+            # Consecutive invalid bytes must each be escaped separately.
+            (b"bad \xc7\xff bytes", "bad \\xc7\\xff bytes"),
+            # cp1252-encoded "Çé" — an invalid two-byte run in UTF-8.
+            (b"bad \xc7\xe9 text", "bad \\xc7\\xe9 text"),
+            # A truncated UTF-8 multi-byte sequence (0xe4 0xbd is an incomplete
+            # 3-byte sequence) followed by valid ASCII.
+            (b"truncated \xe4\xbd then ok", "truncated \\xe4\\xbd then ok"),
+        ],
+        ids=["cp1252-byte", "invalid-byte", "consecutive-invalid", "cp1252-text", "truncated-utf8"],
+    )
+    def test_non_utf8_output_is_escaped(self, caplog, raw_bytes: bytes, expected_escaped: str):
+        """
+        Undecodable bytes in subprocess output must be escaped with backslashreplace
+        (e.g. b"\xc7" -> "\\xc7") so the original byte values are preserved in the logs.
+        """
+        # GIVEN
+        caplog.set_level(_STDOUT_LEVEL)
+        script = (
+            "import sys; "
+            f"sys.stdout.buffer.write({raw_bytes + b'!'!r}); "
+            "sys.stdout.buffer.flush()"
+        )
+
+        # WHEN
+        p = LoggingSubprocess(args=[sys.executable, "-c", script])
+        p.wait()
+
+        # THEN
+        # The trailing "!" proves the full line was logged, not truncated at the bad byte.
+        assert expected_escaped + "!" in caplog.text
+        # The replacement character must not appear; the byte value must be preserved.
+        assert "�" not in caplog.text
+
+    @pytest.mark.timeout(10)
+    def test_valid_utf8_is_not_escaped(self, caplog):
+        """
+        Valid multi-byte UTF-8 sequences must pass through unmodified — escaping applies
+        only to genuinely invalid sequences, even when a multi-byte character could be
+        split across internal read chunk boundaries.
+        """
+        # GIVEN
+        caplog.set_level(_STDOUT_LEVEL)
+        message = "héllo wörld Ç 星期五"
+        script = (
+            "import sys; "
+            f"sys.stdout.buffer.write({message.encode('utf-8')!r} + b'\\n'); "
+            "sys.stdout.buffer.flush()"
+        )
+
+        # WHEN
+        p = LoggingSubprocess(args=[sys.executable, "-c", script])
+        p.wait()
+
+        # THEN
+        assert message in caplog.text
+        assert "\\x" not in caplog.text
 
     def test_executable_not_found(self):
         """When calling LoggingSubprocess with a missing executable, FileNotFoundError will be raised"""
