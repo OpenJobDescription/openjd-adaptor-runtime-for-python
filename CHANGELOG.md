@@ -1,3 +1,10 @@
+## 0.9.6 (2026-07-21)
+
+
+### Bug Fixes
+* decode subprocess output with errors="backslashreplace" to keep the reader thread alive (#275, #277) ([`8ffb2ed`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/8ffb2ed8929fdfe44058a0b7acea628cdb9bd422), [`67efbac`](https://github.com/OpenJobDescription/openjd-adaptor-runtime-for-python/commit/67efbaca674df3ff616ce3fb601a1ec39fa41ebf))
+
+
 ## 0.9.5 (2026-06-18)
 
 
