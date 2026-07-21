@@ -33,8 +33,13 @@ class TestIntegrationClientInterface:
             popen_params.update(creationflags=_subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
         client_subprocess = _subprocess.Popen(**popen_params)
 
-        # To avoid a race condition, giving some extra time for the logging subprocess to start.
-        _sleep(0.5 if OSName.is_posix() else 4)
+        # Wait for the client to report that it has started (and registered its signal
+        # handler) before sending the signal. A fixed sleep is racy on slow CI hosts: if the
+        # signal arrives before the handler is registered, the default handler kills the
+        # process and the test fails with empty output.
+        assert client_subprocess.stdout is not None
+        ready_line = client_subprocess.stdout.readline()
+        assert "client ready" in ready_line
         signal_type: signal.Signals
         if OSName.is_windows():
             signal_type = signal.CTRL_BREAK_EVENT  # type: ignore[attr-defined]

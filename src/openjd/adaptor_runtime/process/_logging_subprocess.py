@@ -69,8 +69,12 @@ class LoggingSubprocess(object):
             # error handling a single undecodable byte raises UnicodeDecodeError in the
             # stream-reader thread, killing it. Once the reader thread is gone the pipe is
             # no longer drained, the subprocess blocks on a full stdout pipe, and the job
-            # deadlocks. Replacing undecodable bytes keeps the reader alive.
-            errors="replace",
+            # deadlocks. Escaping undecodable bytes (e.g. b"\xc7" -> "\\xc7") keeps the
+            # reader alive while preserving the original byte values in the logs, which
+            # helps identify the codepage the subprocess is emitting.
+            # Note: encoding/errors also apply to stdin, so text written to the child's
+            # stdin would have unencodable characters escaped silently rather than raising.
+            errors="backslashreplace",
             cwd=startup_directory,
         )
         if OSName.is_windows():  # pragma: is-posix
