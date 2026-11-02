@@ -812,8 +812,12 @@ class TestFrontendRunner:
             mock_read_from_pipe.assert_called_once()
             assert response == json.loads(mock_response)
 
+        @pytest.mark.parametrize(
+            "error_kind", ["pywintypes-error", "pipe-disconnected", "read-timeout"]
+        )
         def test_raises_when_request_fails(
             self,
+            error_kind: str,
             mock_read_from_pipe: MagicMock,
             mock_response: str,
             runner: FrontendRunner,
@@ -821,8 +825,18 @@ class TestFrontendRunner:
         ):
             # GIVEN
             import pywintypes
+            from openjd.adaptor_runtime_client.named_pipe.named_pipe_helper import (
+                NamedPipeReadTimeoutError,
+                PipeDisconnectedException,
+            )
 
-            error_instance = pywintypes.error(1, "FunctionName", "An error message")
+            error_instance = {
+                "pywintypes-error": pywintypes.error(1, "FunctionName", "An error message"),
+                "pipe-disconnected": PipeDisconnectedException(
+                    pywintypes.error(109, "ReadFile", "The pipe has been ended.")
+                ),
+                "read-timeout": NamedPipeReadTimeoutError(5.0),
+            }[error_kind]
             mock_read_from_pipe.side_effect = error_instance
             method = "GET"
             path = "/path"
@@ -834,12 +848,15 @@ class TestFrontendRunner:
                 with patch.object(
                     frontend_runner.NamedPipeHelper, "establish_named_pipe_connection"
                 ) as mock_establish_named_pipe_connection:
-                    with pytest.raises(pywintypes.error) as raised_exc:
+                    with pytest.raises(type(error_instance)) as raised_exc:
                         runner._send_request(method, path)
 
             # THEN
             assert raised_exc.value is error_instance
-            assert f"Failed to send {path} request: " in caplog.text
+            assert re.search(
+                rf"Failed to send {path} request after \d+\.\d\ds: {re.escape(str(error_instance))}",
+                caplog.text,
+            )
             mock_write_to_pipe.assert_called_once_with(
                 mock_establish_named_pipe_connection(), '{"method": "GET", "path": "/path"}'
             )
