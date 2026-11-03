@@ -37,7 +37,11 @@ from .model import (
 _FRONTEND_RUNNER_REQUEST_TIMEOUT: float = 5.0
 
 if OSName.is_windows():
-    from ...adaptor_runtime_client.named_pipe.named_pipe_helper import NamedPipeHelper
+    from ...adaptor_runtime_client.named_pipe.named_pipe_helper import (
+        NamedPipeHelper,
+        NamedPipeTimeoutError,
+        PipeDisconnectedException,
+    )
     import pywintypes
 
 _logger = logging.getLogger(__name__)
@@ -335,6 +339,7 @@ class FrontendRunner:
                 # This is used for aligning to the Linux's behavior in order to reuse the code in handler.
                 # In linux, query string params will always be put in a list.
                 params = {key: [value] for key, value in params.items()}
+            start = time.monotonic()
             try:
                 response = NamedPipeHelper.send_named_pipe_request(
                     self.connection_settings.socket,
@@ -349,8 +354,11 @@ class FrontendRunner:
                     errmsg = f"Received unexpected HTTP status code {status}: {response['body']}"
                     _logger.error(errmsg)
                     raise HTTPError(response, errmsg)
-            except pywintypes.error as e:
-                _logger.error(f"Failed to send {path} request: {e}")
+            # send_named_pipe_request raises its own types for disconnects and timeouts. The elapsed
+            # time shows whether the backend closed the pipe at once or after its read timeout.
+            except (pywintypes.error, PipeDisconnectedException, NamedPipeTimeoutError) as e:
+                elapsed = time.monotonic() - start
+                _logger.error(f"Failed to send {path} request after {elapsed:.2f}s: {e}")
                 raise
             return response
         else:  # pragma: is-windows
