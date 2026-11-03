@@ -254,15 +254,16 @@ class TestNamedPipeHelper:
             {"method": "POST", "path": "/token-sid", "body": json.dumps(request_body)}
         ]
         assert response == json.loads(server_response)
+        # Canonical order: the NETWORK deny comes first, so it applies to the user's own network logons.
         assert dacl == [
-            (
-                win32security.ACCESS_ALLOWED_ACE_TYPE,
-                as_file_rights(win32con.GENERIC_READ | win32con.GENERIC_WRITE),
-                process_token_user_sid(),
-            ),
             (
                 win32security.ACCESS_DENIED_ACE_TYPE,
                 as_file_rights(win32con.GENERIC_ALL),
                 NETWORK_SID,
+            ),
+            (
+                win32security.ACCESS_ALLOWED_ACE_TYPE,
+                as_file_rights(win32con.GENERIC_READ | win32con.GENERIC_WRITE),
+                process_token_user_sid(),
             ),
         ]

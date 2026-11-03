@@ -135,13 +135,14 @@ class TestNamedPipeHelper:
         mock_open_token.assert_called_once_with(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
         mock_get_token_information.assert_called_once_with(token, win32security.TokenUser)
         mock_close_handle.assert_called_once_with(token)
+        # Canonical order: the NETWORK deny comes first, so it applies to the user's own network logons.
         assert dacl_entries(security_attributes) == [
+            (win32security.ACCESS_DENIED_ACE_TYPE, win32con.GENERIC_ALL, "S-1-5-2"),
             (
                 win32security.ACCESS_ALLOWED_ACE_TYPE,
                 (win32con.GENERIC_READ | win32con.GENERIC_WRITE) & 0xFFFFFFFF,
                 FAKE_USER_SID,
             ),
-            (win32security.ACCESS_DENIED_ACE_TYPE, win32con.GENERIC_ALL, "S-1-5-2"),
         ]
 
     def test_create_security_attributes_does_not_look_up_user_name(
@@ -169,8 +170,12 @@ class TestNamedPipeHelper:
 
         # THEN
         mock_lookup_account_name.assert_not_called()
-        allowed_sid = dacl_entries(security_attributes)[0][2]
-        assert allowed_sid == win32security.ConvertSidToStringSid(expected_sid)
+        allowed_sids = [
+            sid
+            for ace_type, _mask, sid in dacl_entries(security_attributes)
+            if ace_type == win32security.ACCESS_ALLOWED_ACE_TYPE
+        ]
+        assert allowed_sids == [win32security.ConvertSidToStringSid(expected_sid)]
 
     def test_create_security_attributes_closes_token_when_query_fails(self) -> None:
         # GIVEN
