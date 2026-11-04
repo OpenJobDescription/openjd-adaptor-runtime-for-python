@@ -4,11 +4,11 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from random import randint
 
+import win32api
 import win32file
 import pywintypes
 import win32security
 import win32con
-import getpass
 import winerror
 import time
 import win32pipe
@@ -116,7 +116,7 @@ class NamedPipeHelper:
     """
 
     @staticmethod
-    def create_security_attributes():
+    def create_security_attributes() -> win32security.SECURITY_ATTRIBUTES:
         """
         Creates and returns security attributes for a named pipe,
         allowing access only to the current user and denying network access.
@@ -125,26 +125,14 @@ class NamedPipeHelper:
             win32security.SECURITY_ATTRIBUTES: A SECURITY_ATTRIBUTES object configured with the custom security descriptor.
         """
 
-        # Get the username of the current user
-        username = getpass.getuser()
-
-        # Retry with exponential backoff to handle ERROR_NONE_MAPPED (1332) which occurs
-        # when the LSA service hasn't finished initializing on freshly started EC2 instances.
-        _LOOKUP_MAX_RETRIES = 3
-        for attempt in range(_LOOKUP_MAX_RETRIES):
-            try:
-                user_sid, _, _ = win32security.LookupAccountName(
-                    "",  # systemName: The name of the system or server where the account resides.
-                    # Search for the account on the local computer.
-                    # If Domain/User Format is used here, it will fetch the Name from the AD.
-                    username,
-                )
-                break
-            except pywintypes.error as e:
-                if e.winerror == 1332 and attempt < _LOOKUP_MAX_RETRIES - 1:
-                    time.sleep(2**attempt)
-                    continue
-                raise
+        # Take the SID from the process token, not from a user name. A name lookup goes through
+        # LSA and can fail with ERROR_NONE_MAPPED (1332), and getpass.getuser() only reads
+        # environment variables, which need not name the process's account.
+        token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+        try:
+            user_sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+        finally:
+            win32api.CloseHandle(token)
 
         # Users who log on across a network. "S-1-5-2" is a group identifier added to the token of a process
         # when it was logged on across a network.
@@ -320,6 +308,13 @@ class NamedPipeHelper:
                 or due to other errors.
 
         """
+        # CreateFile ignores the security descriptor when opening an existing pipe and reads only
+        # bInheritHandle, so build no DACL here. Inheritable matches pywin32's SECURITY_ATTRIBUTES
+        # default, which the server pipe handle also uses.
+        security_attributes = win32security.SECURITY_ATTRIBUTES()
+        security_attributes.SECURITY_DESCRIPTOR = None
+        security_attributes.bInheritHandle = True
+
         start_time = time.time()
         # Wait for the server pipe to become available.
         handle = None
@@ -330,7 +325,7 @@ class NamedPipeHelper:
                     # Give the read / write permission
                     win32file.GENERIC_READ | win32file.GENERIC_WRITE,
                     0,  # Disable the sharing Mode
-                    NamedPipeHelper.create_security_attributes(),
+                    security_attributes,
                     win32file.OPEN_EXISTING,  # Open existing pipe
                     0,  # No Additional flags
                     None,  # A valid handle to a template file, This parameter is ignored when opening an existing pipe.
